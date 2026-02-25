@@ -6,7 +6,6 @@
   <title>Hälsodagbok</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/recharts@2.8.0/umd/Recharts.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100">
@@ -28,10 +27,80 @@ window.storage = {
 
 const h = React.createElement;
 const { useState, useEffect } = React;
-const {
-  LineChart, BarChart, Line, Bar,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
-} = Recharts;
+
+// ─── SVG Charts (no external library needed) ─────────────────────────────────
+
+function SvgLineChart({ data, lines, height }) {
+  height = height || 260;
+  if (!data || data.length < 2) return h('p', {className:'text-gray-400 text-sm text-center py-8'}, 'Lägg till fler mätningar för att se grafen');
+  var PL=50,PR=20,PT=20,PB=36,W=800,H=height;
+  var chartW=W-PL-PR, chartH=H-PT-PB;
+  var allVals=[];
+  lines.forEach(function(l){ data.forEach(function(d){ if(d[l.key]!=null) allVals.push(d[l.key]); }); });
+  var minV=Math.min.apply(null,allVals)-0.5, maxV=Math.max.apply(null,allVals)+0.5;
+  var rng=maxV-minV||1;
+  var tx=function(i){ return PL+(i/(data.length-1))*chartW; };
+  var ty=function(v){ return PT+chartH-((v-minV)/rng)*chartH; };
+  var gridEls=[];
+  for(var gi=0;gi<=4;gi++){
+    var gv=minV+(rng/4)*gi, gy=ty(gv);
+    gridEls.push(h('line',{key:'g'+gi,x1:PL,y1:gy,x2:PL+chartW,y2:gy,stroke:'#f0f0f0',strokeWidth:1}));
+    gridEls.push(h('text',{key:'gt'+gi,x:PL-4,y:gy+4,textAnchor:'end',fontSize:10,fill:'#9ca3af'},gv.toFixed(1)));
+  }
+  var nth=Math.max(1,Math.ceil(data.length/8));
+  var xLabels=data.map(function(d,i){
+    if(i%nth!==0&&i!==data.length-1) return null;
+    return h('text',{key:'xl'+i,x:tx(i),y:PT+chartH+18,textAnchor:'middle',fontSize:9,fill:'#9ca3af'},d.datum);
+  });
+  var lineEls=lines.map(function(l){
+    var pts=data.filter(function(d){return d[l.key]!=null;}).map(function(d,_,arr){
+      var i=data.indexOf(d); return tx(i)+','+ty(d[l.key]);
+    }).join(' ');
+    return h('polyline',{key:l.key,points:pts,fill:'none',stroke:l.color,strokeWidth:l.width||1.5,strokeDasharray:l.dashed?'5,5':undefined});
+  });
+  var legendEls=lines.map(function(l,i){
+    var lx=PL+i*140;
+    return h('g',{key:'leg'+i},
+      h('line',{x1:lx,y1:H-8,x2:lx+20,y2:H-8,stroke:l.color,strokeWidth:l.width||1.5,strokeDasharray:l.dashed?'5,5':undefined}),
+      h('text',{x:lx+24,y:H-4,fontSize:10,fill:'#6b7280'},l.name)
+    );
+  });
+  return h('svg',{viewBox:'0 0 '+W+' '+H,style:{width:'100%',height:height+'px'},xmlns:'http://www.w3.org/2000/svg'},
+    h('line',{x1:PL,y1:PT,x2:PL,y2:PT+chartH,stroke:'#e5e7eb',strokeWidth:1}),
+    h('line',{x1:PL,y1:PT+chartH,x2:PL+chartW,y2:PT+chartH,stroke:'#e5e7eb',strokeWidth:1}),
+    ...gridEls, ...xLabels, ...lineEls, ...legendEls
+  );
+}
+
+function SvgBarChart({ data, dataKey, color, height }) {
+  height = height || 200;
+  if (!data || data.length === 0) return null;
+  var PL=50,PR=20,PT=20,PB=36,W=800,H=height;
+  var chartW=W-PL-PR, chartH=H-PT-PB;
+  var vals=data.map(function(d){return d[dataKey]||0;}), maxV=Math.max.apply(null,vals)||1;
+  var bW=(chartW/data.length)*0.75;
+  var bars=data.map(function(d,i){
+    var v=d[dataKey]||0, bH=(v/maxV)*chartH;
+    var bx=PL+(i/data.length)*chartW+(chartW/data.length)*0.125;
+    return h('rect',{key:i,x:bx,y:PT+chartH-bH,width:bW,height:bH,fill:color,rx:2});
+  });
+  var nth=Math.max(1,Math.ceil(data.length/8));
+  var xLabels=data.map(function(d,i){
+    if(i%nth!==0&&i!==data.length-1) return null;
+    var bx=PL+(i/data.length)*chartW+(chartW/data.length)*0.125+bW/2;
+    return h('text',{key:'xl'+i,x:bx,y:PT+chartH+18,textAnchor:'middle',fontSize:9,fill:'#9ca3af'},d.datum);
+  });
+  var yLabels=[];
+  for(var yi=0;yi<=4;yi++){
+    var yv=Math.round((maxV/4)*yi), yyy=PT+chartH-(yi/4)*chartH;
+    yLabels.push(h('text',{key:'y'+yi,x:PL-4,y:yyy+4,textAnchor:'end',fontSize:10,fill:'#9ca3af'},yv>=1000?Math.round(yv/1000)+'k':yv));
+  }
+  return h('svg',{viewBox:'0 0 '+W+' '+H,style:{width:'100%',height:height+'px'},xmlns:'http://www.w3.org/2000/svg'},
+    h('line',{x1:PL,y1:PT+chartH,x2:PL+chartW,y2:PT+chartH,stroke:'#e5e7eb',strokeWidth:1}),
+    ...[0,1,2,3,4].map(function(i){var gy=PT+chartH-(i/4)*chartH;return h('line',{key:'g'+i,x1:PL,y1:gy,x2:PL+chartW,y2:gy,stroke:'#f0f0f0',strokeWidth:1});}),
+    ...yLabels, ...xLabels, ...bars
+  );
+}
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
@@ -454,31 +523,16 @@ function WeightStepTracker() {
       h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
         h('h2', { className: 'text-lg font-bold text-gray-800 mb-1' }, 'Viktutveckling'),
         h('p', { className: 'text-xs text-gray-400 mb-4' }, 'Daglig vikt + 7-dagars glidande medelvärde'),
-        h(ResponsiveContainer, { width: '100%', height: 300 },
-          h(LineChart, { data: chartData },
-            h(CartesianGrid, { strokeDasharray: '3 3', stroke: '#f0f0f0' }),
-            h(XAxis, { dataKey: 'datum', tick: { fontSize: 11 } }),
-            h(YAxis, { domain: ['dataMin - 1', 'dataMax + 1'], tick: { fontSize: 11 } }),
-            h(Tooltip, { contentStyle: { borderRadius: '8px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' } }),
-            h(Legend, null),
-            h(Line, { type:'monotone', dataKey:'vikt',    stroke:'#a5b4fc', strokeWidth:1.5, name:'Vikt (kg)',      dot:{ r:2 } }),
-            h(Line, { type:'monotone', dataKey:'snitt7',  stroke:'#4f46e5', strokeWidth:2.5, name:'7-dagars snitt', dot:false }),
-            h(Line, { type:'monotone', dataKey:'målvikt', stroke:'#10b981', strokeWidth:1.5, name:'Målvikt',        dot:false, strokeDasharray:'5 5' })
-          )
-        )
+        h(SvgLineChart, { data: chartData, height: 300, lines: [
+          { key: 'vikt',    color: '#a5b4fc', width: 1.5, name: 'Vikt (kg)' },
+          { key: 'snitt7',  color: '#4f46e5', width: 2.5, name: '7-dagars snitt' },
+          { key: 'målvikt', color: '#10b981', width: 1.5, name: 'Målvikt', dashed: true }
+        ]})
       ),
       // Steps chart
       h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
         h('h2', { className: 'text-lg font-bold text-gray-800 mb-4' }, 'Steg per dag'),
-        h(ResponsiveContainer, { width: '100%', height: 220 },
-          h(BarChart, { data: chartData },
-            h(CartesianGrid, { strokeDasharray: '3 3', stroke: '#f0f0f0' }),
-            h(XAxis, { dataKey: 'datum', tick: { fontSize: 11 } }),
-            h(YAxis, { tick: { fontSize: 11 } }),
-            h(Tooltip, { contentStyle: { borderRadius: '8px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' } }),
-            h(Bar, { dataKey: 'steg', fill: '#fb923c', name: 'Steg', radius: [2,2,0,0] })
-          )
-        )
+        h(SvgBarChart, { data: chartData, dataKey: 'steg', color: '#fb923c', height: 200 })
       )
     );
   }
