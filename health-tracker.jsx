@@ -1,0 +1,1069 @@
+import React, { useState, useEffect } from 'react';
+import {
+  LineChart, BarChart,
+  Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from 'recharts';
+import { Plus, TrendingDown, Target, Activity, Flame, Award, X } from 'lucide-react';
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+const Toast = ({ toast, onClose }) => {
+  if (!toast) return null;
+  return (
+    <div className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-xl shadow-lg text-white flex items-center gap-3 ${
+      toast.type === 'error' ? 'bg-red-500' : 'bg-green-500'
+    }`}>
+      <span className="text-sm font-medium">{toast.msg}</span>
+      <button onClick={onClose} className="hover:opacity-70"><X size={14} /></button>
+    </div>
+  );
+};
+
+const StatCard = ({ icon: Icon, iconColor, label, value, sub, subColor }) => (
+  <div className="bg-white rounded-xl p-4 shadow-md">
+    <Icon className={`${iconColor} mb-2`} size={20} />
+    <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">{label}</p>
+    <p className="text-2xl font-bold text-gray-800 mt-1">{value}</p>
+    {sub && <p className={`text-xs mt-1 ${subColor || 'text-gray-500'}`}>{sub}</p>}
+  </div>
+);
+
+const IntensityDots = ({ level }) => (
+  <span className="inline-flex gap-0.5 items-center">
+    {[1,2,3,4,5].map(i => (
+      <span key={i} className={`w-2 h-2 rounded-full ${i <= level ? 'bg-orange-400' : 'bg-gray-200'}`} />
+    ))}
+  </span>
+);
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export default function WeightStepTracker() {
+  const todayStr = () => new Date().toISOString().split('T')[0];
+
+  const [entries, setEntries]       = useState([]);
+  const [workouts, setWorkouts]     = useState([]);
+  const [goalWeight, setGoalWeight] = useState(85);
+  const [height, setHeight]         = useState(180);
+  const [yearlyGoal, setYearlyGoal] = useState({ sessions: 100, minutes: 5000 });
+  const [newEntry, setNewEntry]     = useState({ date: todayStr(), weight: '', steps: '', comment: '' });
+  const [newWorkout, setNewWorkout] = useState({ date: todayStr(), type: '', duration: '', intensity: '3', comment: '' });
+  const [view, setView]             = useState('overview');
+  const [importText, setImportText] = useState('');
+  const [showImport, setShowImport] = useState(false);
+  const [toast, setToast]           = useState(null);
+  const [loading, setLoading]       = useState(true);
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  // ─── Storage ──────────────────────────────────────────────────────────────
+
+  useEffect(() => { loadData(); }, []);
+  useEffect(() => { if (!loading) saveData(); }, [entries, workouts, goalWeight, yearlyGoal, height, loading]);
+
+  const loadData = async () => {
+    try {
+      const [e, w, g, yg, h] = await Promise.all([
+        window.storage.get('weight-entries'),
+        window.storage.get('workouts'),
+        window.storage.get('goal-weight'),
+        window.storage.get('yearly-goal'),
+        window.storage.get('user-height'),
+      ]);
+      if (e?.value)  setEntries(JSON.parse(e.value));
+      if (w?.value)  setWorkouts(JSON.parse(w.value));
+      if (g?.value)  setGoalWeight(parseFloat(g.value));
+      if (yg?.value) setYearlyGoal(JSON.parse(yg.value));
+      if (h?.value)  setHeight(parseFloat(h.value));
+    } catch (err) {
+      console.log('Ingen sparad data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveData = async () => {
+    try {
+      await Promise.all([
+        window.storage.set('weight-entries', JSON.stringify(entries)),
+        window.storage.set('workouts',        JSON.stringify(workouts)),
+        window.storage.set('goal-weight',     goalWeight.toString()),
+        window.storage.set('yearly-goal',     JSON.stringify(yearlyGoal)),
+        window.storage.set('user-height',     height.toString()),
+      ]);
+    } catch (err) {
+      console.error('Sparfel:', err);
+    }
+  };
+
+  // ─── CRUD ─────────────────────────────────────────────────────────────────
+
+  const addEntry = () => {
+    if (!newEntry.weight) return;
+    const entry = {
+      date: newEntry.date,
+      weight: parseFloat(newEntry.weight),
+      steps: newEntry.steps ? parseInt(newEntry.steps) : null,
+      comment: newEntry.comment,
+      id: Date.now(),
+    };
+    // Replace existing entry with same date
+    setEntries(prev =>
+      [...prev.filter(e => e.date !== entry.date), entry]
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+    );
+    const next = new Date(newEntry.date);
+    next.setDate(next.getDate() + 1);
+    setNewEntry({ date: next.toISOString().split('T')[0], weight: '', steps: '', comment: '' });
+    showToast('✓ Mätning sparad!');
+  };
+
+  const addWorkout = () => {
+    if (!newWorkout.type || !newWorkout.duration) return;
+    const workout = {
+      date: newWorkout.date,
+      type: newWorkout.type,
+      duration: parseInt(newWorkout.duration),
+      intensity: parseInt(newWorkout.intensity || 3),
+      comment: newWorkout.comment,
+      id: Date.now(),
+    };
+    setWorkouts(prev =>
+      [...prev, workout].sort((a, b) => new Date(a.date) - new Date(b.date))
+    );
+    const next = new Date(newWorkout.date);
+    next.setDate(next.getDate() + 1);
+    setNewWorkout({ date: next.toISOString().split('T')[0], type: '', duration: '', intensity: '3', comment: '' });
+    showToast('💪 Träningspass sparat!');
+  };
+
+  const deleteEntry   = (id) => setEntries(prev => prev.filter(e => e.id !== id));
+  const deleteWorkout = (id) => setWorkouts(prev => prev.filter(w => w.id !== id));
+
+  // ─── Import / Export ──────────────────────────────────────────────────────
+
+  const exportData = () => {
+    const data = { entries, workouts, goalWeight, height, yearlyGoal, exportDate: new Date().toISOString() };
+    const blob  = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url   = URL.createObjectURL(blob);
+    const link  = document.createElement('a');
+    link.href   = url;
+    link.download = `halsodagbok_${todayStr()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast('💾 Backup nedladdad!');
+  };
+
+  const importFromFile = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (data.entries)    setEntries(data.entries);
+        if (data.workouts)   setWorkouts(data.workouts);
+        if (data.goalWeight) setGoalWeight(data.goalWeight);
+        if (data.yearlyGoal) setYearlyGoal(data.yearlyGoal);
+        if (data.height)     setHeight(data.height);
+        showToast('✓ Data importerad!');
+        setShowImport(false);
+        setView('overview');
+      } catch {
+        showToast('Kunde inte läsa filen', 'error');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const importHistoricalData = () => {
+    const lines = importText.trim().split('\n');
+    const imported = [];
+    const months = {
+      jan:'01', feb:'02', mar:'03', apr:'04', maj:'05', jun:'06',
+      jul:'07', aug:'08', sep:'09', okt:'10', nov:'11', dec:'12',
+    };
+    for (let line of lines) {
+      line = line.trim();
+      if (!line) continue;
+      const parts = line.split(/[\t\s]+/).filter(p => p);
+      if (parts.length >= 2) {
+        const match = parts[0].match(/(\d+)-(\w+)/);
+        if (match) {
+          const day   = match[1].padStart(2, '0');
+          const month = months[match[2].toLowerCase()];
+          if (month) {
+            const weight = parseFloat(parts[1].replace(',', '.'));
+            if (!isNaN(weight)) {
+              imported.push({
+                date: `2025-${month}-${day}`,
+                weight, steps: null, comment: '',
+                id: Date.now() + imported.length + Math.random(),
+              });
+            }
+          }
+        }
+      }
+    }
+    if (imported.length > 0) {
+      const unique = Array.from(
+        new Map([...entries, ...imported].map(e => [e.date, e])).values()
+      );
+      setEntries(unique.sort((a, b) => new Date(a.date) - new Date(b.date)));
+      setImportText('');
+      setShowImport(false);
+      setView('overview');
+      showToast(`✓ Importerade ${imported.length} mätningar!`);
+    } else {
+      showToast('Ingen giltig data hittades', 'error');
+    }
+  };
+
+  // ─── Calculations ─────────────────────────────────────────────────────────
+
+  const getBMI = (weight) => {
+    if (!height || !weight) return null;
+    const h = height / 100;
+    return parseFloat((weight / (h * h)).toFixed(1));
+  };
+
+  const getBMICategory = (bmi) => {
+    if (bmi < 18.5) return { label: 'Undervikt',  color: 'text-blue-600' };
+    if (bmi < 25)   return { label: 'Normalvikt', color: 'text-green-600' };
+    if (bmi < 30)   return { label: 'Övervikt',   color: 'text-yellow-600' };
+    return             { label: 'Fetma',       color: 'text-red-600' };
+  };
+
+  // Consecutive days streak
+  const getStreak = () => {
+    if (entries.length === 0) return 0;
+    const sorted  = [...entries].sort((a, b) => new Date(b.date) - new Date(a.date));
+    const todayD   = new Date(); todayD.setHours(0,0,0,0);
+    const latestD  = new Date(sorted[0].date); latestD.setHours(0,0,0,0);
+    if ((todayD - latestD) / 86400000 > 1) return 0;
+    let streak = 1;
+    let prev   = new Date(sorted[0].date); prev.setHours(0,0,0,0);
+    for (let i = 1; i < sorted.length; i++) {
+      const d = new Date(sorted[i].date); d.setHours(0,0,0,0);
+      if ((prev - d) / 86400000 === 1) { streak++; prev = d; } else break;
+    }
+    return streak;
+  };
+
+  // Rough calorie estimate via MET
+  const getCalories = (type, duration, weight = 80) => {
+    const mets = {
+      'Styrketräning':5, 'Löpning':9,     'Promenad':3.5, 'Cykling':7,
+      'Simning':7,       'Yoga':2.5,       'Pilates':3,    'Fotboll':7,
+      'Tennis':7,        'Golf':4,         'Skidåkning':7, 'Innebandy':8,
+      'Dans':5,          'Boxning':9,      'Klättring':8,  'Crossfit':10,
+      'Spinning':8,      'Gruppträning':6, 'Baseboll':4,   'Annat':5,
+    };
+    return Math.round((mets[type] || 5) * weight * (duration / 60));
+  };
+
+  // Monday of the week
+  const getWeekNumber = (date) => {
+    const d = new Date(date);
+    const diff = d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1);
+    const monday = new Date(d.setDate(diff));
+    monday.setHours(0,0,0,0);
+    return monday.toISOString().split('T')[0];
+  };
+
+  const getISOWeekNumber = (date) => {
+    const d = new Date(date);
+    d.setHours(0,0,0,0);
+    d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+    const yearStart = new Date(d.getFullYear(), 0, 1);
+    return `V${Math.ceil((((d - yearStart) / 86400000) + 1) / 7)}`;
+  };
+
+  const getWeeklyStats = () => {
+    if (entries.length === 0) return [];
+    const sorted = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const weekMap = {};
+    sorted.forEach(entry => {
+      const ws = getWeekNumber(entry.date);
+      if (!weekMap[ws]) weekMap[ws] = { weekStart: ws, weights: [], steps: [] };
+      weekMap[ws].weights.push(entry.weight);
+      if (entry.steps) weekMap[ws].steps.push(entry.steps);
+    });
+    const weeks = Object.values(weekMap).map(week => {
+      const avgWeight = week.weights.reduce((a, b) => a + b, 0) / week.weights.length;
+      const avgSteps  = week.steps.length
+        ? Math.round(week.steps.reduce((a, b) => a + b, 0) / week.steps.length) : 0;
+      const weekWorkouts = workouts.filter(w => getWeekNumber(w.date) === week.weekStart);
+      return {
+        weekStart:    week.weekStart,
+        weekNumber:   getISOWeekNumber(week.weekStart),
+        avgWeight:    parseFloat(avgWeight.toFixed(1)),
+        minWeight:    Math.min(...week.weights),
+        maxWeight:    Math.max(...week.weights),
+        avgSteps,
+        workoutCount: weekWorkouts.length,
+        totalMinutes: weekWorkouts.reduce((s, w) => s + w.duration, 0),
+        numEntries:   week.weights.length,
+        change:       0,
+      };
+    });
+    for (let i = 1; i < weeks.length; i++) {
+      weeks[i].change = parseFloat((weeks[i].avgWeight - weeks[i-1].avgWeight).toFixed(2));
+    }
+    return weeks.sort((a, b) => new Date(b.weekStart) - new Date(a.weekStart));
+  };
+
+  const getCurrentWeekStats = () => {
+    const ws = getWeeklyStats();
+    if (!ws.length) return null;
+    return { thisWeek: ws[0], lastWeek: ws[1] || null };
+  };
+
+  const getYearlyProgress = () => {
+    const yr           = new Date().getFullYear();
+    const yearWorkouts = workouts.filter(w => new Date(w.date).getFullYear() === yr);
+    const totalSessions = yearWorkouts.length;
+    const totalMinutes  = yearWorkouts.reduce((s, w) => s + w.duration, 0);
+    const weeksElapsed  = Math.floor((new Date() - new Date(yr, 0, 1)) / (7*24*60*60*1000)) + 1;
+    const expectedSessions = Math.round((yearlyGoal.sessions / 52) * weeksElapsed);
+    const expectedMinutes  = Math.round((yearlyGoal.minutes  / 52) * weeksElapsed);
+    return {
+      totalSessions, totalMinutes,
+      goalSessions: yearlyGoal.sessions, goalMinutes: yearlyGoal.minutes,
+      expectedSessions, expectedMinutes,
+      sessionsProgress: Math.min(totalSessions / yearlyGoal.sessions * 100, 100).toFixed(1),
+      minutesProgress:  Math.min(totalMinutes  / yearlyGoal.minutes  * 100, 100).toFixed(1),
+      onTrackSessions: totalSessions >= expectedSessions,
+      onTrackMinutes:  totalMinutes  >= expectedMinutes,
+      aheadSessions: totalSessions - expectedSessions,
+      aheadMinutes:  totalMinutes  - expectedMinutes,
+      weeksElapsed,
+    };
+  };
+
+  const getStats = () => {
+    if (entries.length === 0) return null;
+    const sorted    = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const latest    = sorted[sorted.length - 1];
+    const previous  = sorted[sorted.length - 2];
+    const diff      = previous ? (latest.weight - previous.weight).toFixed(1) : 0;
+    const toGoal    = (latest.weight - goalWeight).toFixed(1);
+    const totalLoss = (sorted[0].weight - latest.weight).toFixed(1);
+    const recentSteps = sorted.slice(-7).filter(e => e.steps).map(e => e.steps);
+    const avgSteps  = recentSteps.length
+      ? Math.round(recentSteps.reduce((a, b) => a + b, 0) / recentSteps.length) : 0;
+    const bmi    = getBMI(latest.weight);
+    const bmiCat = bmi ? getBMICategory(bmi) : null;
+    const streak = getStreak();
+    return { latest, diff, toGoal, totalLoss, avgSteps, bmi, bmiCat, streak };
+  };
+
+  // 7-day moving average for weight chart
+  const getChartData = () => {
+    const sorted = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
+    return sorted.map((entry, idx) => {
+      const window7  = sorted.slice(Math.max(0, idx - 6), idx + 1);
+      const movingAvg = parseFloat(
+        (window7.reduce((s, e) => s + e.weight, 0) / window7.length).toFixed(2)
+      );
+      return {
+        datum:   new Date(entry.date).toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' }),
+        vikt:    entry.weight,
+        steg:    entry.steps || 0,
+        målvikt: goalWeight,
+        snitt7:  movingAvg,
+      };
+    });
+  };
+
+  // ─── Derived data ─────────────────────────────────────────────────────────
+
+  const stats       = getStats();
+  const weeklyStats = getWeeklyStats();
+  const currentWeek = getCurrentWeekStats();
+  const yearProgress = getYearlyProgress();
+  const chartData   = getChartData();
+
+  // ─── Navigation helper ────────────────────────────────────────────────────
+
+  const NavButton = ({ id, label }) => (
+    <button
+      onClick={() => setView(id)}
+      className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
+        view === id ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-indigo-50'
+      }`}
+    >
+      {label}
+    </button>
+  );
+
+  // ─── Loading screen ───────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-5xl mb-4 animate-pulse">🏃</div>
+          <p className="text-gray-500">Laddar…</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <Toast toast={toast} onClose={() => setToast(null)} />
+
+      <div className="max-w-6xl mx-auto">
+
+        {/* ── Header ── */}
+        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-1">Hälsodagbok</h1>
+            <p className="text-gray-500 text-sm">Följ din vikt och aktivitet</p>
+          </div>
+          {stats && (
+            <div className="text-right">
+              <p className="text-xs text-gray-400 uppercase tracking-wide">Senast loggat</p>
+              <p className="font-bold text-gray-700">
+                {new Date(stats.latest.date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* ── Navigation ── */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+          <NavButton id="overview" label="Översikt" />
+          <NavButton id="add"      label="+ Lägg till" />
+          <NavButton id="workouts" label="Träning" />
+          <NavButton id="history"  label="Historik" />
+          <NavButton id="weekly"   label="Veckor" />
+          <button
+            onClick={() => setShowImport(!showImport)}
+            className="px-4 py-2 rounded-lg font-medium whitespace-nowrap bg-white text-gray-700 border border-indigo-200 hover:bg-indigo-50 transition-colors"
+          >
+            Backup
+          </button>
+        </div>
+
+        {/* ── Backup / Import panel ── */}
+        {showImport && (
+          <div className="bg-white rounded-xl p-6 shadow-md mb-6">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xl font-bold text-gray-800">Backup & Import</h2>
+              <button onClick={() => setShowImport(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-6">
+              <div className="flex gap-3 flex-wrap">
+                <button onClick={exportData}
+                  className="bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 text-sm font-medium">
+                  💾 Ladda ner backup
+                </button>
+                <label className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium cursor-pointer">
+                  📂 Återställ från fil
+                  <input type="file" accept=".json" onChange={importFromFile} className="hidden" />
+                </label>
+              </div>
+              <div className="border-t pt-5">
+                <h3 className="font-medium mb-1 text-sm text-gray-700">📋 Importera historisk viktdata</h3>
+                <p className="text-xs text-gray-400 mb-3">
+                  Format per rad: <code className="bg-gray-100 px-1 rounded">03-nov 91,1</code>
+                </p>
+                <textarea
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  placeholder={"03-nov 91,1\n04-nov 90,8\n..."}
+                  className="w-full px-4 py-2 border rounded-lg font-mono text-sm mb-3 focus:ring-2 focus:ring-indigo-300 outline-none"
+                  rows="6"
+                />
+                <button onClick={importHistoricalData}
+                  className="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 text-sm font-medium">
+                  Importera
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* OVERVIEW                                                         */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {view === 'overview' && stats && (
+          <div>
+            {/* KPI cards – row 1 */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <StatCard
+                icon={TrendingDown} iconColor="text-indigo-600"
+                label="Senaste vikt"
+                value={`${stats.latest.weight} kg`}
+                sub={`${parseFloat(stats.diff) > 0 ? '+' : ''}${stats.diff} kg från förra`}
+                subColor={parseFloat(stats.diff) <= 0 ? 'text-green-600' : 'text-red-500'}
+              />
+              <StatCard
+                icon={Target} iconColor="text-purple-600"
+                label="Till målet"
+                value={`${Math.abs(stats.toGoal)} kg`}
+                sub={`Mål: ${goalWeight} kg`}
+              />
+              <StatCard
+                icon={Flame} iconColor="text-green-600"
+                label="Total nedgång"
+                value={`${stats.totalLoss} kg`}
+                sub={`${entries.length} mätningar`}
+              />
+              {stats.bmi ? (
+                <StatCard
+                  icon={Activity} iconColor="text-blue-600"
+                  label="BMI"
+                  value={stats.bmi}
+                  sub={stats.bmiCat?.label}
+                  subColor={stats.bmiCat?.color}
+                />
+              ) : (
+                <StatCard
+                  icon={Activity} iconColor="text-orange-500"
+                  label="Snitt steg (7d)"
+                  value={stats.avgSteps.toLocaleString()}
+                  sub="senaste 7 dagarna"
+                />
+              )}
+            </div>
+
+            {/* KPI cards – row 2 */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <StatCard
+                icon={Award} iconColor="text-yellow-500"
+                label="Inloggningssvit"
+                value={`${stats.streak} 🔥`}
+                sub={stats.streak > 0 ? 'dagar i rad' : 'Logga idag!'}
+              />
+              <StatCard
+                icon={Activity} iconColor="text-orange-500"
+                label="Snitt steg (7d)"
+                value={stats.avgSteps.toLocaleString()}
+                sub="senaste veckan"
+              />
+              {/* Compact workout summary spanning 2 columns */}
+              <div className="bg-white rounded-xl p-4 shadow-md col-span-2">
+                <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-2">Veckoträning</p>
+                {currentWeek ? (
+                  <div className="flex gap-8">
+                    <div>
+                      <p className="text-xl font-bold text-gray-800">{currentWeek.thisWeek.workoutCount} pass</p>
+                      <p className="text-xs text-gray-500">{currentWeek.thisWeek.totalMinutes} min · denna vecka</p>
+                    </div>
+                    {currentWeek.lastWeek && (
+                      <div className="text-gray-400">
+                        <p className="text-xl font-bold">{currentWeek.lastWeek.workoutCount} pass</p>
+                        <p className="text-xs">{currentWeek.lastWeek.totalMinutes} min · förra veckan</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-gray-400 text-sm">Ingen träning loggad</p>
+                )}
+              </div>
+            </div>
+
+            {/* This week / Last week comparison */}
+            {currentWeek && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border-2 border-indigo-200 rounded-xl p-5">
+                  <h3 className="text-xs font-bold text-indigo-600 mb-3 uppercase tracking-wide">
+                    📅 Denna vecka ({currentWeek.thisWeek.weekNumber})
+                  </h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-gray-500">Snitt vikt</p>
+                      <p className="text-xl font-bold text-indigo-700">{currentWeek.thisWeek.avgWeight} kg</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Förändring</p>
+                      <p className={`text-xl font-bold ${currentWeek.thisWeek.change <= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                        {currentWeek.thisWeek.change > 0 ? '+' : ''}{currentWeek.thisWeek.change} kg
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Snitt steg</p>
+                      <p className="text-xl font-bold text-indigo-700">{currentWeek.thisWeek.avgSteps.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Träning</p>
+                      <p className="text-xl font-bold text-indigo-700">{currentWeek.thisWeek.workoutCount} pass</p>
+                      <p className="text-xs text-gray-400">{currentWeek.thisWeek.totalMinutes} min</p>
+                    </div>
+                  </div>
+                </div>
+
+                {currentWeek.lastWeek && (
+                  <div className="bg-white border-2 border-gray-100 rounded-xl p-5">
+                    <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">
+                      📊 Förra veckan ({currentWeek.lastWeek.weekNumber})
+                    </h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-gray-500">Snitt vikt</p>
+                        <p className="text-xl font-bold text-gray-700">{currentWeek.lastWeek.avgWeight} kg</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Förändring</p>
+                        <p className={`text-xl font-bold ${currentWeek.lastWeek.change <= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                          {currentWeek.lastWeek.change > 0 ? '+' : ''}{currentWeek.lastWeek.change} kg
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Snitt steg</p>
+                        <p className="text-xl font-bold text-gray-700">{currentWeek.lastWeek.avgSteps.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Träning</p>
+                        <p className="text-xl font-bold text-gray-700">{currentWeek.lastWeek.workoutCount} pass</p>
+                        <p className="text-xs text-gray-400">{currentWeek.lastWeek.totalMinutes} min</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Weight chart with 7-day moving average */}
+            <div className="bg-white rounded-xl p-6 shadow-md mb-6">
+              <h2 className="text-lg font-bold text-gray-800 mb-1">Viktutveckling</h2>
+              <p className="text-xs text-gray-400 mb-4">Daglig vikt + 7-dagars glidande medelvärde</p>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="datum" tick={{ fontSize: 11 }} />
+                  <YAxis domain={['dataMin - 1', 'dataMax + 1']} tick={{ fontSize: 11 }} />
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
+                  <Legend />
+                  <Line type="monotone" dataKey="vikt"    stroke="#a5b4fc" strokeWidth={1.5} name="Vikt (kg)"          dot={{ r: 2 }} />
+                  <Line type="monotone" dataKey="snitt7"  stroke="#4f46e5" strokeWidth={2.5} name="7-dagars snitt"     dot={false} />
+                  <Line type="monotone" dataKey="målvikt" stroke="#10b981" strokeWidth={1.5} name="Målvikt"            dot={false} strokeDasharray="5 5" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Steps as bar chart – more natural for discrete daily counts */}
+            <div className="bg-white rounded-xl p-6 shadow-md">
+              <h2 className="text-lg font-bold text-gray-800 mb-4">Steg per dag</h2>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="datum" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
+                  <Bar dataKey="steg" fill="#fb923c" name="Steg" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {view === 'overview' && !stats && (
+          <div className="bg-white rounded-xl p-12 text-center shadow-md">
+            <div className="text-5xl mb-4">📊</div>
+            <p className="text-gray-600 text-lg mb-2">Ingen data än</p>
+            <p className="text-gray-400 text-sm mb-6">Lägg till din första vikt eller importera historik</p>
+            <div className="flex gap-3 justify-center flex-wrap">
+              <button onClick={() => setView('add')}
+                className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700">
+                Lägg till mätning
+              </button>
+              <button onClick={() => setShowImport(true)}
+                className="bg-white border-2 border-indigo-200 text-indigo-600 px-6 py-3 rounded-lg hover:bg-indigo-50">
+                Importera data
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* ADD ENTRY                                                        */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {view === 'add' && (
+          <div className="max-w-lg mx-auto">
+            <div className="bg-white rounded-xl p-6 shadow-md">
+              <h2 className="text-xl font-bold mb-5 text-gray-800">Lägg till mätning</h2>
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <input
+                    type="date" value={newEntry.date}
+                    onChange={(e) => setNewEntry({ ...newEntry, date: e.target.value })}
+                    className="flex-1 px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-300 outline-none"
+                  />
+                  <button
+                    onClick={() => setNewEntry({ ...newEntry, date: todayStr() })}
+                    className="px-4 py-3 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100"
+                  >
+                    Idag
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="number" step="0.1" value={newEntry.weight}
+                    onChange={(e) => setNewEntry({ ...newEntry, weight: e.target.value })}
+                    placeholder="Vikt (kg)"
+                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-300 outline-none"
+                  />
+                  {newEntry.weight && height > 0 && (
+                    <span className="absolute right-3 top-3.5 text-xs text-gray-400">
+                      BMI: {getBMI(parseFloat(newEntry.weight))}
+                    </span>
+                  )}
+                </div>
+
+                <input
+                  type="number" value={newEntry.steps}
+                  onChange={(e) => setNewEntry({ ...newEntry, steps: e.target.value })}
+                  placeholder="Steg (valfritt)"
+                  className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-300 outline-none"
+                />
+                <input
+                  type="text" value={newEntry.comment}
+                  onChange={(e) => setNewEntry({ ...newEntry, comment: e.target.value })}
+                  placeholder="Kommentar (valfritt)"
+                  className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-300 outline-none"
+                />
+                <button
+                  onClick={addEntry}
+                  disabled={!newEntry.weight}
+                  className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 font-medium"
+                >
+                  <Plus size={20} /> Spara mätning
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* WORKOUTS                                                         */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {view === 'workouts' && (
+          <div>
+            {/* Yearly goal */}
+            <div className="bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200 rounded-xl p-6 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-gray-800">🎯 Årsmål {new Date().getFullYear()}</h2>
+                <button onClick={() => setView('goals')}
+                  className="text-xs text-orange-600 font-medium hover:underline">
+                  Ändra mål →
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-sm font-medium">Träningspass</span>
+                    <span className={`text-sm font-bold ${yearProgress.onTrackSessions ? 'text-green-600' : 'text-orange-600'}`}>
+                      {yearProgress.totalSessions}/{yearProgress.goalSessions}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3 mb-1">
+                    <div
+                      className={`h-3 rounded-full transition-all ${yearProgress.onTrackSessions ? 'bg-green-500' : 'bg-orange-500'}`}
+                      style={{ width: `${yearProgress.sessionsProgress}%` }}
+                    />
+                  </div>
+                  <p className={`text-xs ${yearProgress.onTrackSessions ? 'text-green-600' : 'text-orange-500'}`}>
+                    {yearProgress.onTrackSessions
+                      ? `✓ Före plan med ${yearProgress.aheadSessions} pass`
+                      : `${Math.abs(yearProgress.aheadSessions)} pass efter plan`}
+                  </p>
+                </div>
+                <div>
+                  <div className="flex justify-between mb-1">
+                    <span className="text-sm font-medium">Träningstid</span>
+                    <span className={`text-sm font-bold ${yearProgress.onTrackMinutes ? 'text-green-600' : 'text-orange-600'}`}>
+                      {Math.round(yearProgress.totalMinutes / 60)}h / {Math.round(yearProgress.goalMinutes / 60)}h
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3 mb-1">
+                    <div
+                      className={`h-3 rounded-full transition-all ${yearProgress.onTrackMinutes ? 'bg-green-500' : 'bg-orange-500'}`}
+                      style={{ width: `${yearProgress.minutesProgress}%` }}
+                    />
+                  </div>
+                  <p className={`text-xs ${yearProgress.onTrackMinutes ? 'text-green-600' : 'text-orange-500'}`}>
+                    {yearProgress.onTrackMinutes
+                      ? `✓ Före plan med ${Math.abs(yearProgress.aheadMinutes)} min`
+                      : `${Math.abs(yearProgress.aheadMinutes)} min efter plan`}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Add workout */}
+            <div className="bg-white rounded-xl p-6 shadow-md mb-6">
+              <h2 className="text-lg font-bold mb-4 text-gray-800">Lägg till träningspass</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex gap-2">
+                  <input
+                    type="date" value={newWorkout.date}
+                    onChange={(e) => setNewWorkout({ ...newWorkout, date: e.target.value })}
+                    className="flex-1 px-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-300 outline-none"
+                  />
+                  <button onClick={() => setNewWorkout({ ...newWorkout, date: todayStr() })}
+                    className="px-3 py-3 bg-orange-50 text-orange-600 rounded-lg text-sm hover:bg-orange-100">
+                    Idag
+                  </button>
+                </div>
+                <select
+                  value={newWorkout.type}
+                  onChange={(e) => setNewWorkout({ ...newWorkout, type: e.target.value })}
+                  className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-300 outline-none"
+                >
+                  <option value="">Välj typ…</option>
+                  {['Styrketräning','Löpning','Promenad','Cykling','Simning','Yoga','Pilates',
+                    'Fotboll','Tennis','Baseboll','Golf','Skidåkning','Innebandy','Dans',
+                    'Boxning','Klättring','Crossfit','Spinning','Gruppträning','Annat'].map(t => (
+                    <option key={t}>{t}</option>
+                  ))}
+                </select>
+                <div>
+                  <input
+                    type="number" value={newWorkout.duration}
+                    onChange={(e) => setNewWorkout({ ...newWorkout, duration: e.target.value })}
+                    placeholder="Minuter"
+                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-300 outline-none"
+                  />
+                  {newWorkout.type && newWorkout.duration && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      ≈ {getCalories(newWorkout.type, parseInt(newWorkout.duration), stats?.latest?.weight)} kcal
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">Intensitet (1–5)</label>
+                  <div className="flex gap-2">
+                    {[1,2,3,4,5].map(i => (
+                      <button key={i}
+                        onClick={() => setNewWorkout({ ...newWorkout, intensity: i.toString() })}
+                        className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors ${
+                          parseInt(newWorkout.intensity) === i
+                            ? 'bg-orange-500 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-orange-100'
+                        }`}
+                      >
+                        {i}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="md:col-span-2">
+                  <input
+                    type="text" value={newWorkout.comment}
+                    onChange={(e) => setNewWorkout({ ...newWorkout, comment: e.target.value })}
+                    placeholder="Kommentar (valfritt)"
+                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-300 outline-none"
+                  />
+                </div>
+              </div>
+              <button
+                onClick={addWorkout}
+                disabled={!newWorkout.type || !newWorkout.duration}
+                className="mt-4 w-full bg-orange-600 text-white py-3 rounded-lg hover:bg-orange-700 disabled:opacity-40 disabled:cursor-not-allowed font-medium"
+              >
+                💪 Spara träningspass
+              </button>
+            </div>
+
+            {/* Workout history */}
+            {workouts.length > 0 && (
+              <div className="bg-white rounded-xl p-6 shadow-md">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-bold text-gray-800">Senaste träningspass</h2>
+                  <span className="text-xs text-gray-400">{workouts.length} totalt</span>
+                </div>
+                <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                  {[...workouts]
+                    .sort((a, b) => new Date(b.date) - new Date(a.date))
+                    .slice(0, 25)
+                    .map(w => (
+                    <div key={w.id}
+                      className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg hover:bg-orange-50 transition-colors">
+                      <div>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="font-medium text-sm text-gray-800">{w.type}</span>
+                          {w.intensity && <IntensityDots level={w.intensity} />}
+                        </div>
+                        <p className="text-xs text-gray-400">
+                          {new Date(w.date).toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })}
+                          {w.comment ? ` · ${w.comment}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-gray-800">{w.duration} min</p>
+                          <p className="text-xs text-gray-400">
+                            ≈ {getCalories(w.type, w.duration, stats?.latest?.weight || 80)} kcal
+                          </p>
+                        </div>
+                        <button onClick={() => deleteWorkout(w.id)}
+                          className="text-gray-300 hover:text-red-500 transition-colors">✕</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* GOALS / SETTINGS                                                 */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {view === 'goals' && (
+          <div className="max-w-lg mx-auto">
+            <div className="bg-white rounded-xl p-6 shadow-md">
+              <h2 className="text-xl font-bold mb-5 text-gray-800">Mål & inställningar</h2>
+              <div className="space-y-5">
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-1">Målvikt (kg)</label>
+                  <input type="number" step="0.5" value={goalWeight}
+                    onChange={(e) => setGoalWeight(parseFloat(e.target.value) || 0)}
+                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-300 outline-none" />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700 block mb-1">Din längd (cm) – används för BMI</label>
+                  <input type="number" value={height}
+                    onChange={(e) => setHeight(parseFloat(e.target.value) || 0)}
+                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-300 outline-none" />
+                </div>
+                <div className="border-t pt-5">
+                  <p className="text-sm font-semibold text-gray-700 mb-3">Årsmål {new Date().getFullYear()}</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-500">Träningspass</label>
+                      <input type="number" value={yearlyGoal.sessions}
+                        onChange={(e) => setYearlyGoal({ ...yearlyGoal, sessions: parseInt(e.target.value) || 0 })}
+                        className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-300 outline-none mt-1" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500">Total tid (minuter)</label>
+                      <input type="number" value={yearlyGoal.minutes}
+                        onChange={(e) => setYearlyGoal({ ...yearlyGoal, minutes: parseInt(e.target.value) || 0 })}
+                        className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-300 outline-none mt-1" />
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => setView('workouts')}
+                  className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 font-medium">
+                  ✓ Spara inställningar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* HISTORY                                                          */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {view === 'history' && (
+          <div className="bg-white rounded-xl p-6 shadow-md">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-800">Mätningshistorik</h2>
+              <span className="text-sm text-gray-400">{entries.length} mätningar</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b-2 border-gray-100">
+                    <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Datum</th>
+                    <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Vikt</th>
+                    <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Δ</th>
+                    <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Steg</th>
+                    <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Kommentar</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...entries]
+                    .sort((a, b) => new Date(b.date) - new Date(a.date))
+                    .map((entry, idx, arr) => {
+                      const prev = arr[idx + 1];
+                      const diff = prev ? (entry.weight - prev.weight).toFixed(1) : null;
+                      return (
+                        <tr key={entry.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                          <td className="py-3 text-sm text-gray-700">
+                            {new Date(entry.date).toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })}
+                          </td>
+                          <td className="py-3 font-bold text-gray-800">{entry.weight} kg</td>
+                          <td className="py-3 text-sm">
+                            {diff !== null && (
+                              <span className={parseFloat(diff) <= 0 ? 'text-green-600' : 'text-red-500'}>
+                                {parseFloat(diff) > 0 ? '+' : ''}{diff}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 text-sm text-gray-500">{entry.steps?.toLocaleString() || '–'}</td>
+                          <td className="py-3 text-xs text-gray-400 max-w-xs truncate">{entry.comment || ''}</td>
+                          <td className="py-3">
+                            <button onClick={() => deleteEntry(entry.id)}
+                              className="text-gray-300 hover:text-red-500 transition-colors text-xs">✕</button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {/* WEEKLY                                                           */}
+        {/* ════════════════════════════════════════════════════════════════ */}
+        {view === 'weekly' && (
+          <div className="bg-white rounded-xl p-6 shadow-md">
+            <h2 className="text-xl font-bold mb-4 text-gray-800">Veckoöversikt</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b-2 border-gray-100">
+                    <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Vecka</th>
+                    <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Snitt vikt</th>
+                    <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Förändring</th>
+                    <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Steg/dag</th>
+                    <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Pass</th>
+                    <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Min</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {weeklyStats.map((week, idx) => (
+                    <tr key={week.weekStart}
+                      className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${idx === 0 ? 'bg-indigo-50' : ''}`}>
+                      <td className="py-3 font-bold text-sm text-gray-800">{week.weekNumber}</td>
+                      <td className="py-3 font-semibold text-gray-800">{week.avgWeight} kg</td>
+                      <td className={`py-3 font-medium text-sm ${
+                        week.change < 0 ? 'text-green-600' : week.change > 0 ? 'text-red-500' : 'text-gray-400'
+                      }`}>
+                        {week.change > 0 ? '+' : ''}{week.change} kg
+                      </td>
+                      <td className="py-3 text-sm text-gray-600">{week.avgSteps.toLocaleString()}</td>
+                      <td className="py-3 text-sm text-gray-600">{week.workoutCount}</td>
+                      <td className="py-3 text-sm text-gray-500">{week.totalMinutes || '–'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
