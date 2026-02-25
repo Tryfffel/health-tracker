@@ -158,6 +158,20 @@ function WeightStepTracker() {
   useEffect(() => { loadData(); }, []);
   useEffect(() => { if (!loading) saveData(); }, [entries, workouts, goalWeight, yearlyGoal, height, ouraToken, ouraClientId, loading]);
 
+  // Read URL params injected by iOS Shortcut: ?steps=8500&date=2026-02-25
+  useEffect(() => {
+    var p = new URLSearchParams(window.location.search);
+    var s = p.get('steps'), d = p.get('date');
+    if (s || d) {
+      setNewEntry(function(prev) {
+        return Object.assign({}, prev, { steps: s || prev.steps, date: d || prev.date });
+      });
+      window.history.replaceState({}, '', window.location.pathname);
+      setView('add');
+      showToast('✅ ' + (s ? Number(s).toLocaleString() + ' steg hämtade från Oura!' : 'Datum förifyllt'));
+    }
+  }, [loading]);
+
   const loadData = async () => {
     try {
       const results = await Promise.all([
@@ -885,21 +899,28 @@ function WeightStepTracker() {
             )
       ),
 
-      // Apple Watch info card
+      // iOS Shortcut card
       h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
         h('div', { className: 'flex items-center gap-3 mb-4' },
-          h('span', { className: 'text-3xl' }, '⌚'),
+          h('span', { className: 'text-3xl' }, '📱'),
           h('div', null,
-            h('h2', { className: 'text-lg font-bold text-gray-800' }, 'Apple Watch'),
-            h('p', { className: 'text-xs text-gray-400' }, 'Via appen Health Auto Export')
+            h('h2', { className: 'text-lg font-bold text-gray-800' }, 'iOS-genväg (rekommenderat)'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Hämtar steg från Oura utan CORS-problem')
           )
         ),
-        h('p', { className: 'text-sm text-gray-600 mb-3' }, 'Apple Health har inget öppet webb-API, men du kan exportera steg manuellt:'),
-        h('ol', { className: 'text-sm text-gray-600 space-y-1 list-decimal list-inside' },
-          h('li', null, 'Öppna Hälsa-appen på iPhone'),
-          h('li', null, 'Tryck på din profilbild → Exportera alla hälsodata'),
-          h('li', null, 'Eller skriv in stegen manuellt i "Lägg till"-vyn')
-        )
+        h('p', { className: 'text-sm text-gray-600 mb-4' }, 'Skapa en iPhone-genväg som hämtar dina steg och öppnar appen automatiskt:'),
+        h('ol', { className: 'text-sm text-gray-600 space-y-2 list-decimal list-inside mb-4' },
+          h('li', null, 'Öppna appen ', h('strong', null, 'Genvägar'), ' på iPhone'),
+          h('li', null, 'Skapa ny genväg → lägg till ', h('strong', null, '"Hämta innehåll från URL"')),
+          h('li', null, 'URL: ', h('code', { className: 'bg-gray-100 px-1 rounded text-xs' }, 'https://api.ouraring.com/v2/usercollection/daily_activity?start_date=[igår]&end_date=[idag]')),
+          h('li', null, 'Rubrik: ', h('code', { className: 'bg-gray-100 px-1 rounded text-xs' }, 'Authorization: Bearer DIN_TOKEN')),
+          h('li', null, 'Lägg till ', h('strong', null, '"Hämta ord från text"'), ' → hämta värdet för "steps"'),
+          h('li', null, 'Lägg till ', h('strong', null, '"Öppna URL"'), ':'),
+          h('div', { className: 'bg-gray-100 rounded px-3 py-2 font-mono text-xs mt-1 break-all ml-4' },
+            'https://tryfffel.github.io/health-tracker/?steps=[steg]&date=[datum]'
+          )
+        ),
+        h('p', { className: 'text-xs text-gray-400' }, 'Appen läser automatiskt stegen från URL:en och förifyllar formuläret — du behöver bara trycka Spara!')
       )
     );
   }
