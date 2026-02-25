@@ -199,9 +199,8 @@ function WeightStepTracker() {
     try {
       const controller = new AbortController();
       const timer = setTimeout(function(){ controller.abort(); }, 8000);
-      // Fetch 7 days back so we catch the latest completed day
       var endD = new Date(dateStr); endD.setDate(endD.getDate() + 1);
-      var startD = new Date(dateStr); startD.setDate(startD.getDate() - 7);
+      var startD = new Date(dateStr); startD.setDate(startD.getDate() - 30);
       var startStr = startD.toISOString().split('T')[0];
       var endStr = endD.toISOString().split('T')[0];
       const url = 'https://api.ouraring.com/v2/usercollection/daily_activity?start_date=' + startStr + '&end_date=' + endStr;
