@@ -204,7 +204,7 @@ function WeightStepTracker() {
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const json = await res.json();
       const day = json.data && json.data[0];
-      if (!day) { showToast('Ingen Oura-data hittades för ' + dateStr, 'error'); return; }
+      if (!day) { showToast('Svar: ' + JSON.stringify(json).substring(0, 120), 'error'); return; }
       setNewEntry(function(prev) {
         return Object.assign({}, prev, {
           steps: day.steps ? String(day.steps) : prev.steps,
