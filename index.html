@@ -6,780 +6,748 @@
   <title>Hälsodagbok</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
+  <script src="https://unpkg.com/recharts@2.10.3/umd/Recharts.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100">
-  <div id="root"></div>
+<div id="root"></div>
+<script>
+// localStorage polyfill matching the window.storage API
+window.storage = {
+  get: async (key) => ({ value: localStorage.getItem(key) }),
+  set: async (key, value) => { localStorage.setItem(key, value); }
+};
 
-  <script>
-    window.storage = {
-      get: async (key) => ({ value: localStorage.getItem(key) }),
-      set: async (key, value) => { localStorage.setItem(key, value); }
+const h = React.createElement;
+const { useState, useEffect } = React;
+const {
+  LineChart, BarChart, Line, Bar,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} = Recharts;
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+const Toast = ({ toast, onClose }) => {
+  if (!toast) return null;
+  return h('div', {
+    className: 'fixed top-4 right-4 z-50 px-5 py-3 rounded-xl shadow-lg text-white flex items-center gap-3 ' + (toast.type === 'error' ? 'bg-red-500' : 'bg-green-500')
+  },
+    h('span', { className: 'text-sm font-medium' }, toast.msg),
+    h('button', { onClick: onClose, className: 'hover:opacity-70 text-lg leading-none ml-2' }, '×')
+  );
+};
+
+const StatCard = ({ emoji, label, value, sub, subColor }) =>
+  h('div', { className: 'bg-white rounded-xl p-4 shadow-md' },
+    h('div', { className: 'text-2xl mb-1' }, emoji),
+    h('p', { className: 'text-xs text-gray-500 uppercase tracking-wide font-medium' }, label),
+    h('p', { className: 'text-2xl font-bold text-gray-800 mt-1' }, value),
+    sub ? h('p', { className: 'text-xs mt-1 ' + (subColor || 'text-gray-500') }, sub) : null
+  );
+
+const IntensityDots = ({ level }) =>
+  h('span', { className: 'inline-flex gap-0.5 items-center' },
+    ...[1,2,3,4,5].map(i =>
+      h('span', { key: i, className: 'w-2 h-2 rounded-full ' + (i <= level ? 'bg-orange-400' : 'bg-gray-200') })
+    )
+  );
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+function WeightStepTracker() {
+  const todayStr = () => new Date().toISOString().split('T')[0];
+
+  const [entries, setEntries]       = useState([]);
+  const [workouts, setWorkouts]     = useState([]);
+  const [goalWeight, setGoalWeight] = useState(85);
+  const [height, setHeight]         = useState(180);
+  const [yearlyGoal, setYearlyGoal] = useState({ sessions: 100, minutes: 5000 });
+  const [newEntry, setNewEntry]     = useState({ date: todayStr(), weight: '', steps: '', comment: '' });
+  const [newWorkout, setNewWorkout] = useState({ date: todayStr(), type: '', duration: '', intensity: '3', comment: '' });
+  const [view, setView]             = useState('overview');
+  const [importText, setImportText] = useState('');
+  const [showImport, setShowImport] = useState(false);
+  const [toast, setToast]           = useState(null);
+  const [loading, setLoading]       = useState(true);
+
+  const showToast = (msg, type) => {
+    setToast({ msg, type: type || 'success' });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  useEffect(() => { loadData(); }, []);
+  useEffect(() => { if (!loading) saveData(); }, [entries, workouts, goalWeight, yearlyGoal, height, loading]);
+
+  const loadData = async () => {
+    try {
+      const results = await Promise.all([
+        window.storage.get('weight-entries'),
+        window.storage.get('workouts'),
+        window.storage.get('goal-weight'),
+        window.storage.get('yearly-goal'),
+        window.storage.get('user-height'),
+      ]);
+      if (results[0] && results[0].value) setEntries(JSON.parse(results[0].value));
+      if (results[1] && results[1].value) setWorkouts(JSON.parse(results[1].value));
+      if (results[2] && results[2].value) setGoalWeight(parseFloat(results[2].value));
+      if (results[3] && results[3].value) setYearlyGoal(JSON.parse(results[3].value));
+      if (results[4] && results[4].value) setHeight(parseFloat(results[4].value));
+    } catch (err) {
+      console.log('Ingen sparad data', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveData = async () => {
+    try {
+      await Promise.all([
+        window.storage.set('weight-entries', JSON.stringify(entries)),
+        window.storage.set('workouts',        JSON.stringify(workouts)),
+        window.storage.set('goal-weight',     goalWeight.toString()),
+        window.storage.set('yearly-goal',     JSON.stringify(yearlyGoal)),
+        window.storage.set('user-height',     height.toString()),
+      ]);
+    } catch (err) { console.error(err); }
+  };
+
+  const addEntry = () => {
+    if (!newEntry.weight) return;
+    const entry = {
+      date: newEntry.date,
+      weight: parseFloat(newEntry.weight),
+      steps: newEntry.steps ? parseInt(newEntry.steps) : null,
+      comment: newEntry.comment,
+      id: Date.now(),
     };
-  </script>
+    setEntries(function(prev) {
+      return prev.filter(function(e) { return e.date !== entry.date; }).concat(entry)
+        .sort(function(a, b) { return new Date(a.date) - new Date(b.date); });
+    });
+    const next = new Date(newEntry.date);
+    next.setDate(next.getDate() + 1);
+    setNewEntry({ date: next.toISOString().split('T')[0], weight: '', steps: '', comment: '' });
+    showToast('✓ Mätning sparad!');
+  };
 
-  <script type="text/babel" data-presets="react">
-    const { useState, useEffect } = React;
-    const {
-      LineChart, BarChart, Line, Bar,
-      XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
-    } = Recharts;
-
-    const Toast = ({ toast, onClose }) => {
-      if (!toast) return null;
-      return (
-        <div className={`fixed top-4 right-4 z-50 px-5 py-3 rounded-xl shadow-lg text-white flex items-center gap-3 ${
-          toast.type === 'error' ? 'bg-red-500' : 'bg-green-500'
-        }`}>
-          <span className="text-sm font-medium">{toast.msg}</span>
-          <button onClick={onClose} className="hover:opacity-70 text-lg leading-none">×</button>
-        </div>
-      );
+  const addWorkout = () => {
+    if (!newWorkout.type || !newWorkout.duration) return;
+    const workout = {
+      date: newWorkout.date,
+      type: newWorkout.type,
+      duration: parseInt(newWorkout.duration),
+      intensity: parseInt(newWorkout.intensity || 3),
+      comment: newWorkout.comment,
+      id: Date.now(),
     };
+    setWorkouts(function(prev) {
+      return prev.concat(workout).sort(function(a, b) { return new Date(a.date) - new Date(b.date); });
+    });
+    const next = new Date(newWorkout.date);
+    next.setDate(next.getDate() + 1);
+    setNewWorkout({ date: next.toISOString().split('T')[0], type: '', duration: '', intensity: '3', comment: '' });
+    showToast('💪 Träningspass sparat!');
+  };
 
-    const StatCard = ({ emoji, iconColor, label, value, sub, subColor }) => (
-      <div className="bg-white rounded-xl p-4 shadow-md">
-        <div className={`text-2xl mb-1`}>{emoji}</div>
-        <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">{label}</p>
-        <p className="text-2xl font-bold text-gray-800 mt-1">{value}</p>
-        {sub && <p className={`text-xs mt-1 ${subColor || 'text-gray-500'}`}>{sub}</p>}
-      </div>
-    );
+  const deleteEntry   = function(id) { setEntries(function(prev) { return prev.filter(function(e) { return e.id !== id; }); }); };
+  const deleteWorkout = function(id) { setWorkouts(function(prev) { return prev.filter(function(w) { return w.id !== id; }); }); };
 
-    const IntensityDots = ({ level }) => (
-      <span className="inline-flex gap-0.5 items-center">
-        {[1,2,3,4,5].map(i => (
-          <span key={i} className={`w-2 h-2 rounded-full ${i <= level ? 'bg-orange-400' : 'bg-gray-200'}`} />
-        ))}
-      </span>
-    );
+  const exportData = () => {
+    const data = { entries, workouts, goalWeight, height, yearlyGoal, exportDate: new Date().toISOString() };
+    const blob  = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url   = URL.createObjectURL(blob);
+    const link  = document.createElement('a');
+    link.href   = url;
+    link.download = 'halsodagbok_' + todayStr() + '.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast('💾 Backup nedladdad!');
+  };
 
-    function WeightStepTracker() {
-      const todayStr = () => new Date().toISOString().split('T')[0];
+  const importFromFile = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (data.entries)    setEntries(data.entries);
+        if (data.workouts)   setWorkouts(data.workouts);
+        if (data.goalWeight) setGoalWeight(data.goalWeight);
+        if (data.yearlyGoal) setYearlyGoal(data.yearlyGoal);
+        if (data.height)     setHeight(data.height);
+        showToast('✓ Data importerad!');
+        setShowImport(false);
+        setView('overview');
+      } catch(err) { showToast('Kunde inte läsa filen', 'error'); }
+    };
+    reader.readAsText(file);
+  };
 
-      const [entries, setEntries]       = useState([]);
-      const [workouts, setWorkouts]     = useState([]);
-      const [goalWeight, setGoalWeight] = useState(85);
-      const [height, setHeight]         = useState(180);
-      const [yearlyGoal, setYearlyGoal] = useState({ sessions: 100, minutes: 5000 });
-      const [newEntry, setNewEntry]     = useState({ date: todayStr(), weight: '', steps: '', comment: '' });
-      const [newWorkout, setNewWorkout] = useState({ date: todayStr(), type: '', duration: '', intensity: '3', comment: '' });
-      const [view, setView]             = useState('overview');
-      const [importText, setImportText] = useState('');
-      const [showImport, setShowImport] = useState(false);
-      const [toast, setToast]           = useState(null);
-      const [loading, setLoading]       = useState(true);
-
-      const showToast = (msg, type = 'success') => {
-        setToast({ msg, type });
-        setTimeout(() => setToast(null), 3000);
-      };
-
-      useEffect(() => { loadData(); }, []);
-      useEffect(() => { if (!loading) saveData(); }, [entries, workouts, goalWeight, yearlyGoal, height, loading]);
-
-      const loadData = async () => {
-        try {
-          const [e, w, g, yg, h] = await Promise.all([
-            window.storage.get('weight-entries'),
-            window.storage.get('workouts'),
-            window.storage.get('goal-weight'),
-            window.storage.get('yearly-goal'),
-            window.storage.get('user-height'),
-          ]);
-          if (e?.value)  setEntries(JSON.parse(e.value));
-          if (w?.value)  setWorkouts(JSON.parse(w.value));
-          if (g?.value)  setGoalWeight(parseFloat(g.value));
-          if (yg?.value) setYearlyGoal(JSON.parse(yg.value));
-          if (h?.value)  setHeight(parseFloat(h.value));
-        } catch (err) {
-          console.log('Ingen sparad data', err);
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      const saveData = async () => {
-        try {
-          await Promise.all([
-            window.storage.set('weight-entries', JSON.stringify(entries)),
-            window.storage.set('workouts',        JSON.stringify(workouts)),
-            window.storage.set('goal-weight',     goalWeight.toString()),
-            window.storage.set('yearly-goal',     JSON.stringify(yearlyGoal)),
-            window.storage.set('user-height',     height.toString()),
-          ]);
-        } catch (err) { console.error('Sparfel:', err); }
-      };
-
-      const addEntry = () => {
-        if (!newEntry.weight) return;
-        const entry = {
-          date: newEntry.date,
-          weight: parseFloat(newEntry.weight),
-          steps: newEntry.steps ? parseInt(newEntry.steps) : null,
-          comment: newEntry.comment,
-          id: Date.now(),
-        };
-        setEntries(prev =>
-          [...prev.filter(e => e.date !== entry.date), entry]
-            .sort((a, b) => new Date(a.date) - new Date(b.date))
-        );
-        const next = new Date(newEntry.date);
-        next.setDate(next.getDate() + 1);
-        setNewEntry({ date: next.toISOString().split('T')[0], weight: '', steps: '', comment: '' });
-        showToast('✓ Mätning sparad!');
-      };
-
-      const addWorkout = () => {
-        if (!newWorkout.type || !newWorkout.duration) return;
-        const workout = {
-          date: newWorkout.date,
-          type: newWorkout.type,
-          duration: parseInt(newWorkout.duration),
-          intensity: parseInt(newWorkout.intensity || 3),
-          comment: newWorkout.comment,
-          id: Date.now(),
-        };
-        setWorkouts(prev =>
-          [...prev, workout].sort((a, b) => new Date(a.date) - new Date(b.date))
-        );
-        const next = new Date(newWorkout.date);
-        next.setDate(next.getDate() + 1);
-        setNewWorkout({ date: next.toISOString().split('T')[0], type: '', duration: '', intensity: '3', comment: '' });
-        showToast('💪 Träningspass sparat!');
-      };
-
-      const deleteEntry   = (id) => setEntries(prev => prev.filter(e => e.id !== id));
-      const deleteWorkout = (id) => setWorkouts(prev => prev.filter(w => w.id !== id));
-
-      const exportData = () => {
-        const data = { entries, workouts, goalWeight, height, yearlyGoal, exportDate: new Date().toISOString() };
-        const blob  = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url   = URL.createObjectURL(blob);
-        const link  = document.createElement('a');
-        link.href   = url;
-        link.download = `halsodagbok_${todayStr()}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        showToast('💾 Backup nedladdad!');
-      };
-
-      const importFromFile = (event) => {
-        const file = event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          try {
-            const data = JSON.parse(e.target.result);
-            if (data.entries)    setEntries(data.entries);
-            if (data.workouts)   setWorkouts(data.workouts);
-            if (data.goalWeight) setGoalWeight(data.goalWeight);
-            if (data.yearlyGoal) setYearlyGoal(data.yearlyGoal);
-            if (data.height)     setHeight(data.height);
-            showToast('✓ Data importerad!');
-            setShowImport(false);
-            setView('overview');
-          } catch { showToast('Kunde inte läsa filen', 'error'); }
-        };
-        reader.readAsText(file);
-      };
-
-      const importHistoricalData = () => {
-        const lines = importText.trim().split('\n');
-        const imported = [];
-        const months = { jan:'01',feb:'02',mar:'03',apr:'04',maj:'05',jun:'06',jul:'07',aug:'08',sep:'09',okt:'10',nov:'11',dec:'12' };
-        for (let line of lines) {
-          line = line.trim();
-          if (!line) continue;
-          const parts = line.split(/[\t\s]+/).filter(p => p);
-          if (parts.length >= 2) {
-            const match = parts[0].match(/(\d+)-(\w+)/);
-            if (match) {
-              const day   = match[1].padStart(2, '0');
-              const month = months[match[2].toLowerCase()];
-              if (month) {
-                const weight = parseFloat(parts[1].replace(',', '.'));
-                if (!isNaN(weight)) {
-                  imported.push({ date: `2025-${month}-${day}`, weight, steps: null, comment: '', id: Date.now() + imported.length + Math.random() });
-                }
-              }
+  const importHistoricalData = () => {
+    const lines = importText.trim().split('\n');
+    const imported = [];
+    const months = { jan:'01',feb:'02',mar:'03',apr:'04',maj:'05',jun:'06',jul:'07',aug:'08',sep:'09',okt:'10',nov:'11',dec:'12' };
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i].trim();
+      if (!line) continue;
+      const parts = line.split(/[\t\s]+/).filter(function(p) { return p; });
+      if (parts.length >= 2) {
+        const match = parts[0].match(/(\d+)-(\w+)/);
+        if (match) {
+          const day   = match[1].length === 1 ? '0' + match[1] : match[1];
+          const month = months[match[2].toLowerCase()];
+          if (month) {
+            const weight = parseFloat(parts[1].replace(',', '.'));
+            if (!isNaN(weight)) {
+              imported.push({ date: '2025-' + month + '-' + day, weight: weight, steps: null, comment: '', id: Date.now() + imported.length + Math.random() });
             }
           }
         }
-        if (imported.length > 0) {
-          const unique = Array.from(new Map([...entries, ...imported].map(e => [e.date, e])).values());
-          setEntries(unique.sort((a, b) => new Date(a.date) - new Date(b.date)));
-          setImportText(''); setShowImport(false); setView('overview');
-          showToast(`✓ Importerade ${imported.length} mätningar!`);
-        } else { showToast('Ingen giltig data hittades', 'error'); }
+      }
+    }
+    if (imported.length > 0) {
+      const combined = entries.concat(imported);
+      const map = {};
+      combined.forEach(function(e) { map[e.date] = e; });
+      const unique = Object.values(map).sort(function(a,b) { return new Date(a.date) - new Date(b.date); });
+      setEntries(unique);
+      setImportText(''); setShowImport(false); setView('overview');
+      showToast('✓ Importerade ' + imported.length + ' mätningar!');
+    } else { showToast('Ingen giltig data hittades', 'error'); }
+  };
+
+  const getBMI = function(weight) {
+    if (!height || !weight) return null;
+    const hm = height / 100;
+    return parseFloat((weight / (hm * hm)).toFixed(1));
+  };
+
+  const getBMICategory = function(bmi) {
+    if (bmi < 18.5) return { label: 'Undervikt',  color: 'text-blue-600' };
+    if (bmi < 25)   return { label: 'Normalvikt', color: 'text-green-600' };
+    if (bmi < 30)   return { label: 'Övervikt',   color: 'text-yellow-600' };
+    return             { label: 'Fetma',       color: 'text-red-600' };
+  };
+
+  const getStreak = function() {
+    if (entries.length === 0) return 0;
+    const sorted = entries.slice().sort(function(a,b) { return new Date(b.date) - new Date(a.date); });
+    const todayD  = new Date(); todayD.setHours(0,0,0,0);
+    const latestD = new Date(sorted[0].date); latestD.setHours(0,0,0,0);
+    if ((todayD - latestD) / 86400000 > 1) return 0;
+    let streak = 1;
+    let prev = new Date(sorted[0].date); prev.setHours(0,0,0,0);
+    for (let i = 1; i < sorted.length; i++) {
+      const d = new Date(sorted[i].date); d.setHours(0,0,0,0);
+      if ((prev - d) / 86400000 === 1) { streak++; prev = d; } else break;
+    }
+    return streak;
+  };
+
+  const getCalories = function(type, duration, weight) {
+    weight = weight || 80;
+    const mets = { 'Styrketräning':5,'Löpning':9,'Promenad':3.5,'Cykling':7,'Simning':7,'Yoga':2.5,'Pilates':3,'Fotboll':7,'Tennis':7,'Golf':4,'Skidåkning':7,'Innebandy':8,'Dans':5,'Boxning':9,'Klättring':8,'Crossfit':10,'Spinning':8,'Gruppträning':6,'Baseboll':4,'Annat':5 };
+    return Math.round((mets[type] || 5) * weight * (duration / 60));
+  };
+
+  const getWeekNumber = function(date) {
+    const d = new Date(date);
+    const diff = d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1);
+    const monday = new Date(d.setDate(diff));
+    monday.setHours(0,0,0,0);
+    return monday.toISOString().split('T')[0];
+  };
+
+  const getISOWeekNumber = function(date) {
+    const d = new Date(date);
+    d.setHours(0,0,0,0);
+    d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+    const yearStart = new Date(d.getFullYear(), 0, 1);
+    return 'V' + Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  };
+
+  const getWeeklyStats = function() {
+    if (entries.length === 0) return [];
+    const sorted = entries.slice().sort(function(a,b) { return new Date(a.date) - new Date(b.date); });
+    const weekMap = {};
+    sorted.forEach(function(entry) {
+      const ws = getWeekNumber(entry.date);
+      if (!weekMap[ws]) weekMap[ws] = { weekStart: ws, weights: [], steps: [] };
+      weekMap[ws].weights.push(entry.weight);
+      if (entry.steps) weekMap[ws].steps.push(entry.steps);
+    });
+    const weeks = Object.values(weekMap).map(function(week) {
+      const avgWeight = week.weights.reduce(function(a,b){return a+b;},0) / week.weights.length;
+      const avgSteps  = week.steps.length ? Math.round(week.steps.reduce(function(a,b){return a+b;},0) / week.steps.length) : 0;
+      const weekWorkouts = workouts.filter(function(w) { return getWeekNumber(w.date) === week.weekStart; });
+      return {
+        weekStart: week.weekStart, weekNumber: getISOWeekNumber(week.weekStart),
+        avgWeight: parseFloat(avgWeight.toFixed(1)),
+        avgSteps: avgSteps,
+        workoutCount: weekWorkouts.length,
+        totalMinutes: weekWorkouts.reduce(function(s,w){return s+w.duration;},0),
+        change: 0,
       };
+    });
+    for (let i = 1; i < weeks.length; i++) {
+      weeks[i].change = parseFloat((weeks[i].avgWeight - weeks[i-1].avgWeight).toFixed(2));
+    }
+    return weeks.sort(function(a,b) { return new Date(b.weekStart) - new Date(a.weekStart); });
+  };
 
-      const getBMI = (weight) => {
-        if (!height || !weight) return null;
-        const h = height / 100;
-        return parseFloat((weight / (h * h)).toFixed(1));
+  const getCurrentWeekStats = function() {
+    const ws = getWeeklyStats();
+    if (!ws.length) return null;
+    return { thisWeek: ws[0], lastWeek: ws[1] || null };
+  };
+
+  const getYearlyProgress = function() {
+    const yr = new Date().getFullYear();
+    const yearWorkouts = workouts.filter(function(w) { return new Date(w.date).getFullYear() === yr; });
+    const totalSessions = yearWorkouts.length;
+    const totalMinutes  = yearWorkouts.reduce(function(s,w){return s+w.duration;},0);
+    const weeksElapsed  = Math.floor((new Date() - new Date(yr, 0, 1)) / (7*24*60*60*1000)) + 1;
+    const expectedSessions = Math.round((yearlyGoal.sessions / 52) * weeksElapsed);
+    const expectedMinutes  = Math.round((yearlyGoal.minutes  / 52) * weeksElapsed);
+    return {
+      totalSessions: totalSessions, totalMinutes: totalMinutes,
+      goalSessions: yearlyGoal.sessions, goalMinutes: yearlyGoal.minutes,
+      sessionsProgress: Math.min(totalSessions / yearlyGoal.sessions * 100, 100).toFixed(1),
+      minutesProgress:  Math.min(totalMinutes  / yearlyGoal.minutes  * 100, 100).toFixed(1),
+      onTrackSessions: totalSessions >= expectedSessions,
+      onTrackMinutes:  totalMinutes  >= expectedMinutes,
+      aheadSessions: totalSessions - expectedSessions,
+      aheadMinutes:  totalMinutes  - expectedMinutes,
+    };
+  };
+
+  const getStats = function() {
+    if (entries.length === 0) return null;
+    const sorted    = entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+    const latest    = sorted[sorted.length - 1];
+    const previous  = sorted[sorted.length - 2];
+    const diff      = previous ? (latest.weight - previous.weight).toFixed(1) : 0;
+    const toGoal    = (latest.weight - goalWeight).toFixed(1);
+    const totalLoss = (sorted[0].weight - latest.weight).toFixed(1);
+    const recentSteps = sorted.slice(-7).filter(function(e){return e.steps;}).map(function(e){return e.steps;});
+    const avgSteps  = recentSteps.length ? Math.round(recentSteps.reduce(function(a,b){return a+b;},0) / recentSteps.length) : 0;
+    const bmi    = getBMI(latest.weight);
+    const bmiCat = bmi ? getBMICategory(bmi) : null;
+    return { latest: latest, diff: diff, toGoal: toGoal, totalLoss: totalLoss, avgSteps: avgSteps, bmi: bmi, bmiCat: bmiCat, streak: getStreak() };
+  };
+
+  const getChartData = function() {
+    const sorted = entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+    return sorted.map(function(entry, idx) {
+      const w7 = sorted.slice(Math.max(0, idx - 6), idx + 1);
+      return {
+        datum:   new Date(entry.date).toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' }),
+        vikt:    entry.weight,
+        steg:    entry.steps || 0,
+        målvikt: goalWeight,
+        snitt7:  parseFloat((w7.reduce(function(s,e){return s+e.weight;},0) / w7.length).toFixed(2)),
       };
-      const getBMICategory = (bmi) => {
-        if (bmi < 18.5) return { label: 'Undervikt',  color: 'text-blue-600' };
-        if (bmi < 25)   return { label: 'Normalvikt', color: 'text-green-600' };
-        if (bmi < 30)   return { label: 'Övervikt',   color: 'text-yellow-600' };
-        return             { label: 'Fetma',       color: 'text-red-600' };
-      };
+    });
+  };
 
-      const getStreak = () => {
-        if (entries.length === 0) return 0;
-        const sorted = [...entries].sort((a, b) => new Date(b.date) - new Date(a.date));
-        const todayD  = new Date(); todayD.setHours(0,0,0,0);
-        const latestD = new Date(sorted[0].date); latestD.setHours(0,0,0,0);
-        if ((todayD - latestD) / 86400000 > 1) return 0;
-        let streak = 1, prev = new Date(sorted[0].date); prev.setHours(0,0,0,0);
-        for (let i = 1; i < sorted.length; i++) {
-          const d = new Date(sorted[i].date); d.setHours(0,0,0,0);
-          if ((prev - d) / 86400000 === 1) { streak++; prev = d; } else break;
-        }
-        return streak;
-      };
+  const stats        = getStats();
+  const weeklyStats  = getWeeklyStats();
+  const currentWeek  = getCurrentWeekStats();
+  const yearProgress = getYearlyProgress();
+  const chartData    = getChartData();
 
-      const getCalories = (type, duration, weight = 80) => {
-        const mets = { 'Styrketräning':5,'Löpning':9,'Promenad':3.5,'Cykling':7,'Simning':7,'Yoga':2.5,'Pilates':3,'Fotboll':7,'Tennis':7,'Golf':4,'Skidåkning':7,'Innebandy':8,'Dans':5,'Boxning':9,'Klättring':8,'Crossfit':10,'Spinning':8,'Gruppträning':6,'Baseboll':4,'Annat':5 };
-        return Math.round((mets[type] || 5) * weight * (duration / 60));
-      };
+  const NavButton = function(props) {
+    return h('button', {
+      onClick: function() { setView(props.id); },
+      className: 'px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ' + (view === props.id ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-indigo-50')
+    }, props.label);
+  };
 
-      const getWeekNumber = (date) => {
-        const d = new Date(date);
-        const diff = d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1);
-        const monday = new Date(d.setDate(diff));
-        monday.setHours(0,0,0,0);
-        return monday.toISOString().split('T')[0];
-      };
+  if (loading) {
+    return h('div', { className: 'min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center' },
+      h('div', { className: 'text-center' },
+        h('div', { className: 'text-5xl mb-4' }, '🏃'),
+        h('p', { className: 'text-gray-500' }, 'Laddar…')
+      )
+    );
+  }
 
-      const getISOWeekNumber = (date) => {
-        const d = new Date(date);
-        d.setHours(0,0,0,0);
-        d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-        const yearStart = new Date(d.getFullYear(), 0, 1);
-        return `V${Math.ceil((((d - yearStart) / 86400000) + 1) / 7)}`;
-      };
+  // ─── View rendering helpers ─────────────────────────────────────────────────
 
-      const getWeeklyStats = () => {
-        if (entries.length === 0) return [];
-        const sorted = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
-        const weekMap = {};
-        sorted.forEach(entry => {
-          const ws = getWeekNumber(entry.date);
-          if (!weekMap[ws]) weekMap[ws] = { weekStart: ws, weights: [], steps: [] };
-          weekMap[ws].weights.push(entry.weight);
-          if (entry.steps) weekMap[ws].steps.push(entry.steps);
-        });
-        const weeks = Object.values(weekMap).map(week => {
-          const avgWeight = week.weights.reduce((a, b) => a + b, 0) / week.weights.length;
-          const avgSteps  = week.steps.length ? Math.round(week.steps.reduce((a, b) => a + b, 0) / week.steps.length) : 0;
-          const weekWorkouts = workouts.filter(w => getWeekNumber(w.date) === week.weekStart);
-          return {
-            weekStart: week.weekStart, weekNumber: getISOWeekNumber(week.weekStart),
-            avgWeight: parseFloat(avgWeight.toFixed(1)),
-            avgSteps, workoutCount: weekWorkouts.length,
-            totalMinutes: weekWorkouts.reduce((s, w) => s + w.duration, 0),
-            change: 0,
-          };
-        });
-        for (let i = 1; i < weeks.length; i++) {
-          weeks[i].change = parseFloat((weeks[i].avgWeight - weeks[i-1].avgWeight).toFixed(2));
-        }
-        return weeks.sort((a, b) => new Date(b.weekStart) - new Date(a.weekStart));
-      };
-
-      const getCurrentWeekStats = () => {
-        const ws = getWeeklyStats();
-        if (!ws.length) return null;
-        return { thisWeek: ws[0], lastWeek: ws[1] || null };
-      };
-
-      const getYearlyProgress = () => {
-        const yr = new Date().getFullYear();
-        const yearWorkouts = workouts.filter(w => new Date(w.date).getFullYear() === yr);
-        const totalSessions = yearWorkouts.length;
-        const totalMinutes  = yearWorkouts.reduce((s, w) => s + w.duration, 0);
-        const weeksElapsed  = Math.floor((new Date() - new Date(yr, 0, 1)) / (7*24*60*60*1000)) + 1;
-        const expectedSessions = Math.round((yearlyGoal.sessions / 52) * weeksElapsed);
-        const expectedMinutes  = Math.round((yearlyGoal.minutes  / 52) * weeksElapsed);
-        return {
-          totalSessions, totalMinutes,
-          goalSessions: yearlyGoal.sessions, goalMinutes: yearlyGoal.minutes,
-          sessionsProgress: Math.min(totalSessions / yearlyGoal.sessions * 100, 100).toFixed(1),
-          minutesProgress:  Math.min(totalMinutes  / yearlyGoal.minutes  * 100, 100).toFixed(1),
-          onTrackSessions: totalSessions >= expectedSessions,
-          onTrackMinutes:  totalMinutes  >= expectedMinutes,
-          aheadSessions: totalSessions - expectedSessions,
-          aheadMinutes:  totalMinutes  - expectedMinutes,
-        };
-      };
-
-      const getStats = () => {
-        if (entries.length === 0) return null;
-        const sorted    = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
-        const latest    = sorted[sorted.length - 1];
-        const previous  = sorted[sorted.length - 2];
-        const diff      = previous ? (latest.weight - previous.weight).toFixed(1) : 0;
-        const toGoal    = (latest.weight - goalWeight).toFixed(1);
-        const totalLoss = (sorted[0].weight - latest.weight).toFixed(1);
-        const recentSteps = sorted.slice(-7).filter(e => e.steps).map(e => e.steps);
-        const avgSteps  = recentSteps.length ? Math.round(recentSteps.reduce((a, b) => a + b, 0) / recentSteps.length) : 0;
-        const bmi    = getBMI(latest.weight);
-        const bmiCat = bmi ? getBMICategory(bmi) : null;
-        return { latest, diff, toGoal, totalLoss, avgSteps, bmi, bmiCat, streak: getStreak() };
-      };
-
-      const getChartData = () => {
-        const sorted = [...entries].sort((a, b) => new Date(a.date) - new Date(b.date));
-        return sorted.map((entry, idx) => {
-          const w7 = sorted.slice(Math.max(0, idx - 6), idx + 1);
-          return {
-            datum:   new Date(entry.date).toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' }),
-            vikt:    entry.weight,
-            steg:    entry.steps || 0,
-            målvikt: goalWeight,
-            snitt7:  parseFloat((w7.reduce((s, e) => s + e.weight, 0) / w7.length).toFixed(2)),
-          };
-        });
-      };
-
-      const stats        = getStats();
-      const weeklyStats  = getWeeklyStats();
-      const currentWeek  = getCurrentWeekStats();
-      const yearProgress = getYearlyProgress();
-      const chartData    = getChartData();
-
-      const NavButton = ({ id, label }) => (
-        <button onClick={() => setView(id)}
-          className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-colors ${
-            view === id ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-indigo-50'
-          }`}>
-          {label}
-        </button>
-      );
-
-      if (loading) return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-          <div className="text-center"><div className="text-5xl mb-4">🏃</div><p className="text-gray-500">Laddar…</p></div>
-        </div>
-      );
-
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-          <Toast toast={toast} onClose={() => setToast(null)} />
-          <div className="max-w-6xl mx-auto">
-
-            {/* Header */}
-            <div className="bg-white rounded-2xl shadow-xl p-6 mb-6 flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-800 mb-1">🏥 Hälsodagbok</h1>
-                <p className="text-gray-500 text-sm">Följ din vikt och aktivitet</p>
-              </div>
-              {stats && (
-                <div className="text-right">
-                  <p className="text-xs text-gray-400 uppercase tracking-wide">Senast loggat</p>
-                  <p className="font-bold text-gray-700">{new Date(stats.latest.date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Nav */}
-            <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
-              <NavButton id="overview" label="Översikt" />
-              <NavButton id="add"      label="+ Lägg till" />
-              <NavButton id="workouts" label="Träning" />
-              <NavButton id="history"  label="Historik" />
-              <NavButton id="weekly"   label="Veckor" />
-              <button onClick={() => setShowImport(!showImport)}
-                className="px-4 py-2 rounded-lg font-medium whitespace-nowrap bg-white text-gray-700 border border-indigo-200 hover:bg-indigo-50">
-                Backup
-              </button>
-            </div>
-
-            {/* Backup panel */}
-            {showImport && (
-              <div className="bg-white rounded-xl p-6 shadow-md mb-6">
-                <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-xl font-bold text-gray-800">Backup & Import</h2>
-                  <button onClick={() => setShowImport(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
-                </div>
-                <div className="space-y-6">
-                  <div className="flex gap-3 flex-wrap">
-                    <button onClick={exportData} className="bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 text-sm font-medium">💾 Ladda ner backup</button>
-                    <label className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium cursor-pointer">
-                      📂 Återställ från fil
-                      <input type="file" accept=".json" onChange={importFromFile} className="hidden" />
-                    </label>
-                  </div>
-                  <div className="border-t pt-5">
-                    <h3 className="font-medium mb-1 text-sm text-gray-700">📋 Importera historisk viktdata</h3>
-                    <p className="text-xs text-gray-400 mb-3">Format per rad: <code className="bg-gray-100 px-1 rounded">03-nov 91,1</code></p>
-                    <textarea value={importText} onChange={(e) => setImportText(e.target.value)}
-                      placeholder={"03-nov 91,1\n04-nov 90,8\n..."}
-                      className="w-full px-4 py-2 border rounded-lg font-mono text-sm mb-3 outline-none" rows="6" />
-                    <button onClick={importHistoricalData} className="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 text-sm font-medium">Importera</button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* OVERVIEW */}
-            {view === 'overview' && stats && (
-              <div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  <StatCard emoji="📉" label="Senaste vikt" value={`${stats.latest.weight} kg`}
-                    sub={`${parseFloat(stats.diff) > 0 ? '+' : ''}${stats.diff} kg från förra`}
-                    subColor={parseFloat(stats.diff) <= 0 ? 'text-green-600' : 'text-red-500'} />
-                  <StatCard emoji="🎯" label="Till målet" value={`${Math.abs(stats.toGoal)} kg`} sub={`Mål: ${goalWeight} kg`} />
-                  <StatCard emoji="🔥" label="Total nedgång" value={`${stats.totalLoss} kg`} sub={`${entries.length} mätningar`} />
-                  {stats.bmi
-                    ? <StatCard emoji="⚖️" label="BMI" value={stats.bmi} sub={stats.bmiCat?.label} subColor={stats.bmiCat?.color} />
-                    : <StatCard emoji="👟" label="Snitt steg (7d)" value={stats.avgSteps.toLocaleString()} sub="senaste 7 dagarna" />
-                  }
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  <StatCard emoji="🏆" label="Inloggningssvit" value={`${stats.streak} 🔥`} sub={stats.streak > 0 ? 'dagar i rad' : 'Logga idag!'} />
-                  <StatCard emoji="👟" label="Snitt steg (7d)" value={stats.avgSteps.toLocaleString()} sub="senaste veckan" />
-                  <div className="bg-white rounded-xl p-4 shadow-md col-span-2">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-2">💪 Veckoträning</p>
-                    {currentWeek ? (
-                      <div className="flex gap-8">
-                        <div><p className="text-xl font-bold text-gray-800">{currentWeek.thisWeek.workoutCount} pass</p><p className="text-xs text-gray-500">{currentWeek.thisWeek.totalMinutes} min · denna vecka</p></div>
-                        {currentWeek.lastWeek && <div className="text-gray-400"><p className="text-xl font-bold">{currentWeek.lastWeek.workoutCount} pass</p><p className="text-xs">{currentWeek.lastWeek.totalMinutes} min · förra veckan</p></div>}
-                      </div>
-                    ) : <p className="text-gray-400 text-sm">Ingen träning loggad</p>}
-                  </div>
-                </div>
-
-                {currentWeek && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border-2 border-indigo-200 rounded-xl p-5">
-                      <h3 className="text-xs font-bold text-indigo-600 mb-3 uppercase tracking-wide">📅 Denna vecka ({currentWeek.thisWeek.weekNumber})</h3>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div><p className="text-xs text-gray-500">Snitt vikt</p><p className="text-xl font-bold text-indigo-700">{currentWeek.thisWeek.avgWeight} kg</p></div>
-                        <div><p className="text-xs text-gray-500">Förändring</p><p className={`text-xl font-bold ${currentWeek.thisWeek.change <= 0 ? 'text-green-600' : 'text-red-500'}`}>{currentWeek.thisWeek.change > 0 ? '+' : ''}{currentWeek.thisWeek.change} kg</p></div>
-                        <div><p className="text-xs text-gray-500">Snitt steg</p><p className="text-xl font-bold text-indigo-700">{currentWeek.thisWeek.avgSteps.toLocaleString()}</p></div>
-                        <div><p className="text-xs text-gray-500">Träning</p><p className="text-xl font-bold text-indigo-700">{currentWeek.thisWeek.workoutCount} pass</p><p className="text-xs text-gray-400">{currentWeek.thisWeek.totalMinutes} min</p></div>
-                      </div>
-                    </div>
-                    {currentWeek.lastWeek && (
-                      <div className="bg-white border-2 border-gray-100 rounded-xl p-5">
-                        <h3 className="text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide">📊 Förra veckan ({currentWeek.lastWeek.weekNumber})</h3>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div><p className="text-xs text-gray-500">Snitt vikt</p><p className="text-xl font-bold text-gray-700">{currentWeek.lastWeek.avgWeight} kg</p></div>
-                          <div><p className="text-xs text-gray-500">Förändring</p><p className={`text-xl font-bold ${currentWeek.lastWeek.change <= 0 ? 'text-green-600' : 'text-red-500'}`}>{currentWeek.lastWeek.change > 0 ? '+' : ''}{currentWeek.lastWeek.change} kg</p></div>
-                          <div><p className="text-xs text-gray-500">Snitt steg</p><p className="text-xl font-bold text-gray-700">{currentWeek.lastWeek.avgSteps.toLocaleString()}</p></div>
-                          <div><p className="text-xs text-gray-500">Träning</p><p className="text-xl font-bold text-gray-700">{currentWeek.lastWeek.workoutCount} pass</p><p className="text-xs text-gray-400">{currentWeek.lastWeek.totalMinutes} min</p></div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="bg-white rounded-xl p-6 shadow-md mb-6">
-                  <h2 className="text-lg font-bold text-gray-800 mb-1">Viktutveckling</h2>
-                  <p className="text-xs text-gray-400 mb-4">Daglig vikt + 7-dagars glidande medelvärde</p>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="datum" tick={{ fontSize: 11 }} />
-                      <YAxis domain={['dataMin - 1', 'dataMax + 1']} tick={{ fontSize: 11 }} />
-                      <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
-                      <Legend />
-                      <Line type="monotone" dataKey="vikt"    stroke="#a5b4fc" strokeWidth={1.5} name="Vikt (kg)"      dot={{ r: 2 }} />
-                      <Line type="monotone" dataKey="snitt7"  stroke="#4f46e5" strokeWidth={2.5} name="7-dagars snitt" dot={false} />
-                      <Line type="monotone" dataKey="målvikt" stroke="#10b981" strokeWidth={1.5} name="Målvikt"        dot={false} strokeDasharray="5 5" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-
-                <div className="bg-white rounded-xl p-6 shadow-md">
-                  <h2 className="text-lg font-bold text-gray-800 mb-4">Steg per dag</h2>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="datum" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} />
-                      <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
-                      <Bar dataKey="steg" fill="#fb923c" name="Steg" radius={[2, 2, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
-
-            {view === 'overview' && !stats && (
-              <div className="bg-white rounded-xl p-12 text-center shadow-md">
-                <div className="text-5xl mb-4">📊</div>
-                <p className="text-gray-600 text-lg mb-2">Ingen data än</p>
-                <p className="text-gray-400 text-sm mb-6">Lägg till din första vikt eller importera historik</p>
-                <div className="flex gap-3 justify-center flex-wrap">
-                  <button onClick={() => setView('add')} className="bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700">Lägg till mätning</button>
-                  <button onClick={() => setShowImport(true)} className="bg-white border-2 border-indigo-200 text-indigo-600 px-6 py-3 rounded-lg hover:bg-indigo-50">Importera data</button>
-                </div>
-              </div>
-            )}
-
-            {/* ADD */}
-            {view === 'add' && (
-              <div className="max-w-lg mx-auto">
-                <div className="bg-white rounded-xl p-6 shadow-md">
-                  <h2 className="text-xl font-bold mb-5 text-gray-800">Lägg till mätning</h2>
-                  <div className="space-y-4">
-                    <div className="flex gap-2">
-                      <input type="date" value={newEntry.date} onChange={(e) => setNewEntry({...newEntry, date: e.target.value})}
-                        className="flex-1 px-4 py-3 border rounded-lg outline-none" />
-                      <button onClick={() => setNewEntry({...newEntry, date: todayStr()})}
-                        className="px-4 py-3 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100">Idag</button>
-                    </div>
-                    <div className="relative">
-                      <input type="number" step="0.1" value={newEntry.weight} onChange={(e) => setNewEntry({...newEntry, weight: e.target.value})}
-                        placeholder="Vikt (kg)" className="w-full px-4 py-3 border rounded-lg outline-none" />
-                      {newEntry.weight && height > 0 && (
-                        <span className="absolute right-3 top-3.5 text-xs text-gray-400">BMI: {getBMI(parseFloat(newEntry.weight))}</span>
-                      )}
-                    </div>
-                    <input type="number" value={newEntry.steps} onChange={(e) => setNewEntry({...newEntry, steps: e.target.value})}
-                      placeholder="Steg (valfritt)" className="w-full px-4 py-3 border rounded-lg outline-none" />
-                    <input type="text" value={newEntry.comment} onChange={(e) => setNewEntry({...newEntry, comment: e.target.value})}
-                      placeholder="Kommentar (valfritt)" className="w-full px-4 py-3 border rounded-lg outline-none" />
-                    <button onClick={addEntry} disabled={!newEntry.weight}
-                      className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 disabled:opacity-40 font-medium">
-                      + Spara mätning
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* WORKOUTS */}
-            {view === 'workouts' && (
-              <div>
-                <div className="bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200 rounded-xl p-6 mb-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-bold text-gray-800">🎯 Årsmål {new Date().getFullYear()}</h2>
-                    <button onClick={() => setView('goals')} className="text-xs text-orange-600 font-medium hover:underline">Ändra mål →</button>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <div className="flex justify-between mb-1"><span className="text-sm font-medium">Träningspass</span>
-                        <span className={`text-sm font-bold ${yearProgress.onTrackSessions ? 'text-green-600' : 'text-orange-600'}`}>{yearProgress.totalSessions}/{yearProgress.goalSessions}</span></div>
-                      <div className="w-full bg-gray-200 rounded-full h-3 mb-1">
-                        <div className={`h-3 rounded-full ${yearProgress.onTrackSessions ? 'bg-green-500' : 'bg-orange-500'}`} style={{width:`${yearProgress.sessionsProgress}%`}} /></div>
-                      <p className={`text-xs ${yearProgress.onTrackSessions ? 'text-green-600' : 'text-orange-500'}`}>
-                        {yearProgress.onTrackSessions ? `✓ Före plan med ${yearProgress.aheadSessions} pass` : `${Math.abs(yearProgress.aheadSessions)} pass efter plan`}</p>
-                    </div>
-                    <div>
-                      <div className="flex justify-between mb-1"><span className="text-sm font-medium">Träningstid</span>
-                        <span className={`text-sm font-bold ${yearProgress.onTrackMinutes ? 'text-green-600' : 'text-orange-600'}`}>{Math.round(yearProgress.totalMinutes/60)}h/{Math.round(yearProgress.goalMinutes/60)}h</span></div>
-                      <div className="w-full bg-gray-200 rounded-full h-3 mb-1">
-                        <div className={`h-3 rounded-full ${yearProgress.onTrackMinutes ? 'bg-green-500' : 'bg-orange-500'}`} style={{width:`${yearProgress.minutesProgress}%`}} /></div>
-                      <p className={`text-xs ${yearProgress.onTrackMinutes ? 'text-green-600' : 'text-orange-500'}`}>
-                        {yearProgress.onTrackMinutes ? `✓ Före plan med ${Math.abs(yearProgress.aheadMinutes)} min` : `${Math.abs(yearProgress.aheadMinutes)} min efter plan`}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-xl p-6 shadow-md mb-6">
-                  <h2 className="text-lg font-bold mb-4 text-gray-800">Lägg till träningspass</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="flex gap-2">
-                      <input type="date" value={newWorkout.date} onChange={(e) => setNewWorkout({...newWorkout, date: e.target.value})}
-                        className="flex-1 px-4 py-3 border rounded-lg outline-none" />
-                      <button onClick={() => setNewWorkout({...newWorkout, date: todayStr()})}
-                        className="px-3 py-3 bg-orange-50 text-orange-600 rounded-lg text-sm hover:bg-orange-100">Idag</button>
-                    </div>
-                    <select value={newWorkout.type} onChange={(e) => setNewWorkout({...newWorkout, type: e.target.value})}
-                      className="w-full px-4 py-3 border rounded-lg outline-none">
-                      <option value="">Välj typ…</option>
-                      {['Styrketräning','Löpning','Promenad','Cykling','Simning','Yoga','Pilates','Fotboll','Tennis','Baseboll','Golf','Skidåkning','Innebandy','Dans','Boxning','Klättring','Crossfit','Spinning','Gruppträning','Annat'].map(t => <option key={t}>{t}</option>)}
-                    </select>
-                    <div>
-                      <input type="number" value={newWorkout.duration} onChange={(e) => setNewWorkout({...newWorkout, duration: e.target.value})}
-                        placeholder="Minuter" className="w-full px-4 py-3 border rounded-lg outline-none" />
-                      {newWorkout.type && newWorkout.duration && (
-                        <p className="text-xs text-gray-400 mt-1">≈ {getCalories(newWorkout.type, parseInt(newWorkout.duration), stats?.latest?.weight)} kcal</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-500 block mb-1">Intensitet (1–5)</label>
-                      <div className="flex gap-2">
-                        {[1,2,3,4,5].map(i => (
-                          <button key={i} onClick={() => setNewWorkout({...newWorkout, intensity: i.toString()})}
-                            className={`flex-1 py-2.5 rounded-lg text-sm font-bold ${parseInt(newWorkout.intensity) === i ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-orange-100'}`}>{i}</button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="md:col-span-2">
-                      <input type="text" value={newWorkout.comment} onChange={(e) => setNewWorkout({...newWorkout, comment: e.target.value})}
-                        placeholder="Kommentar (valfritt)" className="w-full px-4 py-3 border rounded-lg outline-none" />
-                    </div>
-                  </div>
-                  <button onClick={addWorkout} disabled={!newWorkout.type || !newWorkout.duration}
-                    className="mt-4 w-full bg-orange-600 text-white py-3 rounded-lg hover:bg-orange-700 disabled:opacity-40 font-medium">
-                    💪 Spara träningspass
-                  </button>
-                </div>
-
-                {workouts.length > 0 && (
-                  <div className="bg-white rounded-xl p-6 shadow-md">
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-lg font-bold text-gray-800">Senaste träningspass</h2>
-                      <span className="text-xs text-gray-400">{workouts.length} totalt</span>
-                    </div>
-                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {[...workouts].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 25).map(w => (
-                        <div key={w.id} className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg hover:bg-orange-50">
-                          <div>
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <span className="font-medium text-sm text-gray-800">{w.type}</span>
-                              {w.intensity && <IntensityDots level={w.intensity} />}
-                            </div>
-                            <p className="text-xs text-gray-400">
-                              {new Date(w.date).toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })}
-                              {w.comment ? ` · ${w.comment}` : ''}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-right">
-                              <p className="text-sm font-bold text-gray-800">{w.duration} min</p>
-                              <p className="text-xs text-gray-400">≈ {getCalories(w.type, w.duration, stats?.latest?.weight || 80)} kcal</p>
-                            </div>
-                            <button onClick={() => deleteWorkout(w.id)} className="text-gray-300 hover:text-red-500">✕</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* GOALS */}
-            {view === 'goals' && (
-              <div className="max-w-lg mx-auto">
-                <div className="bg-white rounded-xl p-6 shadow-md">
-                  <h2 className="text-xl font-bold mb-5 text-gray-800">Mål & inställningar</h2>
-                  <div className="space-y-5">
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 block mb-1">Målvikt (kg)</label>
-                      <input type="number" step="0.5" value={goalWeight} onChange={(e) => setGoalWeight(parseFloat(e.target.value) || 0)}
-                        className="w-full px-4 py-3 border rounded-lg outline-none" />
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 block mb-1">Din längd (cm) – för BMI</label>
-                      <input type="number" value={height} onChange={(e) => setHeight(parseFloat(e.target.value) || 0)}
-                        className="w-full px-4 py-3 border rounded-lg outline-none" />
-                    </div>
-                    <div className="border-t pt-5">
-                      <p className="text-sm font-semibold text-gray-700 mb-3">Årsmål {new Date().getFullYear()}</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-xs text-gray-500">Träningspass</label>
-                          <input type="number" value={yearlyGoal.sessions} onChange={(e) => setYearlyGoal({...yearlyGoal, sessions: parseInt(e.target.value) || 0})}
-                            className="w-full px-4 py-3 border rounded-lg outline-none mt-1" />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-500">Total tid (minuter)</label>
-                          <input type="number" value={yearlyGoal.minutes} onChange={(e) => setYearlyGoal({...yearlyGoal, minutes: parseInt(e.target.value) || 0})}
-                            className="w-full px-4 py-3 border rounded-lg outline-none mt-1" />
-                        </div>
-                      </div>
-                    </div>
-                    <button onClick={() => setView('workouts')} className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 font-medium">✓ Spara</button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* HISTORY */}
-            {view === 'history' && (
-              <div className="bg-white rounded-xl p-6 shadow-md">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-bold text-gray-800">Mätningshistorik</h2>
-                  <span className="text-sm text-gray-400">{entries.length} mätningar</span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b-2 border-gray-100">
-                        <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Datum</th>
-                        <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Vikt</th>
-                        <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Δ</th>
-                        <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Steg</th>
-                        <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Kommentar</th>
-                        <th />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...entries].sort((a, b) => new Date(b.date) - new Date(a.date)).map((entry, idx, arr) => {
-                        const prev = arr[idx + 1];
-                        const diff = prev ? (entry.weight - prev.weight).toFixed(1) : null;
-                        return (
-                          <tr key={entry.id} className="border-b border-gray-50 hover:bg-gray-50">
-                            <td className="py-3 text-sm text-gray-700">{new Date(entry.date).toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })}</td>
-                            <td className="py-3 font-bold text-gray-800">{entry.weight} kg</td>
-                            <td className="py-3 text-sm">{diff !== null && <span className={parseFloat(diff) <= 0 ? 'text-green-600' : 'text-red-500'}>{parseFloat(diff) > 0 ? '+' : ''}{diff}</span>}</td>
-                            <td className="py-3 text-sm text-gray-500">{entry.steps?.toLocaleString() || '–'}</td>
-                            <td className="py-3 text-xs text-gray-400 max-w-xs truncate">{entry.comment || ''}</td>
-                            <td className="py-3"><button onClick={() => deleteEntry(entry.id)} className="text-gray-300 hover:text-red-500 text-xs">✕</button></td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* WEEKLY */}
-            {view === 'weekly' && (
-              <div className="bg-white rounded-xl p-6 shadow-md">
-                <h2 className="text-xl font-bold mb-4 text-gray-800">Veckoöversikt</h2>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b-2 border-gray-100">
-                        <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Vecka</th>
-                        <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Snitt vikt</th>
-                        <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Förändring</th>
-                        <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Steg/dag</th>
-                        <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Pass</th>
-                        <th className="text-left py-3 text-xs uppercase tracking-wide text-gray-400">Min</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {weeklyStats.map((week, idx) => (
-                        <tr key={week.weekStart} className={`border-b border-gray-50 hover:bg-gray-50 ${idx === 0 ? 'bg-indigo-50' : ''}`}>
-                          <td className="py-3 font-bold text-sm text-gray-800">{week.weekNumber}</td>
-                          <td className="py-3 font-semibold text-gray-800">{week.avgWeight} kg</td>
-                          <td className={`py-3 font-medium text-sm ${week.change < 0 ? 'text-green-600' : week.change > 0 ? 'text-red-500' : 'text-gray-400'}`}>
-                            {week.change > 0 ? '+' : ''}{week.change} kg
-                          </td>
-                          <td className="py-3 text-sm text-gray-600">{week.avgSteps.toLocaleString()}</td>
-                          <td className="py-3 text-sm text-gray-600">{week.workoutCount}</td>
-                          <td className="py-3 text-sm text-gray-500">{week.totalMinutes || '–'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-          </div>
-        </div>
+  function renderOverview() {
+    if (!stats) {
+      return h('div', { className: 'bg-white rounded-xl p-12 text-center shadow-md' },
+        h('div', { className: 'text-5xl mb-4' }, '📊'),
+        h('p', { className: 'text-gray-600 text-lg mb-2' }, 'Ingen data än'),
+        h('p', { className: 'text-gray-400 text-sm mb-6' }, 'Lägg till din första vikt eller importera historik'),
+        h('div', { className: 'flex gap-3 justify-center flex-wrap' },
+          h('button', { onClick: function(){setView('add');}, className: 'bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700' }, 'Lägg till mätning'),
+          h('button', { onClick: function(){setShowImport(true);}, className: 'bg-white border-2 border-indigo-200 text-indigo-600 px-6 py-3 rounded-lg hover:bg-indigo-50' }, 'Importera data')
+        )
       );
     }
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<WeightStepTracker />);
-  </script>
+    const diffNum = parseFloat(stats.diff);
+    return h('div', null,
+      // Row 1 stats
+      h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-4' },
+        h(StatCard, { emoji:'📉', label:'Senaste vikt', value: stats.latest.weight + ' kg', sub: (diffNum > 0 ? '+' : '') + stats.diff + ' kg från förra', subColor: diffNum <= 0 ? 'text-green-600' : 'text-red-500' }),
+        h(StatCard, { emoji:'🎯', label:'Till målet', value: Math.abs(stats.toGoal) + ' kg', sub: 'Mål: ' + goalWeight + ' kg' }),
+        h(StatCard, { emoji:'🔥', label:'Total nedgång', value: stats.totalLoss + ' kg', sub: entries.length + ' mätningar' }),
+        stats.bmi
+          ? h(StatCard, { emoji:'⚖️', label:'BMI', value: stats.bmi, sub: stats.bmiCat ? stats.bmiCat.label : '', subColor: stats.bmiCat ? stats.bmiCat.color : '' })
+          : h(StatCard, { emoji:'👟', label:'Snitt steg (7d)', value: stats.avgSteps.toLocaleString(), sub: 'senaste 7 dagarna' })
+      ),
+      // Row 2 stats
+      h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-6' },
+        h(StatCard, { emoji:'🏆', label:'Inloggningssvit', value: stats.streak + ' 🔥', sub: stats.streak > 0 ? 'dagar i rad' : 'Logga idag!' }),
+        h(StatCard, { emoji:'👟', label:'Snitt steg (7d)', value: stats.avgSteps.toLocaleString(), sub: 'senaste veckan' }),
+        h('div', { className: 'bg-white rounded-xl p-4 shadow-md col-span-2' },
+          h('p', { className: 'text-xs text-gray-500 uppercase tracking-wide font-medium mb-2' }, '💪 Veckoträning'),
+          currentWeek
+            ? h('div', { className: 'flex gap-8' },
+                h('div', null,
+                  h('p', { className: 'text-xl font-bold text-gray-800' }, currentWeek.thisWeek.workoutCount + ' pass'),
+                  h('p', { className: 'text-xs text-gray-500' }, currentWeek.thisWeek.totalMinutes + ' min · denna vecka')
+                ),
+                currentWeek.lastWeek ? h('div', { className: 'text-gray-400' },
+                  h('p', { className: 'text-xl font-bold' }, currentWeek.lastWeek.workoutCount + ' pass'),
+                  h('p', { className: 'text-xs' }, currentWeek.lastWeek.totalMinutes + ' min · förra veckan')
+                ) : null
+              )
+            : h('p', { className: 'text-gray-400 text-sm' }, 'Ingen träning loggad')
+        )
+      ),
+      // This/last week
+      currentWeek ? h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-6' },
+        h('div', { className: 'bg-gradient-to-r from-indigo-50 to-blue-50 border-2 border-indigo-200 rounded-xl p-5' },
+          h('h3', { className: 'text-xs font-bold text-indigo-600 mb-3 uppercase tracking-wide' }, '📅 Denna vecka (' + currentWeek.thisWeek.weekNumber + ')'),
+          h('div', { className: 'grid grid-cols-2 gap-3' },
+            h('div', null, h('p', {className:'text-xs text-gray-500'}, 'Snitt vikt'), h('p', {className:'text-xl font-bold text-indigo-700'}, currentWeek.thisWeek.avgWeight + ' kg')),
+            h('div', null, h('p', {className:'text-xs text-gray-500'}, 'Förändring'), h('p', {className:'text-xl font-bold ' + (currentWeek.thisWeek.change <= 0 ? 'text-green-600' : 'text-red-500')}, (currentWeek.thisWeek.change > 0 ? '+' : '') + currentWeek.thisWeek.change + ' kg')),
+            h('div', null, h('p', {className:'text-xs text-gray-500'}, 'Snitt steg'), h('p', {className:'text-xl font-bold text-indigo-700'}, currentWeek.thisWeek.avgSteps.toLocaleString())),
+            h('div', null, h('p', {className:'text-xs text-gray-500'}, 'Träning'), h('p', {className:'text-xl font-bold text-indigo-700'}, currentWeek.thisWeek.workoutCount + ' pass'), h('p', {className:'text-xs text-gray-400'}, currentWeek.thisWeek.totalMinutes + ' min'))
+          )
+        ),
+        currentWeek.lastWeek ? h('div', { className: 'bg-white border-2 border-gray-100 rounded-xl p-5' },
+          h('h3', { className: 'text-xs font-bold text-gray-400 mb-3 uppercase tracking-wide' }, '📊 Förra veckan (' + currentWeek.lastWeek.weekNumber + ')'),
+          h('div', { className: 'grid grid-cols-2 gap-3' },
+            h('div', null, h('p', {className:'text-xs text-gray-500'}, 'Snitt vikt'), h('p', {className:'text-xl font-bold text-gray-700'}, currentWeek.lastWeek.avgWeight + ' kg')),
+            h('div', null, h('p', {className:'text-xs text-gray-500'}, 'Förändring'), h('p', {className:'text-xl font-bold ' + (currentWeek.lastWeek.change <= 0 ? 'text-green-600' : 'text-red-500')}, (currentWeek.lastWeek.change > 0 ? '+' : '') + currentWeek.lastWeek.change + ' kg')),
+            h('div', null, h('p', {className:'text-xs text-gray-500'}, 'Snitt steg'), h('p', {className:'text-xl font-bold text-gray-700'}, currentWeek.lastWeek.avgSteps.toLocaleString())),
+            h('div', null, h('p', {className:'text-xs text-gray-500'}, 'Träning'), h('p', {className:'text-xl font-bold text-gray-700'}, currentWeek.lastWeek.workoutCount + ' pass'), h('p', {className:'text-xs text-gray-400'}, currentWeek.lastWeek.totalMinutes + ' min'))
+          )
+        ) : null
+      ) : null,
+      // Weight chart
+      h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
+        h('h2', { className: 'text-lg font-bold text-gray-800 mb-1' }, 'Viktutveckling'),
+        h('p', { className: 'text-xs text-gray-400 mb-4' }, 'Daglig vikt + 7-dagars glidande medelvärde'),
+        h(ResponsiveContainer, { width: '100%', height: 300 },
+          h(LineChart, { data: chartData },
+            h(CartesianGrid, { strokeDasharray: '3 3', stroke: '#f0f0f0' }),
+            h(XAxis, { dataKey: 'datum', tick: { fontSize: 11 } }),
+            h(YAxis, { domain: ['dataMin - 1', 'dataMax + 1'], tick: { fontSize: 11 } }),
+            h(Tooltip, { contentStyle: { borderRadius: '8px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' } }),
+            h(Legend, null),
+            h(Line, { type:'monotone', dataKey:'vikt',    stroke:'#a5b4fc', strokeWidth:1.5, name:'Vikt (kg)',      dot:{ r:2 } }),
+            h(Line, { type:'monotone', dataKey:'snitt7',  stroke:'#4f46e5', strokeWidth:2.5, name:'7-dagars snitt', dot:false }),
+            h(Line, { type:'monotone', dataKey:'målvikt', stroke:'#10b981', strokeWidth:1.5, name:'Målvikt',        dot:false, strokeDasharray:'5 5' })
+          )
+        )
+      ),
+      // Steps chart
+      h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
+        h('h2', { className: 'text-lg font-bold text-gray-800 mb-4' }, 'Steg per dag'),
+        h(ResponsiveContainer, { width: '100%', height: 220 },
+          h(BarChart, { data: chartData },
+            h(CartesianGrid, { strokeDasharray: '3 3', stroke: '#f0f0f0' }),
+            h(XAxis, { dataKey: 'datum', tick: { fontSize: 11 } }),
+            h(YAxis, { tick: { fontSize: 11 } }),
+            h(Tooltip, { contentStyle: { borderRadius: '8px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' } }),
+            h(Bar, { dataKey: 'steg', fill: '#fb923c', name: 'Steg', radius: [2,2,0,0] })
+          )
+        )
+      )
+    );
+  }
+
+  function renderAdd() {
+    const bmiPreview = newEntry.weight && height > 0 ? getBMI(parseFloat(newEntry.weight)) : null;
+    return h('div', { className: 'max-w-lg mx-auto' },
+      h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
+        h('h2', { className: 'text-xl font-bold mb-5 text-gray-800' }, 'Lägg till mätning'),
+        h('div', { className: 'space-y-4' },
+          h('div', { className: 'flex gap-2' },
+            h('input', { type:'date', value: newEntry.date, onChange: function(e){setNewEntry(Object.assign({},newEntry,{date:e.target.value}));}, className:'flex-1 px-4 py-3 border rounded-lg outline-none' }),
+            h('button', { onClick: function(){setNewEntry(Object.assign({},newEntry,{date:todayStr()}));}, className:'px-4 py-3 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100' }, 'Idag')
+          ),
+          h('div', { className: 'relative' },
+            h('input', { type:'number', step:'0.1', value: newEntry.weight, onChange: function(e){setNewEntry(Object.assign({},newEntry,{weight:e.target.value}));}, placeholder:'Vikt (kg)', className:'w-full px-4 py-3 border rounded-lg outline-none' }),
+            bmiPreview ? h('span', { className: 'absolute right-3 top-3.5 text-xs text-gray-400' }, 'BMI: ' + bmiPreview) : null
+          ),
+          h('input', { type:'number', value: newEntry.steps, onChange: function(e){setNewEntry(Object.assign({},newEntry,{steps:e.target.value}));}, placeholder:'Steg (valfritt)', className:'w-full px-4 py-3 border rounded-lg outline-none' }),
+          h('input', { type:'text', value: newEntry.comment, onChange: function(e){setNewEntry(Object.assign({},newEntry,{comment:e.target.value}));}, placeholder:'Kommentar (valfritt)', className:'w-full px-4 py-3 border rounded-lg outline-none' }),
+          h('button', { onClick: addEntry, disabled: !newEntry.weight, className:'w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 disabled:opacity-40 font-medium' }, '+ Spara mätning')
+        )
+      )
+    );
+  }
+
+  function renderWorkouts() {
+    const workoutTypes = ['Styrketräning','Löpning','Promenad','Cykling','Simning','Yoga','Pilates','Fotboll','Tennis','Baseboll','Golf','Skidåkning','Innebandy','Dans','Boxning','Klättring','Crossfit','Spinning','Gruppträning','Annat'];
+    const currentWeight = stats ? stats.latest.weight : 80;
+    const calPreview = newWorkout.type && newWorkout.duration ? getCalories(newWorkout.type, parseInt(newWorkout.duration), currentWeight) : null;
+
+    return h('div', null,
+      // Yearly goal
+      h('div', { className: 'bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200 rounded-xl p-6 mb-6' },
+        h('div', { className: 'flex items-center justify-between mb-4' },
+          h('h2', { className: 'text-lg font-bold text-gray-800' }, '🎯 Årsmål ' + new Date().getFullYear()),
+          h('button', { onClick: function(){setView('goals');}, className:'text-xs text-orange-600 font-medium hover:underline' }, 'Ändra mål →')
+        ),
+        h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-6' },
+          h('div', null,
+            h('div', { className: 'flex justify-between mb-1' }, h('span', {className:'text-sm font-medium'}, 'Träningspass'), h('span', {className:'text-sm font-bold ' + (yearProgress.onTrackSessions ? 'text-green-600' : 'text-orange-600')}, yearProgress.totalSessions + '/' + yearProgress.goalSessions)),
+            h('div', { className: 'w-full bg-gray-200 rounded-full h-3 mb-1' }, h('div', { className: 'h-3 rounded-full ' + (yearProgress.onTrackSessions ? 'bg-green-500' : 'bg-orange-500'), style: { width: yearProgress.sessionsProgress + '%' } })),
+            h('p', { className: 'text-xs ' + (yearProgress.onTrackSessions ? 'text-green-600' : 'text-orange-500') }, yearProgress.onTrackSessions ? '✓ Före plan med ' + yearProgress.aheadSessions + ' pass' : Math.abs(yearProgress.aheadSessions) + ' pass efter plan')
+          ),
+          h('div', null,
+            h('div', { className: 'flex justify-between mb-1' }, h('span', {className:'text-sm font-medium'}, 'Träningstid'), h('span', {className:'text-sm font-bold ' + (yearProgress.onTrackMinutes ? 'text-green-600' : 'text-orange-600')}, Math.round(yearProgress.totalMinutes/60) + 'h/' + Math.round(yearProgress.goalMinutes/60) + 'h')),
+            h('div', { className: 'w-full bg-gray-200 rounded-full h-3 mb-1' }, h('div', { className: 'h-3 rounded-full ' + (yearProgress.onTrackMinutes ? 'bg-green-500' : 'bg-orange-500'), style: { width: yearProgress.minutesProgress + '%' } })),
+            h('p', { className: 'text-xs ' + (yearProgress.onTrackMinutes ? 'text-green-600' : 'text-orange-500') }, yearProgress.onTrackMinutes ? '✓ Före plan med ' + Math.abs(yearProgress.aheadMinutes) + ' min' : Math.abs(yearProgress.aheadMinutes) + ' min efter plan')
+          )
+        )
+      ),
+      // Add workout form
+      h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
+        h('h2', { className: 'text-lg font-bold mb-4 text-gray-800' }, 'Lägg till träningspass'),
+        h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4' },
+          h('div', { className: 'flex gap-2' },
+            h('input', { type:'date', value:newWorkout.date, onChange:function(e){setNewWorkout(Object.assign({},newWorkout,{date:e.target.value}));}, className:'flex-1 px-4 py-3 border rounded-lg outline-none' }),
+            h('button', { onClick:function(){setNewWorkout(Object.assign({},newWorkout,{date:todayStr()}));}, className:'px-3 py-3 bg-orange-50 text-orange-600 rounded-lg text-sm hover:bg-orange-100' }, 'Idag')
+          ),
+          h('select', { value:newWorkout.type, onChange:function(e){setNewWorkout(Object.assign({},newWorkout,{type:e.target.value}));}, className:'w-full px-4 py-3 border rounded-lg outline-none' },
+            h('option', { value:'' }, 'Välj typ…'),
+            ...workoutTypes.map(function(t) { return h('option', {key:t, value:t}, t); })
+          ),
+          h('div', null,
+            h('input', { type:'number', value:newWorkout.duration, onChange:function(e){setNewWorkout(Object.assign({},newWorkout,{duration:e.target.value}));}, placeholder:'Minuter', className:'w-full px-4 py-3 border rounded-lg outline-none' }),
+            calPreview ? h('p', { className:'text-xs text-gray-400 mt-1' }, '≈ ' + calPreview + ' kcal') : null
+          ),
+          h('div', null,
+            h('label', { className: 'text-xs text-gray-500 block mb-1' }, 'Intensitet (1–5)'),
+            h('div', { className: 'flex gap-2' },
+              ...[1,2,3,4,5].map(function(i) {
+                return h('button', { key:i, onClick:function(){setNewWorkout(Object.assign({},newWorkout,{intensity:i.toString()}));}, className:'flex-1 py-2.5 rounded-lg text-sm font-bold ' + (parseInt(newWorkout.intensity) === i ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-orange-100') }, i);
+              })
+            )
+          ),
+          h('div', { className: 'md:col-span-2' },
+            h('input', { type:'text', value:newWorkout.comment, onChange:function(e){setNewWorkout(Object.assign({},newWorkout,{comment:e.target.value}));}, placeholder:'Kommentar (valfritt)', className:'w-full px-4 py-3 border rounded-lg outline-none' })
+          )
+        ),
+        h('button', { onClick:addWorkout, disabled:!newWorkout.type||!newWorkout.duration, className:'mt-4 w-full bg-orange-600 text-white py-3 rounded-lg hover:bg-orange-700 disabled:opacity-40 font-medium' }, '💪 Spara träningspass')
+      ),
+      // Workout history
+      workouts.length > 0 ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
+        h('div', { className: 'flex items-center justify-between mb-4' },
+          h('h2', { className: 'text-lg font-bold text-gray-800' }, 'Senaste träningspass'),
+          h('span', { className: 'text-xs text-gray-400' }, workouts.length + ' totalt')
+        ),
+        h('div', { className: 'space-y-2 max-h-96 overflow-y-auto' },
+          ...workouts.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).slice(0,25).map(function(w) {
+            return h('div', { key:w.id, className:'flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg hover:bg-orange-50' },
+              h('div', null,
+                h('div', { className:'flex items-center gap-2 mb-0.5' },
+                  h('span', { className:'font-medium text-sm text-gray-800' }, w.type),
+                  w.intensity ? h(IntensityDots, { level:w.intensity }) : null
+                ),
+                h('p', { className:'text-xs text-gray-400' }, new Date(w.date).toLocaleDateString('sv-SE', { weekday:'short', day:'numeric', month:'short' }) + (w.comment ? ' · ' + w.comment : ''))
+              ),
+              h('div', { className:'flex items-center gap-4' },
+                h('div', { className:'text-right' },
+                  h('p', { className:'text-sm font-bold text-gray-800' }, w.duration + ' min'),
+                  h('p', { className:'text-xs text-gray-400' }, '≈ ' + getCalories(w.type, w.duration, currentWeight) + ' kcal')
+                ),
+                h('button', { onClick:function(){deleteWorkout(w.id);}, className:'text-gray-300 hover:text-red-500' }, '✕')
+              )
+            );
+          })
+        )
+      ) : null
+    );
+  }
+
+  function renderGoals() {
+    return h('div', { className: 'max-w-lg mx-auto' },
+      h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
+        h('h2', { className: 'text-xl font-bold mb-5 text-gray-800' }, 'Mål & inställningar'),
+        h('div', { className: 'space-y-5' },
+          h('div', null,
+            h('label', { className: 'text-sm font-medium text-gray-700 block mb-1' }, 'Målvikt (kg)'),
+            h('input', { type:'number', step:'0.5', value:goalWeight, onChange:function(e){setGoalWeight(parseFloat(e.target.value)||0);}, className:'w-full px-4 py-3 border rounded-lg outline-none' })
+          ),
+          h('div', null,
+            h('label', { className: 'text-sm font-medium text-gray-700 block mb-1' }, 'Din längd (cm) – för BMI'),
+            h('input', { type:'number', value:height, onChange:function(e){setHeight(parseFloat(e.target.value)||0);}, className:'w-full px-4 py-3 border rounded-lg outline-none' })
+          ),
+          h('div', { className: 'border-t pt-5' },
+            h('p', { className: 'text-sm font-semibold text-gray-700 mb-3' }, 'Årsmål ' + new Date().getFullYear()),
+            h('div', { className: 'grid grid-cols-2 gap-3' },
+              h('div', null,
+                h('label', { className: 'text-xs text-gray-500' }, 'Träningspass'),
+                h('input', { type:'number', value:yearlyGoal.sessions, onChange:function(e){setYearlyGoal(Object.assign({},yearlyGoal,{sessions:parseInt(e.target.value)||0}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1' })
+              ),
+              h('div', null,
+                h('label', { className: 'text-xs text-gray-500' }, 'Total tid (minuter)'),
+                h('input', { type:'number', value:yearlyGoal.minutes, onChange:function(e){setYearlyGoal(Object.assign({},yearlyGoal,{minutes:parseInt(e.target.value)||0}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1' })
+              )
+            )
+          ),
+          h('button', { onClick:function(){setView('workouts');}, className:'w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 font-medium' }, '✓ Spara')
+        )
+      )
+    );
+  }
+
+  function renderHistory() {
+    const sortedEntries = entries.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+    return h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
+      h('div', { className: 'flex items-center justify-between mb-4' },
+        h('h2', { className: 'text-xl font-bold text-gray-800' }, 'Mätningshistorik'),
+        h('span', { className: 'text-sm text-gray-400' }, entries.length + ' mätningar')
+      ),
+      h('div', { className: 'overflow-x-auto' },
+        h('table', { className: 'w-full' },
+          h('thead', null,
+            h('tr', { className: 'border-b-2 border-gray-100' },
+              h('th', { className: 'text-left py-3 text-xs uppercase tracking-wide text-gray-400' }, 'Datum'),
+              h('th', { className: 'text-left py-3 text-xs uppercase tracking-wide text-gray-400' }, 'Vikt'),
+              h('th', { className: 'text-left py-3 text-xs uppercase tracking-wide text-gray-400' }, 'Δ'),
+              h('th', { className: 'text-left py-3 text-xs uppercase tracking-wide text-gray-400' }, 'Steg'),
+              h('th', { className: 'text-left py-3 text-xs uppercase tracking-wide text-gray-400' }, 'Kommentar'),
+              h('th', null)
+            )
+          ),
+          h('tbody', null,
+            ...sortedEntries.map(function(entry, idx) {
+              const prev = sortedEntries[idx + 1];
+              const diff = prev ? (entry.weight - prev.weight).toFixed(1) : null;
+              const diffNum = diff !== null ? parseFloat(diff) : 0;
+              return h('tr', { key: entry.id, className: 'border-b border-gray-50 hover:bg-gray-50' },
+                h('td', { className: 'py-3 text-sm text-gray-700' }, new Date(entry.date).toLocaleDateString('sv-SE', { weekday:'short', day:'numeric', month:'short' })),
+                h('td', { className: 'py-3 font-bold text-gray-800' }, entry.weight + ' kg'),
+                h('td', { className: 'py-3 text-sm' }, diff !== null ? h('span', { className: diffNum <= 0 ? 'text-green-600' : 'text-red-500' }, (diffNum > 0 ? '+' : '') + diff) : null),
+                h('td', { className: 'py-3 text-sm text-gray-500' }, entry.steps ? entry.steps.toLocaleString() : '–'),
+                h('td', { className: 'py-3 text-xs text-gray-400 max-w-xs truncate' }, entry.comment || ''),
+                h('td', { className: 'py-3' }, h('button', { onClick: function(){deleteEntry(entry.id);}, className:'text-gray-300 hover:text-red-500 text-xs' }, '✕'))
+              );
+            })
+          )
+        )
+      )
+    );
+  }
+
+  function renderWeekly() {
+    return h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
+      h('h2', { className: 'text-xl font-bold mb-4 text-gray-800' }, 'Veckoöversikt'),
+      h('div', { className: 'overflow-x-auto' },
+        h('table', { className: 'w-full' },
+          h('thead', null,
+            h('tr', { className: 'border-b-2 border-gray-100' },
+              h('th', { className: 'text-left py-3 text-xs uppercase tracking-wide text-gray-400' }, 'Vecka'),
+              h('th', { className: 'text-left py-3 text-xs uppercase tracking-wide text-gray-400' }, 'Snitt vikt'),
+              h('th', { className: 'text-left py-3 text-xs uppercase tracking-wide text-gray-400' }, 'Förändring'),
+              h('th', { className: 'text-left py-3 text-xs uppercase tracking-wide text-gray-400' }, 'Steg/dag'),
+              h('th', { className: 'text-left py-3 text-xs uppercase tracking-wide text-gray-400' }, 'Pass'),
+              h('th', { className: 'text-left py-3 text-xs uppercase tracking-wide text-gray-400' }, 'Min')
+            )
+          ),
+          h('tbody', null,
+            ...weeklyStats.map(function(week, idx) {
+              return h('tr', { key: week.weekStart, className: 'border-b border-gray-50 hover:bg-gray-50 ' + (idx === 0 ? 'bg-indigo-50' : '') },
+                h('td', { className: 'py-3 font-bold text-sm text-gray-800' }, week.weekNumber),
+                h('td', { className: 'py-3 font-semibold text-gray-800' }, week.avgWeight + ' kg'),
+                h('td', { className: 'py-3 font-medium text-sm ' + (week.change < 0 ? 'text-green-600' : week.change > 0 ? 'text-red-500' : 'text-gray-400') }, (week.change > 0 ? '+' : '') + week.change + ' kg'),
+                h('td', { className: 'py-3 text-sm text-gray-600' }, week.avgSteps.toLocaleString()),
+                h('td', { className: 'py-3 text-sm text-gray-600' }, week.workoutCount),
+                h('td', { className: 'py-3 text-sm text-gray-500' }, week.totalMinutes || '–')
+              );
+            })
+          )
+        )
+      )
+    );
+  }
+
+  // ─── Main render ──────────────────────────────────────────────────────────
+
+  return h('div', { className: 'min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4' },
+    h(Toast, { toast: toast, onClose: function(){ setToast(null); } }),
+    h('div', { className: 'max-w-6xl mx-auto' },
+
+      // Header
+      h('div', { className: 'bg-white rounded-2xl shadow-xl p-6 mb-6 flex items-center justify-between' },
+        h('div', null,
+          h('h1', { className: 'text-3xl font-bold text-gray-800 mb-1' }, '🏥 Hälsodagbok'),
+          h('p', { className: 'text-gray-500 text-sm' }, 'Följ din vikt och aktivitet')
+        ),
+        stats ? h('div', { className: 'text-right' },
+          h('p', { className: 'text-xs text-gray-400 uppercase tracking-wide' }, 'Senast loggat'),
+          h('p', { className: 'font-bold text-gray-700' }, new Date(stats.latest.date).toLocaleDateString('sv-SE', { day:'numeric', month:'short' }))
+        ) : null
+      ),
+
+      // Nav
+      h('div', { className: 'flex gap-2 mb-6 overflow-x-auto pb-1' },
+        h(NavButton, { id:'overview', label:'Översikt' }),
+        h(NavButton, { id:'add',      label:'+ Lägg till' }),
+        h(NavButton, { id:'workouts', label:'Träning' }),
+        h(NavButton, { id:'history',  label:'Historik' }),
+        h(NavButton, { id:'weekly',   label:'Veckor' }),
+        h('button', { onClick:function(){setShowImport(!showImport);}, className:'px-4 py-2 rounded-lg font-medium whitespace-nowrap bg-white text-gray-700 border border-indigo-200 hover:bg-indigo-50' }, 'Backup')
+      ),
+
+      // Backup panel
+      showImport ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
+        h('div', { className: 'flex items-center justify-between mb-5' },
+          h('h2', { className: 'text-xl font-bold text-gray-800' }, 'Backup & Import'),
+          h('button', { onClick:function(){setShowImport(false);}, className:'text-gray-400 hover:text-gray-600 text-2xl leading-none' }, '×')
+        ),
+        h('div', { className: 'space-y-6' },
+          h('div', { className: 'flex gap-3 flex-wrap' },
+            h('button', { onClick:exportData, className:'bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 text-sm font-medium' }, '💾 Ladda ner backup'),
+            h('label', { className:'bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium cursor-pointer' },
+              '📂 Återställ från fil',
+              h('input', { type:'file', accept:'.json', onChange:importFromFile, className:'hidden' })
+            )
+          ),
+          h('div', { className: 'border-t pt-5' },
+            h('h3', { className: 'font-medium mb-1 text-sm text-gray-700' }, '📋 Importera historisk viktdata'),
+            h('p', { className: 'text-xs text-gray-400 mb-3' }, 'Format per rad: 03-nov 91,1'),
+            h('textarea', { value:importText, onChange:function(e){setImportText(e.target.value);}, placeholder:'03-nov 91,1\n04-nov 90,8\n...', className:'w-full px-4 py-2 border rounded-lg font-mono text-sm mb-3 outline-none', rows:6 }),
+            h('button', { onClick:importHistoricalData, className:'bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 text-sm font-medium' }, 'Importera')
+          )
+        )
+      ) : null,
+
+      // Views
+      view === 'overview' ? renderOverview() : null,
+      view === 'add'      ? renderAdd()      : null,
+      view === 'workouts' ? renderWorkouts() : null,
+      view === 'goals'    ? renderGoals()    : null,
+      view === 'history'  ? renderHistory()  : null,
+      view === 'weekly'   ? renderWeekly()   : null
+    )
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(h(WeightStepTracker, null));
+</script>
 </body>
 </html>
