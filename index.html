@@ -146,8 +146,9 @@ function WeightStepTracker() {
   const [showImport, setShowImport] = useState(false);
   const [toast, setToast]           = useState(null);
   const [loading, setLoading]       = useState(true);
-  const [ouraToken, setOuraToken]   = useState('');
-  const [ouraLoading, setOuraLoading] = useState(false);
+  const [ouraToken, setOuraToken]       = useState('');
+  const [ouraClientId, setOuraClientId] = useState('');
+  const [ouraLoading, setOuraLoading]   = useState(false);
 
   const showToast = (msg, type) => {
     setToast({ msg, type: type || 'success' });
@@ -155,7 +156,7 @@ function WeightStepTracker() {
   };
 
   useEffect(() => { loadData(); }, []);
-  useEffect(() => { if (!loading) saveData(); }, [entries, workouts, goalWeight, yearlyGoal, height, ouraToken, loading]);
+  useEffect(() => { if (!loading) saveData(); }, [entries, workouts, goalWeight, yearlyGoal, height, ouraToken, ouraClientId, loading]);
 
   const loadData = async () => {
     try {
@@ -166,6 +167,7 @@ function WeightStepTracker() {
         window.storage.get('yearly-goal'),
         window.storage.get('user-height'),
         window.storage.get('oura-token'),
+        window.storage.get('oura-client-id'),
       ]);
       if (results[0] && results[0].value) setEntries(JSON.parse(results[0].value));
       if (results[1] && results[1].value) setWorkouts(JSON.parse(results[1].value));
@@ -173,6 +175,7 @@ function WeightStepTracker() {
       if (results[3] && results[3].value) setYearlyGoal(JSON.parse(results[3].value));
       if (results[4] && results[4].value) setHeight(parseFloat(results[4].value));
       if (results[5] && results[5].value) setOuraToken(results[5].value);
+      if (results[6] && results[6].value) setOuraClientId(results[6].value);
     } catch (err) {
       console.log('Ingen sparad data', err);
     } finally {
@@ -189,9 +192,60 @@ function WeightStepTracker() {
         window.storage.set('yearly-goal',     JSON.stringify(yearlyGoal)),
         window.storage.set('user-height',     height.toString()),
         window.storage.set('oura-token',      ouraToken),
+        window.storage.set('oura-client-id',  ouraClientId),
       ]);
     } catch (err) { console.error(err); }
   };
+
+  // ── Oura OAuth PKCE helpers ─────────────────────────────────────────────────
+  const ouraRedirectUri = window.location.origin + window.location.pathname.replace(/\/$/, '') + '/';
+
+  const startOuraOAuth = async () => {
+    if (!ouraClientId.trim()) { showToast('Ange ditt Oura Client ID i fältet ovan', 'error'); return; }
+    var arr = new Uint8Array(32);
+    crypto.getRandomValues(arr);
+    var verifier = btoa(String.fromCharCode.apply(null, arr)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+    var enc = new TextEncoder();
+    var digest = await crypto.subtle.digest('SHA-256', enc.encode(verifier));
+    var challenge = btoa(String.fromCharCode.apply(null, new Uint8Array(digest))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+    localStorage.setItem('oura_pkce_verifier', verifier);
+    var params = new URLSearchParams({
+      response_type: 'code',
+      client_id: ouraClientId.trim(),
+      redirect_uri: ouraRedirectUri,
+      scope: 'daily personal',
+      state: 'ht',
+      code_challenge: challenge,
+      code_challenge_method: 'S256'
+    });
+    window.location.href = 'https://cloud.ouraring.com/oauth/authorize?' + params.toString();
+  };
+
+  useEffect(function() {
+    var params = new URLSearchParams(window.location.search);
+    var code = params.get('code');
+    var state = params.get('state');
+    if (code && state === 'ht') {
+      window.history.replaceState({}, '', window.location.pathname);
+      var verifier = localStorage.getItem('oura_pkce_verifier');
+      localStorage.removeItem('oura_pkce_verifier');
+      var clientId = localStorage.getItem('oura-client-id') || ouraClientId;
+      fetch('https://api.ouraring.com/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ grant_type: 'authorization_code', code: code, redirect_uri: window.location.origin + window.location.pathname, client_id: clientId, code_verifier: verifier }).toString()
+      }).then(function(r){ return r.json(); }).then(function(data){
+        if (data.access_token) {
+          setOuraToken(data.access_token);
+          showToast('✅ Oura ansluten!');
+          setView('settings');
+        } else {
+          showToast('OAuth misslyckades: ' + JSON.stringify(data), 'error');
+        }
+      }).catch(function(e){ showToast('OAuth-fel: ' + e.message, 'error'); });
+    }
+  }, []);
+  // ────────────────────────────────────────────────────────────────────────────
 
   const fetchOura = async (dateStr) => {
     var token = ouraToken.trim();
@@ -808,27 +862,45 @@ function WeightStepTracker() {
             h('p', { className: 'text-xs text-gray-400' }, 'Hämta steg automatiskt när du loggar')
           )
         ),
-        h('p', { className: 'text-sm text-gray-600 mb-4' },
-          'Skapa en personlig token på ',
-          h('a', { href: 'https://cloud.ouraring.com/personal-access-tokens', target: '_blank', className: 'text-indigo-600 underline' }, 'cloud.ouraring.com'),
-          ' och klistra in den här.'
-        ),
-        h('div', { className: 'space-y-3' },
-          h('input', {
-            type: 'password',
-            value: ouraToken,
-            onChange: function(e){ setOuraToken(e.target.value); },
-            placeholder: 'Din Oura personal access token...',
-            className: 'w-full px-4 py-3 border rounded-lg outline-none font-mono text-sm'
-          }),
-          ouraToken ? h('div', { className: 'flex items-center gap-2 text-sm text-green-600 bg-green-50 rounded-lg px-3 py-2' },
-            h('span', null, '✅'),
-            h('span', null, 'Token sparad — knappen "💍 Oura" syns nu när du lägger till mätningar')
-          ) : h('div', { className: 'flex items-center gap-2 text-sm text-gray-400 bg-gray-50 rounded-lg px-3 py-2' },
-            h('span', null, 'ℹ️'),
-            h('span', null, 'Ingen token inlagd ännu')
-          )
-        )
+
+        ouraToken
+          ? h('div', { className: 'space-y-3' },
+              h('div', { className: 'flex items-center gap-2 text-sm text-green-600 bg-green-50 rounded-lg px-3 py-2' },
+                h('span', null, '✅ Oura är ansluten — "💍 Oura"-knappen syns i Lägg till-vyn')
+              ),
+              h('button', {
+                onClick: function(){ setOuraToken(''); showToast('Oura frånkopplad'); },
+                className: 'text-xs text-red-500 hover:underline'
+              }, 'Koppla från')
+            )
+          : h('div', { className: 'space-y-4' },
+              h('div', { className: 'bg-blue-50 rounded-lg p-4 text-sm text-blue-800 space-y-2' },
+                h('p', { className: 'font-semibold' }, 'Steg 1 — Skapa en app på Oura:'),
+                h('ol', { className: 'list-decimal list-inside space-y-1 text-xs' },
+                  h('li', null, h('a', { href: 'https://cloud.ouraring.com/oauth/applications', target: '_blank', className: 'underline font-medium' }, 'Öppna cloud.ouraring.com/oauth/applications')),
+                  h('li', null, 'Klicka "Create New Application"'),
+                  h('li', null, 'Fyll i valfritt namn, t.ex. "Hälsoapp"'),
+                  h('li', null, 'Sätt Redirect URI till:'),
+                  h('div', { className: 'bg-white rounded px-2 py-1 font-mono text-xs mt-1 break-all select-all border' }, ouraRedirectUri),
+                  h('li', { className: 'mt-1' }, 'Kopiera ditt Client ID')
+                )
+              ),
+              h('div', null,
+                h('label', { className: 'text-sm font-medium text-gray-700 block mb-1' }, 'Steg 2 — Klistra in Client ID:'),
+                h('input', {
+                  type: 'text',
+                  value: ouraClientId,
+                  onChange: function(e){ setOuraClientId(e.target.value); },
+                  placeholder: 'Ditt Oura Client ID...',
+                  className: 'w-full px-4 py-3 border rounded-lg outline-none font-mono text-sm'
+                })
+              ),
+              h('button', {
+                onClick: startOuraOAuth,
+                disabled: !ouraClientId.trim(),
+                className: 'w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 disabled:opacity-40 font-medium'
+              }, '🔗 Anslut med Oura')
+            )
       ),
 
       // Apple Watch info card
