@@ -197,9 +197,10 @@ function WeightStepTracker() {
     if (!ouraToken) { showToast('Ange din Oura-token i Inställningar först', 'error'); return; }
     setOuraLoading(true);
     try {
-      const res = await fetch(
-        'https://api.ouraring.com/v2/usercollection/daily_activity?start_date=' + dateStr + '&end_date=' + dateStr + '&access_token=' + encodeURIComponent(ouraToken)
-      );
+      const apiUrl = 'https://api.ouraring.com/v2/usercollection/daily_activity?start_date=' + dateStr + '&end_date=' + dateStr;
+      const res = await fetch('https://corsproxy.io/?' + encodeURIComponent(apiUrl), {
+        headers: { 'Authorization': 'Bearer ' + ouraToken, 'x-requested-with': 'XMLHttpRequest' }
+      });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const json = await res.json();
       const day = json.data && json.data[0];
