@@ -203,27 +203,25 @@ function WeightStepTracker() {
       var startD = new Date(dateStr); startD.setDate(startD.getDate() - 30);
       var startStr = startD.toISOString().split('T')[0];
       var endStr = endD.toISOString().split('T')[0];
-      const url = 'https://api.ouraring.com/v2/usercollection/daily_activity?start_date=' + startStr + '&end_date=' + endStr;
-      const res = await fetch(url, {
-        headers: { 'Authorization': 'Bearer ' + ouraToken },
-        mode: 'cors',
-        credentials: 'omit',
-        signal: controller.signal
-      });
+      // Try daily_activity first, then daily_readiness as fallback
+      var actUrl = 'https://api.ouraring.com/v2/usercollection/daily_activity?start_date=' + startStr + '&end_date=' + endStr;
+      var actRes = await fetch(actUrl, { headers: { 'Authorization': 'Bearer ' + ouraToken }, mode: 'cors', credentials: 'omit', signal: controller.signal });
       clearTimeout(timer);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const json = await res.json();
-      // Find exact date or fall back to most recent
-      var day = json.data && (json.data.find(function(d){ return d.timestamp && d.timestamp.startsWith(dateStr); }) || json.data[json.data.length - 1]);
-      if (!day) { showToast('Ingen Oura-data hittades — synka ringen och försök igen', 'error'); return; }
-      var foundDate = day.timestamp ? day.timestamp.substring(0,10) : dateStr;
+      if (!actRes.ok) throw new Error('HTTP ' + actRes.status);
+      var actJson = await actRes.json();
+      var day = actJson.data && (actJson.data.find(function(d){ return d.day && d.day.startsWith(dateStr); }) || actJson.data.find(function(d){ return d.timestamp && d.timestamp.startsWith(dateStr); }) || actJson.data[actJson.data.length - 1]);
+      if (!day) {
+        // Fallback: show what keys the first record has (debug)
+        var firstRecord = actJson.data && actJson.data[0];
+        showToast('Hittade ' + (actJson.data ? actJson.data.length : 0) + ' poster. ' + (firstRecord ? 'Nycklar: ' + Object.keys(firstRecord).join(', ') : 'Tom lista.'), 'error');
+        return;
+      }
+      var foundDate = day.day || (day.timestamp ? day.timestamp.substring(0,10) : dateStr);
+      var steps = day.steps || 0;
       setNewEntry(function(prev) {
-        return Object.assign({}, prev, {
-          steps: day.steps ? String(day.steps) : prev.steps,
-          date: foundDate
-        });
+        return Object.assign({}, prev, { steps: steps ? String(steps) : prev.steps, date: foundDate });
       });
-      showToast('✅ Hämtade ' + (day.steps || 0).toLocaleString() + ' steg (' + foundDate + ') från Oura');
+      showToast('✅ Hämtade ' + steps.toLocaleString() + ' steg (' + foundDate + ') från Oura');
     } catch(err) {
       showToast('Kunde inte hämta från Oura: ' + err.message, 'error');
     } finally {
