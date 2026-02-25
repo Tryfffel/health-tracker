@@ -8,29 +8,24 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
-  <script src="https://unpkg.com/lucide-react/dist/umd/lucide-react.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100">
   <div id="root"></div>
 
   <script>
-    // localStorage polyfill matching window.storage API used in the component
     window.storage = {
       get: async (key) => ({ value: localStorage.getItem(key) }),
       set: async (key, value) => { localStorage.setItem(key, value); }
     };
   </script>
 
-  <script type="text/babel">
+  <script type="text/babel" data-presets="react">
     const { useState, useEffect } = React;
     const {
-      LineChart, BarChart,
-      Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+      LineChart, BarChart, Line, Bar,
+      XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
     } = Recharts;
-    const { Plus, TrendingDown, Target, Activity, Flame, Award, X } = LucideReact;
-
-    // ─── Sub-components ──────────────────────────────────────────────────────
 
     const Toast = ({ toast, onClose }) => {
       if (!toast) return null;
@@ -39,14 +34,14 @@
           toast.type === 'error' ? 'bg-red-500' : 'bg-green-500'
         }`}>
           <span className="text-sm font-medium">{toast.msg}</span>
-          <button onClick={onClose} className="hover:opacity-70"><X size={14} /></button>
+          <button onClick={onClose} className="hover:opacity-70 text-lg leading-none">×</button>
         </div>
       );
     };
 
-    const StatCard = ({ icon: Icon, iconColor, label, value, sub, subColor }) => (
+    const StatCard = ({ emoji, iconColor, label, value, sub, subColor }) => (
       <div className="bg-white rounded-xl p-4 shadow-md">
-        <Icon className={`${iconColor} mb-2`} size={20} />
+        <div className={`text-2xl mb-1`}>{emoji}</div>
         <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">{label}</p>
         <p className="text-2xl font-bold text-gray-800 mt-1">{value}</p>
         {sub && <p className={`text-xs mt-1 ${subColor || 'text-gray-500'}`}>{sub}</p>}
@@ -60,8 +55,6 @@
         ))}
       </span>
     );
-
-    // ─── Main Component ──────────────────────────────────────────────────────
 
     function WeightStepTracker() {
       const todayStr = () => new Date().toISOString().split('T')[0];
@@ -102,7 +95,7 @@
           if (yg?.value) setYearlyGoal(JSON.parse(yg.value));
           if (h?.value)  setHeight(parseFloat(h.value));
         } catch (err) {
-          console.log('Ingen sparad data');
+          console.log('Ingen sparad data', err);
         } finally {
           setLoading(false);
         }
@@ -198,10 +191,7 @@
       const importHistoricalData = () => {
         const lines = importText.trim().split('\n');
         const imported = [];
-        const months = {
-          jan:'01',feb:'02',mar:'03',apr:'04',maj:'05',jun:'06',
-          jul:'07',aug:'08',sep:'09',okt:'10',nov:'11',dec:'12',
-        };
+        const months = { jan:'01',feb:'02',mar:'03',apr:'04',maj:'05',jun:'06',jul:'07',aug:'08',sep:'09',okt:'10',nov:'11',dec:'12' };
         for (let line of lines) {
           line = line.trim();
           if (!line) continue;
@@ -255,12 +245,7 @@
       };
 
       const getCalories = (type, duration, weight = 80) => {
-        const mets = {
-          'Styrketräning':5,'Löpning':9,'Promenad':3.5,'Cykling':7,'Simning':7,
-          'Yoga':2.5,'Pilates':3,'Fotboll':7,'Tennis':7,'Golf':4,'Skidåkning':7,
-          'Innebandy':8,'Dans':5,'Boxning':9,'Klättring':8,'Crossfit':10,
-          'Spinning':8,'Gruppträning':6,'Baseboll':4,'Annat':5,
-        };
+        const mets = { 'Styrketräning':5,'Löpning':9,'Promenad':3.5,'Cykling':7,'Simning':7,'Yoga':2.5,'Pilates':3,'Fotboll':7,'Tennis':7,'Golf':4,'Skidåkning':7,'Innebandy':8,'Dans':5,'Boxning':9,'Klättring':8,'Crossfit':10,'Spinning':8,'Gruppträning':6,'Baseboll':4,'Annat':5 };
         return Math.round((mets[type] || 5) * weight * (duration / 60));
       };
 
@@ -297,10 +282,9 @@
           return {
             weekStart: week.weekStart, weekNumber: getISOWeekNumber(week.weekStart),
             avgWeight: parseFloat(avgWeight.toFixed(1)),
-            minWeight: Math.min(...week.weights), maxWeight: Math.max(...week.weights),
             avgSteps, workoutCount: weekWorkouts.length,
             totalMinutes: weekWorkouts.reduce((s, w) => s + w.duration, 0),
-            numEntries: week.weights.length, change: 0,
+            change: 0,
           };
         });
         for (let i = 1; i < weeks.length; i++) {
@@ -326,7 +310,6 @@
         return {
           totalSessions, totalMinutes,
           goalSessions: yearlyGoal.sessions, goalMinutes: yearlyGoal.minutes,
-          expectedSessions, expectedMinutes,
           sessionsProgress: Math.min(totalSessions / yearlyGoal.sessions * 100, 100).toFixed(1),
           minutesProgress:  Math.min(totalMinutes  / yearlyGoal.minutes  * 100, 100).toFixed(1),
           onTrackSessions: totalSessions >= expectedSessions,
@@ -391,21 +374,21 @@
           <Toast toast={toast} onClose={() => setToast(null)} />
           <div className="max-w-6xl mx-auto">
 
+            {/* Header */}
             <div className="bg-white rounded-2xl shadow-xl p-6 mb-6 flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold text-gray-800 mb-1">Hälsodagbok</h1>
+                <h1 className="text-3xl font-bold text-gray-800 mb-1">🏥 Hälsodagbok</h1>
                 <p className="text-gray-500 text-sm">Följ din vikt och aktivitet</p>
               </div>
               {stats && (
                 <div className="text-right">
                   <p className="text-xs text-gray-400 uppercase tracking-wide">Senast loggat</p>
-                  <p className="font-bold text-gray-700">
-                    {new Date(stats.latest.date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}
-                  </p>
+                  <p className="font-bold text-gray-700">{new Date(stats.latest.date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}</p>
                 </div>
               )}
             </div>
 
+            {/* Nav */}
             <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
               <NavButton id="overview" label="Översikt" />
               <NavButton id="add"      label="+ Lägg till" />
@@ -418,11 +401,12 @@
               </button>
             </div>
 
+            {/* Backup panel */}
             {showImport && (
               <div className="bg-white rounded-xl p-6 shadow-md mb-6">
                 <div className="flex items-center justify-between mb-5">
                   <h2 className="text-xl font-bold text-gray-800">Backup & Import</h2>
-                  <button onClick={() => setShowImport(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+                  <button onClick={() => setShowImport(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
                 </div>
                 <div className="space-y-6">
                   <div className="flex gap-3 flex-wrap">
@@ -437,7 +421,7 @@
                     <p className="text-xs text-gray-400 mb-3">Format per rad: <code className="bg-gray-100 px-1 rounded">03-nov 91,1</code></p>
                     <textarea value={importText} onChange={(e) => setImportText(e.target.value)}
                       placeholder={"03-nov 91,1\n04-nov 90,8\n..."}
-                      className="w-full px-4 py-2 border rounded-lg font-mono text-sm mb-3 focus:ring-2 focus:ring-indigo-300 outline-none" rows="6" />
+                      className="w-full px-4 py-2 border rounded-lg font-mono text-sm mb-3 outline-none" rows="6" />
                     <button onClick={importHistoricalData} className="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 text-sm font-medium">Importera</button>
                   </div>
                 </div>
@@ -448,22 +432,22 @@
             {view === 'overview' && stats && (
               <div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  <StatCard icon={TrendingDown} iconColor="text-indigo-600" label="Senaste vikt" value={`${stats.latest.weight} kg`}
+                  <StatCard emoji="📉" label="Senaste vikt" value={`${stats.latest.weight} kg`}
                     sub={`${parseFloat(stats.diff) > 0 ? '+' : ''}${stats.diff} kg från förra`}
                     subColor={parseFloat(stats.diff) <= 0 ? 'text-green-600' : 'text-red-500'} />
-                  <StatCard icon={Target} iconColor="text-purple-600" label="Till målet" value={`${Math.abs(stats.toGoal)} kg`} sub={`Mål: ${goalWeight} kg`} />
-                  <StatCard icon={Flame} iconColor="text-green-600" label="Total nedgång" value={`${stats.totalLoss} kg`} sub={`${entries.length} mätningar`} />
+                  <StatCard emoji="🎯" label="Till målet" value={`${Math.abs(stats.toGoal)} kg`} sub={`Mål: ${goalWeight} kg`} />
+                  <StatCard emoji="🔥" label="Total nedgång" value={`${stats.totalLoss} kg`} sub={`${entries.length} mätningar`} />
                   {stats.bmi
-                    ? <StatCard icon={Activity} iconColor="text-blue-600" label="BMI" value={stats.bmi} sub={stats.bmiCat?.label} subColor={stats.bmiCat?.color} />
-                    : <StatCard icon={Activity} iconColor="text-orange-500" label="Snitt steg (7d)" value={stats.avgSteps.toLocaleString()} sub="senaste 7 dagarna" />
+                    ? <StatCard emoji="⚖️" label="BMI" value={stats.bmi} sub={stats.bmiCat?.label} subColor={stats.bmiCat?.color} />
+                    : <StatCard emoji="👟" label="Snitt steg (7d)" value={stats.avgSteps.toLocaleString()} sub="senaste 7 dagarna" />
                   }
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  <StatCard icon={Award} iconColor="text-yellow-500" label="Inloggningssvit" value={`${stats.streak} 🔥`} sub={stats.streak > 0 ? 'dagar i rad' : 'Logga idag!'} />
-                  <StatCard icon={Activity} iconColor="text-orange-500" label="Snitt steg (7d)" value={stats.avgSteps.toLocaleString()} sub="senaste veckan" />
+                  <StatCard emoji="🏆" label="Inloggningssvit" value={`${stats.streak} 🔥`} sub={stats.streak > 0 ? 'dagar i rad' : 'Logga idag!'} />
+                  <StatCard emoji="👟" label="Snitt steg (7d)" value={stats.avgSteps.toLocaleString()} sub="senaste veckan" />
                   <div className="bg-white rounded-xl p-4 shadow-md col-span-2">
-                    <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-2">Veckoträning</p>
+                    <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-2">💪 Veckoträning</p>
                     {currentWeek ? (
                       <div className="flex gap-8">
                         <div><p className="text-xl font-bold text-gray-800">{currentWeek.thisWeek.workoutCount} pass</p><p className="text-xs text-gray-500">{currentWeek.thisWeek.totalMinutes} min · denna vecka</p></div>
@@ -550,24 +534,24 @@
                   <div className="space-y-4">
                     <div className="flex gap-2">
                       <input type="date" value={newEntry.date} onChange={(e) => setNewEntry({...newEntry, date: e.target.value})}
-                        className="flex-1 px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-300 outline-none" />
+                        className="flex-1 px-4 py-3 border rounded-lg outline-none" />
                       <button onClick={() => setNewEntry({...newEntry, date: todayStr()})}
                         className="px-4 py-3 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100">Idag</button>
                     </div>
                     <div className="relative">
                       <input type="number" step="0.1" value={newEntry.weight} onChange={(e) => setNewEntry({...newEntry, weight: e.target.value})}
-                        placeholder="Vikt (kg)" className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-300 outline-none" />
+                        placeholder="Vikt (kg)" className="w-full px-4 py-3 border rounded-lg outline-none" />
                       {newEntry.weight && height > 0 && (
                         <span className="absolute right-3 top-3.5 text-xs text-gray-400">BMI: {getBMI(parseFloat(newEntry.weight))}</span>
                       )}
                     </div>
                     <input type="number" value={newEntry.steps} onChange={(e) => setNewEntry({...newEntry, steps: e.target.value})}
-                      placeholder="Steg (valfritt)" className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-300 outline-none" />
+                      placeholder="Steg (valfritt)" className="w-full px-4 py-3 border rounded-lg outline-none" />
                     <input type="text" value={newEntry.comment} onChange={(e) => setNewEntry({...newEntry, comment: e.target.value})}
-                      placeholder="Kommentar (valfritt)" className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-300 outline-none" />
+                      placeholder="Kommentar (valfritt)" className="w-full px-4 py-3 border rounded-lg outline-none" />
                     <button onClick={addEntry} disabled={!newEntry.weight}
-                      className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 disabled:opacity-40 flex items-center justify-center gap-2 font-medium">
-                      <Plus size={20} /> Spara mätning
+                      className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 disabled:opacity-40 font-medium">
+                      + Spara mätning
                     </button>
                   </div>
                 </div>
@@ -607,18 +591,18 @@
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="flex gap-2">
                       <input type="date" value={newWorkout.date} onChange={(e) => setNewWorkout({...newWorkout, date: e.target.value})}
-                        className="flex-1 px-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-300 outline-none" />
+                        className="flex-1 px-4 py-3 border rounded-lg outline-none" />
                       <button onClick={() => setNewWorkout({...newWorkout, date: todayStr()})}
                         className="px-3 py-3 bg-orange-50 text-orange-600 rounded-lg text-sm hover:bg-orange-100">Idag</button>
                     </div>
                     <select value={newWorkout.type} onChange={(e) => setNewWorkout({...newWorkout, type: e.target.value})}
-                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-300 outline-none">
+                      className="w-full px-4 py-3 border rounded-lg outline-none">
                       <option value="">Välj typ…</option>
                       {['Styrketräning','Löpning','Promenad','Cykling','Simning','Yoga','Pilates','Fotboll','Tennis','Baseboll','Golf','Skidåkning','Innebandy','Dans','Boxning','Klättring','Crossfit','Spinning','Gruppträning','Annat'].map(t => <option key={t}>{t}</option>)}
                     </select>
                     <div>
                       <input type="number" value={newWorkout.duration} onChange={(e) => setNewWorkout({...newWorkout, duration: e.target.value})}
-                        placeholder="Minuter" className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-300 outline-none" />
+                        placeholder="Minuter" className="w-full px-4 py-3 border rounded-lg outline-none" />
                       {newWorkout.type && newWorkout.duration && (
                         <p className="text-xs text-gray-400 mt-1">≈ {getCalories(newWorkout.type, parseInt(newWorkout.duration), stats?.latest?.weight)} kcal</p>
                       )}
@@ -628,13 +612,13 @@
                       <div className="flex gap-2">
                         {[1,2,3,4,5].map(i => (
                           <button key={i} onClick={() => setNewWorkout({...newWorkout, intensity: i.toString()})}
-                            className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-colors ${parseInt(newWorkout.intensity) === i ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-orange-100'}`}>{i}</button>
+                            className={`flex-1 py-2.5 rounded-lg text-sm font-bold ${parseInt(newWorkout.intensity) === i ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-orange-100'}`}>{i}</button>
                         ))}
                       </div>
                     </div>
                     <div className="md:col-span-2">
                       <input type="text" value={newWorkout.comment} onChange={(e) => setNewWorkout({...newWorkout, comment: e.target.value})}
-                        placeholder="Kommentar (valfritt)" className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-300 outline-none" />
+                        placeholder="Kommentar (valfritt)" className="w-full px-4 py-3 border rounded-lg outline-none" />
                     </div>
                   </div>
                   <button onClick={addWorkout} disabled={!newWorkout.type || !newWorkout.duration}
@@ -649,9 +633,9 @@
                       <h2 className="text-lg font-bold text-gray-800">Senaste träningspass</h2>
                       <span className="text-xs text-gray-400">{workouts.length} totalt</span>
                     </div>
-                    <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
                       {[...workouts].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 25).map(w => (
-                        <div key={w.id} className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg hover:bg-orange-50 transition-colors">
+                        <div key={w.id} className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg hover:bg-orange-50">
                           <div>
                             <div className="flex items-center gap-2 mb-0.5">
                               <span className="font-medium text-sm text-gray-800">{w.type}</span>
@@ -667,7 +651,7 @@
                               <p className="text-sm font-bold text-gray-800">{w.duration} min</p>
                               <p className="text-xs text-gray-400">≈ {getCalories(w.type, w.duration, stats?.latest?.weight || 80)} kcal</p>
                             </div>
-                            <button onClick={() => deleteWorkout(w.id)} className="text-gray-300 hover:text-red-500 transition-colors">✕</button>
+                            <button onClick={() => deleteWorkout(w.id)} className="text-gray-300 hover:text-red-500">✕</button>
                           </div>
                         </div>
                       ))}
@@ -686,12 +670,12 @@
                     <div>
                       <label className="text-sm font-medium text-gray-700 block mb-1">Målvikt (kg)</label>
                       <input type="number" step="0.5" value={goalWeight} onChange={(e) => setGoalWeight(parseFloat(e.target.value) || 0)}
-                        className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-300 outline-none" />
+                        className="w-full px-4 py-3 border rounded-lg outline-none" />
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-700 block mb-1">Din längd (cm) – för BMI</label>
                       <input type="number" value={height} onChange={(e) => setHeight(parseFloat(e.target.value) || 0)}
-                        className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-300 outline-none" />
+                        className="w-full px-4 py-3 border rounded-lg outline-none" />
                     </div>
                     <div className="border-t pt-5">
                       <p className="text-sm font-semibold text-gray-700 mb-3">Årsmål {new Date().getFullYear()}</p>
@@ -699,12 +683,12 @@
                         <div>
                           <label className="text-xs text-gray-500">Träningspass</label>
                           <input type="number" value={yearlyGoal.sessions} onChange={(e) => setYearlyGoal({...yearlyGoal, sessions: parseInt(e.target.value) || 0})}
-                            className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-300 outline-none mt-1" />
+                            className="w-full px-4 py-3 border rounded-lg outline-none mt-1" />
                         </div>
                         <div>
                           <label className="text-xs text-gray-500">Total tid (minuter)</label>
                           <input type="number" value={yearlyGoal.minutes} onChange={(e) => setYearlyGoal({...yearlyGoal, minutes: parseInt(e.target.value) || 0})}
-                            className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-300 outline-none mt-1" />
+                            className="w-full px-4 py-3 border rounded-lg outline-none mt-1" />
                         </div>
                       </div>
                     </div>
@@ -738,13 +722,13 @@
                         const prev = arr[idx + 1];
                         const diff = prev ? (entry.weight - prev.weight).toFixed(1) : null;
                         return (
-                          <tr key={entry.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                          <tr key={entry.id} className="border-b border-gray-50 hover:bg-gray-50">
                             <td className="py-3 text-sm text-gray-700">{new Date(entry.date).toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })}</td>
                             <td className="py-3 font-bold text-gray-800">{entry.weight} kg</td>
                             <td className="py-3 text-sm">{diff !== null && <span className={parseFloat(diff) <= 0 ? 'text-green-600' : 'text-red-500'}>{parseFloat(diff) > 0 ? '+' : ''}{diff}</span>}</td>
                             <td className="py-3 text-sm text-gray-500">{entry.steps?.toLocaleString() || '–'}</td>
                             <td className="py-3 text-xs text-gray-400 max-w-xs truncate">{entry.comment || ''}</td>
-                            <td className="py-3"><button onClick={() => deleteEntry(entry.id)} className="text-gray-300 hover:text-red-500 transition-colors text-xs">✕</button></td>
+                            <td className="py-3"><button onClick={() => deleteEntry(entry.id)} className="text-gray-300 hover:text-red-500 text-xs">✕</button></td>
                           </tr>
                         );
                       })}
@@ -772,7 +756,7 @@
                     </thead>
                     <tbody>
                       {weeklyStats.map((week, idx) => (
-                        <tr key={week.weekStart} className={`border-b border-gray-50 hover:bg-gray-50 transition-colors ${idx === 0 ? 'bg-indigo-50' : ''}`}>
+                        <tr key={week.weekStart} className={`border-b border-gray-50 hover:bg-gray-50 ${idx === 0 ? 'bg-indigo-50' : ''}`}>
                           <td className="py-3 font-bold text-sm text-gray-800">{week.weekNumber}</td>
                           <td className="py-3 font-semibold text-gray-800">{week.avgWeight} kg</td>
                           <td className={`py-3 font-medium text-sm ${week.change < 0 ? 'text-green-600' : week.change > 0 ? 'text-red-500' : 'text-gray-400'}`}>
@@ -794,7 +778,8 @@
       );
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<WeightStepTracker />);
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<WeightStepTracker />);
   </script>
 </body>
 </html>
