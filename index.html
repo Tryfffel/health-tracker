@@ -239,8 +239,9 @@ function WeightStepTracker() {
       var startD = new Date(dateStr); startD.setDate(startD.getDate() - 30);
       var startStr = startD.toISOString().split('T')[0];
       var endStr = endD.toISOString().split('T')[0];
-      var actUrl = 'https://api.ouraring.com/v2/usercollection/daily_activity?start_date=' + startStr + '&end_date=' + endStr;
-      var actRes = await fetch(actUrl, { headers: { 'Authorization': 'Bearer ' + token }, signal: controller.signal });
+      // Use access_token as query param to avoid Safari CORS preflight blocking Authorization header
+      var actUrl = 'https://api.ouraring.com/v2/usercollection/daily_activity?start_date=' + startStr + '&end_date=' + endStr + '&access_token=' + encodeURIComponent(token);
+      var actRes = await fetch(actUrl, { signal: controller.signal });
       clearTimeout(timer);
       if (!actRes.ok) throw new Error('HTTP ' + actRes.status);
       var actJson = await actRes.json();
