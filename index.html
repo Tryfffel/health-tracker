@@ -11,6 +11,14 @@
 </head>
 <body class="bg-gray-100">
 <div id="root"></div>
+<div id="error-display" style="display:none;padding:20px;background:#fee2e2;color:#991b1b;font-family:monospace;font-size:13px;white-space:pre-wrap;margin:20px;border-radius:8px;"></div>
+<script>
+window.addEventListener('error', function(e) {
+  var el = document.getElementById('error-display');
+  el.style.display = 'block';
+  el.textContent = 'FEL: ' + e.message + '\nRad: ' + e.lineno + '\nFil: ' + e.filename;
+});
+</script>
 <script>
 // localStorage polyfill matching the window.storage API
 window.storage = {
