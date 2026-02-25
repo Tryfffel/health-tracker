@@ -198,8 +198,7 @@ function WeightStepTracker() {
     setOuraLoading(true);
     try {
       const res = await fetch(
-        'https://api.ouraring.com/v2/usercollection/daily_activity?start_date=' + dateStr + '&end_date=' + dateStr,
-        { headers: { 'Authorization': 'Bearer ' + ouraToken } }
+        'https://api.ouraring.com/v2/usercollection/daily_activity?start_date=' + dateStr + '&end_date=' + dateStr + '&access_token=' + encodeURIComponent(ouraToken)
       );
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const json = await res.json();
