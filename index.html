@@ -197,52 +197,33 @@ function WeightStepTracker() {
     } catch (err) { console.error(err); }
   };
 
-  // ── Oura OAuth PKCE helpers ─────────────────────────────────────────────────
+  // ── Oura OAuth (implicit flow – no server needed) ───────────────────────────
   const ouraRedirectUri = window.location.origin + window.location.pathname.replace(/\/$/, '') + '/';
 
-  const startOuraOAuth = async () => {
+  const startOuraOAuth = function() {
     if (!ouraClientId.trim()) { showToast('Ange ditt Oura Client ID i fältet ovan', 'error'); return; }
-    var arr = new Uint8Array(32);
-    crypto.getRandomValues(arr);
-    var verifier = btoa(String.fromCharCode.apply(null, arr)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
-    var enc = new TextEncoder();
-    var digest = await crypto.subtle.digest('SHA-256', enc.encode(verifier));
-    var challenge = btoa(String.fromCharCode.apply(null, new Uint8Array(digest))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
-    localStorage.setItem('oura_pkce_verifier', verifier);
     var params = new URLSearchParams({
-      response_type: 'code',
+      response_type: 'token',
       client_id: ouraClientId.trim(),
       redirect_uri: ouraRedirectUri,
       scope: 'daily personal',
-      state: 'ht',
-      code_challenge: challenge,
-      code_challenge_method: 'S256'
+      state: 'ht'
     });
     window.location.href = 'https://cloud.ouraring.com/oauth/authorize?' + params.toString();
   };
 
   useEffect(function() {
-    var params = new URLSearchParams(window.location.search);
-    var code = params.get('code');
-    var state = params.get('state');
-    if (code && state === 'ht') {
-      window.history.replaceState({}, '', window.location.pathname);
-      var verifier = localStorage.getItem('oura_pkce_verifier');
-      localStorage.removeItem('oura_pkce_verifier');
-      var clientId = localStorage.getItem('oura-client-id') || ouraClientId;
-      fetch('https://api.ouraring.com/oauth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ grant_type: 'authorization_code', code: code, redirect_uri: window.location.origin + window.location.pathname, client_id: clientId, code_verifier: verifier }).toString()
-      }).then(function(r){ return r.json(); }).then(function(data){
-        if (data.access_token) {
-          setOuraToken(data.access_token);
-          showToast('✅ Oura ansluten!');
-          setView('settings');
-        } else {
-          showToast('OAuth misslyckades: ' + JSON.stringify(data), 'error');
-        }
-      }).catch(function(e){ showToast('OAuth-fel: ' + e.message, 'error'); });
+    // Handle implicit flow: token arrives in URL hash (#access_token=...)
+    var hash = window.location.hash;
+    if (hash && hash.includes('access_token')) {
+      var hashParams = new URLSearchParams(hash.replace(/^#/, ''));
+      var token = hashParams.get('access_token');
+      if (token) {
+        setOuraToken(token);
+        window.history.replaceState({}, '', window.location.pathname);
+        showToast('✅ Oura ansluten!');
+        setView('settings');
+      }
     }
   }, []);
   // ────────────────────────────────────────────────────────────────────────────
