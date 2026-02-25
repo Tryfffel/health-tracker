@@ -146,6 +146,8 @@ function WeightStepTracker() {
   const [showImport, setShowImport] = useState(false);
   const [toast, setToast]           = useState(null);
   const [loading, setLoading]       = useState(true);
+  const [ouraToken, setOuraToken]   = useState('');
+  const [ouraLoading, setOuraLoading] = useState(false);
 
   const showToast = (msg, type) => {
     setToast({ msg, type: type || 'success' });
@@ -153,7 +155,7 @@ function WeightStepTracker() {
   };
 
   useEffect(() => { loadData(); }, []);
-  useEffect(() => { if (!loading) saveData(); }, [entries, workouts, goalWeight, yearlyGoal, height, loading]);
+  useEffect(() => { if (!loading) saveData(); }, [entries, workouts, goalWeight, yearlyGoal, height, ouraToken, loading]);
 
   const loadData = async () => {
     try {
@@ -163,12 +165,14 @@ function WeightStepTracker() {
         window.storage.get('goal-weight'),
         window.storage.get('yearly-goal'),
         window.storage.get('user-height'),
+        window.storage.get('oura-token'),
       ]);
       if (results[0] && results[0].value) setEntries(JSON.parse(results[0].value));
       if (results[1] && results[1].value) setWorkouts(JSON.parse(results[1].value));
       if (results[2] && results[2].value) setGoalWeight(parseFloat(results[2].value));
       if (results[3] && results[3].value) setYearlyGoal(JSON.parse(results[3].value));
       if (results[4] && results[4].value) setHeight(parseFloat(results[4].value));
+      if (results[5] && results[5].value) setOuraToken(results[5].value);
     } catch (err) {
       console.log('Ingen sparad data', err);
     } finally {
@@ -184,8 +188,34 @@ function WeightStepTracker() {
         window.storage.set('goal-weight',     goalWeight.toString()),
         window.storage.set('yearly-goal',     JSON.stringify(yearlyGoal)),
         window.storage.set('user-height',     height.toString()),
+        window.storage.set('oura-token',      ouraToken),
       ]);
     } catch (err) { console.error(err); }
+  };
+
+  const fetchOura = async (dateStr) => {
+    if (!ouraToken) { showToast('Ange din Oura-token i Inställningar först', 'error'); return; }
+    setOuraLoading(true);
+    try {
+      const res = await fetch(
+        'https://api.ouraring.com/v2/usercollection/daily_activity?start_date=' + dateStr + '&end_date=' + dateStr,
+        { headers: { 'Authorization': 'Bearer ' + ouraToken } }
+      );
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      const day = json.data && json.data[0];
+      if (!day) { showToast('Ingen Oura-data hittades för ' + dateStr, 'error'); return; }
+      setNewEntry(function(prev) {
+        return Object.assign({}, prev, {
+          steps: day.steps ? String(day.steps) : prev.steps,
+        });
+      });
+      showToast('✅ Hämtade ' + (day.steps || 0).toLocaleString() + ' steg från Oura');
+    } catch(err) {
+      showToast('Kunde inte hämta från Oura: ' + err.message, 'error');
+    } finally {
+      setOuraLoading(false);
+    }
   };
 
   const addEntry = () => {
@@ -551,7 +581,15 @@ function WeightStepTracker() {
             h('input', { type:'number', step:'0.1', value: newEntry.weight, onChange: function(e){setNewEntry(Object.assign({},newEntry,{weight:e.target.value}));}, placeholder:'Vikt (kg)', className:'w-full px-4 py-3 border rounded-lg outline-none' }),
             bmiPreview ? h('span', { className: 'absolute right-3 top-3.5 text-xs text-gray-400' }, 'BMI: ' + bmiPreview) : null
           ),
-          h('input', { type:'number', value: newEntry.steps, onChange: function(e){setNewEntry(Object.assign({},newEntry,{steps:e.target.value}));}, placeholder:'Steg (valfritt)', className:'w-full px-4 py-3 border rounded-lg outline-none' }),
+          h('div', { className: 'flex gap-2' },
+            h('input', { type:'number', value: newEntry.steps, onChange: function(e){setNewEntry(Object.assign({},newEntry,{steps:e.target.value}));}, placeholder:'Steg (valfritt)', className:'flex-1 px-4 py-3 border rounded-lg outline-none' }),
+            ouraToken ? h('button', {
+              onClick: function(){ fetchOura(newEntry.date); },
+              disabled: ouraLoading,
+              title: 'Hämta steg från Oura Ring',
+              className: 'px-3 py-3 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100 disabled:opacity-50 whitespace-nowrap'
+            }, ouraLoading ? '⏳' : '💍 Oura') : null
+          ),
           h('input', { type:'text', value: newEntry.comment, onChange: function(e){setNewEntry(Object.assign({},newEntry,{comment:e.target.value}));}, placeholder:'Kommentar (valfritt)', className:'w-full px-4 py-3 border rounded-lg outline-none' }),
           h('button', { onClick: addEntry, disabled: !newEntry.weight, className:'w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 disabled:opacity-40 font-medium' }, '+ Spara mätning')
         )
@@ -747,6 +785,60 @@ function WeightStepTracker() {
     );
   }
 
+  function renderSettings() {
+    return h('div', { className: 'max-w-lg mx-auto space-y-6' },
+
+      // Oura card
+      h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
+        h('div', { className: 'flex items-center gap-3 mb-4' },
+          h('span', { className: 'text-3xl' }, '💍'),
+          h('div', null,
+            h('h2', { className: 'text-lg font-bold text-gray-800' }, 'Oura Ring'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Hämta steg automatiskt när du loggar')
+          )
+        ),
+        h('p', { className: 'text-sm text-gray-600 mb-4' },
+          'Skapa en personlig token på ',
+          h('a', { href: 'https://cloud.ouraring.com/personal-access-tokens', target: '_blank', className: 'text-indigo-600 underline' }, 'cloud.ouraring.com'),
+          ' och klistra in den här.'
+        ),
+        h('div', { className: 'space-y-3' },
+          h('input', {
+            type: 'password',
+            value: ouraToken,
+            onChange: function(e){ setOuraToken(e.target.value); },
+            placeholder: 'Din Oura personal access token...',
+            className: 'w-full px-4 py-3 border rounded-lg outline-none font-mono text-sm'
+          }),
+          ouraToken ? h('div', { className: 'flex items-center gap-2 text-sm text-green-600 bg-green-50 rounded-lg px-3 py-2' },
+            h('span', null, '✅'),
+            h('span', null, 'Token sparad — knappen "💍 Oura" syns nu när du lägger till mätningar')
+          ) : h('div', { className: 'flex items-center gap-2 text-sm text-gray-400 bg-gray-50 rounded-lg px-3 py-2' },
+            h('span', null, 'ℹ️'),
+            h('span', null, 'Ingen token inlagd ännu')
+          )
+        )
+      ),
+
+      // Apple Watch info card
+      h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
+        h('div', { className: 'flex items-center gap-3 mb-4' },
+          h('span', { className: 'text-3xl' }, '⌚'),
+          h('div', null,
+            h('h2', { className: 'text-lg font-bold text-gray-800' }, 'Apple Watch'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Via appen Health Auto Export')
+          )
+        ),
+        h('p', { className: 'text-sm text-gray-600 mb-3' }, 'Apple Health har inget öppet webb-API, men du kan exportera steg manuellt:'),
+        h('ol', { className: 'text-sm text-gray-600 space-y-1 list-decimal list-inside' },
+          h('li', null, 'Öppna Hälsa-appen på iPhone'),
+          h('li', null, 'Tryck på din profilbild → Exportera alla hälsodata'),
+          h('li', null, 'Eller skriv in stegen manuellt i "Lägg till"-vyn')
+        )
+      )
+    );
+  }
+
   // ─── Main render ──────────────────────────────────────────────────────────
 
   return h('div', { className: 'min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4' },
@@ -767,11 +859,12 @@ function WeightStepTracker() {
 
       // Nav
       h('div', { className: 'flex gap-2 mb-6 overflow-x-auto pb-1' },
-        h(NavButton, { id:'overview', label:'Översikt' }),
-        h(NavButton, { id:'add',      label:'+ Lägg till' }),
-        h(NavButton, { id:'workouts', label:'Träning' }),
-        h(NavButton, { id:'history',  label:'Historik' }),
-        h(NavButton, { id:'weekly',   label:'Veckor' }),
+        h(NavButton, { id:'overview',  label:'Översikt' }),
+        h(NavButton, { id:'add',       label:'+ Lägg till' }),
+        h(NavButton, { id:'workouts',  label:'Träning' }),
+        h(NavButton, { id:'history',   label:'Historik' }),
+        h(NavButton, { id:'weekly',    label:'Veckor' }),
+        h(NavButton, { id:'settings',  label:'⚙️ Inställningar' }),
         h('button', { onClick:function(){setShowImport(!showImport);}, className:'px-4 py-2 rounded-lg font-medium whitespace-nowrap bg-white text-gray-700 border border-indigo-200 hover:bg-indigo-50' }, 'Backup')
       ),
 
@@ -799,12 +892,13 @@ function WeightStepTracker() {
       ) : null,
 
       // Views
-      view === 'overview' ? renderOverview() : null,
-      view === 'add'      ? renderAdd()      : null,
-      view === 'workouts' ? renderWorkouts() : null,
-      view === 'goals'    ? renderGoals()    : null,
-      view === 'history'  ? renderHistory()  : null,
-      view === 'weekly'   ? renderWeekly()   : null
+      view === 'overview'  ? renderOverview()  : null,
+      view === 'add'       ? renderAdd()       : null,
+      view === 'workouts'  ? renderWorkouts()  : null,
+      view === 'goals'     ? renderGoals()     : null,
+      view === 'history'   ? renderHistory()   : null,
+      view === 'weekly'    ? renderWeekly()    : null,
+      view === 'settings'  ? renderSettings()  : null
     )
   );
 }
