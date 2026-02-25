@@ -139,7 +139,7 @@ function WeightStepTracker() {
   const [goalWeight, setGoalWeight] = useState(85);
   const [height, setHeight]         = useState(180);
   const [yearlyGoal, setYearlyGoal] = useState({ sessions: 100, minutes: 5000 });
-  const [newEntry, setNewEntry]     = useState({ date: todayStr(), weight: '', steps: '', comment: '' });
+  const [newEntry, setNewEntry]     = useState({ date: todayStr(), weight: '', steps: '', mood: '', comment: '' });
   const [newWorkout, setNewWorkout] = useState({ date: todayStr(), type: '', duration: '', intensity: '3', comment: '' });
   const [view, setView]             = useState('overview');
   const [importText, setImportText] = useState('');
@@ -285,6 +285,7 @@ function WeightStepTracker() {
       date: newEntry.date,
       weight: parseFloat(newEntry.weight),
       steps: newEntry.steps ? parseInt(newEntry.steps) : null,
+      mood: newEntry.mood ? parseInt(newEntry.mood) : null,
       comment: newEntry.comment,
       id: Date.now(),
     };
@@ -294,7 +295,7 @@ function WeightStepTracker() {
     });
     const next = new Date(newEntry.date);
     next.setDate(next.getDate() + 1);
-    setNewEntry({ date: next.toISOString().split('T')[0], weight: '', steps: '', comment: '' });
+    setNewEntry({ date: next.toISOString().split('T')[0], weight: '', steps: '', mood: '', comment: '' });
     showToast('✓ Mätning sparad!');
   };
 
@@ -507,6 +508,52 @@ function WeightStepTracker() {
     return { latest: latest, diff: diff, toGoal: toGoal, totalLoss: totalLoss, avgSteps: avgSteps, bmi: bmi, bmiCat: bmiCat, streak: getStreak() };
   };
 
+  const getPrediction = function() {
+    if (entries.length < 7) return null;
+    const sorted = entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+    const recent = sorted.slice(-30);
+    if (recent.length < 5) return null;
+    var n = recent.length, sumX=0, sumY=0, sumXY=0, sumX2=0;
+    var t0 = new Date(recent[0].date).getTime();
+    recent.forEach(function(e) {
+      var x = (new Date(e.date).getTime()-t0)/86400000, y = e.weight;
+      sumX+=x; sumY+=y; sumXY+=x*y; sumX2+=x*x;
+    });
+    var slope = (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX);
+    var intercept = (sumY - slope*sumX) / n;
+    if (slope >= 0) return { gaining: true, kgPerWeek: parseFloat((slope*7).toFixed(2)) };
+    var currentX = (new Date(recent[recent.length-1].date).getTime()-t0)/86400000;
+    var daysToGoal = (goalWeight - intercept)/slope - currentX;
+    if (daysToGoal < 0 || daysToGoal > 365*3) return null;
+    return { weeksToGoal: Math.round(daysToGoal/7), kgPerWeek: parseFloat(Math.abs(slope*7).toFixed(2)), gaining: false };
+  };
+
+  const getMonthlySummary = function() {
+    var now = new Date();
+    var pad = function(n){ return String(n).padStart(2,'0'); };
+    var tryMonth = function(yr, mo) { return yr + '-' + pad(mo+1); };
+    var monthStr = tryMonth(now.getFullYear(), now.getMonth());
+    var mEntries = entries.filter(function(e){ return e.date.startsWith(monthStr); });
+    if (mEntries.length < 2) {
+      var prev = new Date(now.getFullYear(), now.getMonth()-1, 1);
+      monthStr = tryMonth(prev.getFullYear(), prev.getMonth());
+      mEntries = entries.filter(function(e){ return e.date.startsWith(monthStr); });
+    }
+    if (mEntries.length === 0) return null;
+    var mWorkouts = workouts.filter(function(w){ return w.date.startsWith(monthStr); });
+    var sorted = mEntries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+    var weightChange = sorted.length>1 ? parseFloat((sorted[sorted.length-1].weight - sorted[0].weight).toFixed(1)) : 0;
+    var stepsArr = mEntries.filter(function(e){return e.steps;}).map(function(e){return e.steps;});
+    var avgSteps = stepsArr.length ? Math.round(stepsArr.reduce(function(a,b){return a+b;},0)/stepsArr.length) : 0;
+    var moodArr = mEntries.filter(function(e){return e.mood;}).map(function(e){return e.mood;});
+    var avgMood = moodArr.length ? parseFloat((moodArr.reduce(function(a,b){return a+b;},0)/moodArr.length).toFixed(1)) : null;
+    var names = ['januari','februari','mars','april','maj','juni','juli','augusti','september','oktober','november','december'];
+    var moIdx = parseInt(monthStr.split('-')[1])-1;
+    return { monthName: names[moIdx], weightChange, workoutCount: mWorkouts.length,
+      totalMinutes: mWorkouts.reduce(function(s,w){return s+w.duration;},0),
+      avgSteps, avgMood, logCount: mEntries.length };
+  };
+
   const getChartData = function() {
     const sorted = entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
     return sorted.map(function(entry, idx) {
@@ -515,17 +562,21 @@ function WeightStepTracker() {
         datum:   new Date(entry.date).toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' }),
         vikt:    entry.weight,
         steg:    entry.steps || 0,
+        humör:   entry.mood || null,
+        bmi:     getBMI(entry.weight),
         målvikt: goalWeight,
         snitt7:  parseFloat((w7.reduce(function(s,e){return s+e.weight;},0) / w7.length).toFixed(2)),
       };
     });
   };
 
-  const stats        = getStats();
-  const weeklyStats  = getWeeklyStats();
-  const currentWeek  = getCurrentWeekStats();
-  const yearProgress = getYearlyProgress();
-  const chartData    = getChartData();
+  const stats          = getStats();
+  const weeklyStats    = getWeeklyStats();
+  const currentWeek    = getCurrentWeekStats();
+  const yearProgress   = getYearlyProgress();
+  const chartData      = getChartData();
+  const prediction     = getPrediction();
+  const monthlySummary = getMonthlySummary();
 
   const NavButton = function(props) {
     return h('button', {
@@ -610,16 +661,68 @@ function WeightStepTracker() {
           )
         ) : null
       ) : null,
-      // Weight chart
+
+      // Prediction + Monthly summary row
+      h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-6' },
+        prediction ? h('div', { className: 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-5' },
+          h('div', { className: 'flex items-center gap-2 mb-2' },
+            h('span', { className: 'text-2xl' }, prediction.gaining ? '📈' : '🎯'),
+            h('h3', { className: 'font-bold text-gray-800' }, prediction.gaining ? 'Trendvarning' : 'Förutsägelse')
+          ),
+          prediction.gaining
+            ? h('p', { className: 'text-sm text-red-600' }, 'Du går upp ca ' + prediction.kgPerWeek + ' kg/vecka i nuvarande takt')
+            : h('div', null,
+                h('p', { className: 'text-3xl font-bold text-green-700 mb-1' }, prediction.weeksToGoal + ' veckor'),
+                h('p', { className: 'text-sm text-gray-600' }, 'tills du når ' + goalWeight + ' kg i nuvarande takt'),
+                h('p', { className: 'text-xs text-gray-400 mt-1' }, '≈ ' + prediction.kgPerWeek + ' kg/vecka')
+              )
+        ) : null,
+        monthlySummary ? h('div', { className: 'bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-5' },
+          h('div', { className: 'flex items-center gap-2 mb-3' },
+            h('span', { className: 'text-2xl' }, '📋'),
+            h('h3', { className: 'font-bold text-gray-800' }, 'Sammanfattning ' + monthlySummary.monthName)
+          ),
+          h('p', { className: 'text-sm text-gray-700 leading-relaxed' },
+            'Du loggade ' + monthlySummary.logCount + ' gånger och vikten förändrades med ',
+            h('strong', { className: monthlySummary.weightChange <= 0 ? 'text-green-600' : 'text-red-500' },
+              (monthlySummary.weightChange > 0 ? '+' : '') + monthlySummary.weightChange + ' kg'),
+            '. Du tränade ', h('strong', null, monthlySummary.workoutCount + ' gånger'),
+            ' (' + monthlySummary.totalMinutes + ' min)' +
+            (monthlySummary.avgSteps ? ' och gick i snitt ' + monthlySummary.avgSteps.toLocaleString() + ' steg/dag' : '') + '.' +
+            (monthlySummary.avgMood ? ' Snitt humör: ' + monthlySummary.avgMood + '/5.' : '')
+          )
+        ) : null
+      ),
+
+      // Weight chart (with BMI)
       h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
         h('h2', { className: 'text-lg font-bold text-gray-800 mb-1' }, 'Viktutveckling'),
-        h('p', { className: 'text-xs text-gray-400 mb-4' }, 'Daglig vikt + 7-dagars glidande medelvärde'),
+        h('p', { className: 'text-xs text-gray-400 mb-4' }, 'Daglig vikt + 7-dagars snitt + BMI'),
         h(SvgLineChart, { data: chartData, height: 300, lines: [
           { key: 'vikt',    color: '#a5b4fc', width: 1.5, name: 'Vikt (kg)' },
           { key: 'snitt7',  color: '#4f46e5', width: 2.5, name: '7-dagars snitt' },
           { key: 'målvikt', color: '#10b981', width: 1.5, name: 'Målvikt', dashed: true }
         ]})
       ),
+
+      // BMI chart
+      chartData.some(function(d){ return d.bmi; }) ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
+        h('h2', { className: 'text-lg font-bold text-gray-800 mb-1' }, 'BMI-historik'),
+        h('p', { className: 'text-xs text-gray-400 mb-4' }, 'Normalvikt: 18.5–25'),
+        h(SvgLineChart, { data: chartData, height: 200, lines: [
+          { key: 'bmi', color: '#f59e0b', width: 2, name: 'BMI' }
+        ]})
+      ) : null,
+
+      // Mood chart
+      chartData.some(function(d){ return d.humör; }) ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
+        h('h2', { className: 'text-lg font-bold text-gray-800 mb-1' }, 'Energi & humör'),
+        h('p', { className: 'text-xs text-gray-400 mb-4' }, '1 = låg energi · 5 = toppen'),
+        h(SvgLineChart, { data: chartData, height: 180, lines: [
+          { key: 'humör', color: '#ec4899', width: 2, name: 'Humör (1–5)' }
+        ]})
+      ) : null,
+
       // Steps chart
       h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
         h('h2', { className: 'text-lg font-bold text-gray-800 mb-4' }, 'Steg per dag'),
@@ -650,6 +753,19 @@ function WeightStepTracker() {
               title: 'Hämta steg från Oura Ring',
               className: 'px-3 py-3 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100 disabled:opacity-50 whitespace-nowrap'
             }, ouraLoading ? '⏳' : '💍 Oura') : null
+          ),
+          h('div', null,
+            h('p', { className: 'text-sm text-gray-600 mb-2' }, 'Energi & humör (valfritt)'),
+            h('div', { className: 'flex gap-2' },
+              ['😴','😔','😐','😊','🤩'].map(function(emoji, i) {
+                var val = String(i+1);
+                return h('button', {
+                  key: val,
+                  onClick: function(){ setNewEntry(Object.assign({},newEntry,{mood: newEntry.mood===val ? '' : val})); },
+                  className: 'flex-1 py-2 rounded-lg text-xl border-2 transition-colors ' + (newEntry.mood===val ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-white hover:border-indigo-300')
+                }, emoji);
+              })
+            )
           ),
           h('input', { type:'text', value: newEntry.comment, onChange: function(e){setNewEntry(Object.assign({},newEntry,{comment:e.target.value}));}, placeholder:'Kommentar (valfritt)', className:'w-full px-4 py-3 border rounded-lg outline-none' }),
           h('button', { onClick: addEntry, disabled: !newEntry.weight, className:'w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 disabled:opacity-40 font-medium' }, '+ Spara mätning')
