@@ -156,8 +156,14 @@ function WeightStepTracker() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const [habits, setHabits]         = useState([]);
+  const [habitLogs, setHabitLogs]   = useState({});
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [newHabit, setNewHabit]     = useState({ name: '', type: 'good', emoji: '✅' });
+  const [habitTab, setHabitTab]     = useState('week');
+
   useEffect(() => { loadData(); }, []);
-  useEffect(() => { if (!loading) saveData(); }, [entries, workouts, goalWeight, targetRate, yearlyGoal, height, ouraToken, ouraClientId, loading]);
+  useEffect(() => { if (!loading) saveData(); }, [entries, workouts, habits, habitLogs, goalWeight, targetRate, yearlyGoal, height, ouraToken, ouraClientId, loading]);
 
   // Read URL params injected by iOS Shortcut: ?steps=8500&date=2026-02-25
   useEffect(() => {
@@ -184,6 +190,8 @@ function WeightStepTracker() {
         window.storage.get('oura-token'),
         window.storage.get('oura-client-id'),
         window.storage.get('target-rate'),
+        window.storage.get('habits'),
+        window.storage.get('habit-logs'),
       ]);
       if (results[0] && results[0].value) setEntries(JSON.parse(results[0].value));
       if (results[1] && results[1].value) setWorkouts(JSON.parse(results[1].value));
@@ -193,6 +201,8 @@ function WeightStepTracker() {
       if (results[5] && results[5].value) setOuraToken(results[5].value);
       if (results[6] && results[6].value) setOuraClientId(results[6].value);
       if (results[7] && results[7].value) setTargetRate(parseFloat(results[7].value));
+      if (results[8] && results[8].value) setHabits(JSON.parse(results[8].value));
+      if (results[9] && results[9].value) setHabitLogs(JSON.parse(results[9].value));
     } catch (err) {
       console.log('Ingen sparad data', err);
     } finally {
@@ -209,6 +219,8 @@ function WeightStepTracker() {
         window.storage.set('yearly-goal',     JSON.stringify(yearlyGoal)),
         window.storage.set('user-height',     height.toString()),
         window.storage.set('target-rate',     targetRate.toString()),
+        window.storage.set('habits',          JSON.stringify(habits)),
+        window.storage.set('habit-logs',      JSON.stringify(habitLogs)),
         window.storage.set('oura-token',      ouraToken),
         window.storage.set('oura-client-id',  ouraClientId),
       ]);
@@ -989,6 +1001,247 @@ function WeightStepTracker() {
     );
   }
 
+  function renderHabits() {
+    var DAY_NAMES = ['M','T','O','T','F','L','S'];
+    var today = new Date(); today.setHours(0,0,0,0);
+    var todayStr2 = today.toISOString().split('T')[0];
+
+    // Compute 7 days of the displayed week
+    var dow = today.getDay(); // 0=sun
+    var monday = new Date(today);
+    monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1) + weekOffset * 7);
+    var weekDays = [];
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(monday); d.setDate(monday.getDate() + i);
+      weekDays.push(d.toISOString().split('T')[0]);
+    }
+    var weekLabel = (weekOffset === 0) ? 'Denna vecka' : (weekOffset === -1 ? 'Förra veckan' : new Date(weekDays[0]).toLocaleDateString('sv-SE', { day:'numeric', month:'short' }) + ' – ' + new Date(weekDays[6]).toLocaleDateString('sv-SE', { day:'numeric', month:'short' }));
+
+    function toggleHabitLog(hid, date) {
+      setHabitLogs(function(prev) {
+        var day = Object.assign({}, prev[date] || {});
+        day[hid] = !day[hid];
+        return Object.assign({}, prev, { [date]: day });
+      });
+    }
+
+    function getStreak(hid) {
+      var streak = 0;
+      var d = new Date(today);
+      while (true) {
+        var ds = d.toISOString().split('T')[0];
+        if (habitLogs[ds] && habitLogs[ds][hid]) { streak++; d.setDate(d.getDate()-1); }
+        else break;
+      }
+      return streak;
+    }
+
+    function getBestStreak(hid) {
+      var best = 0, cur = 0;
+      var allDates = Object.keys(habitLogs).sort();
+      allDates.forEach(function(ds) {
+        if (habitLogs[ds] && habitLogs[ds][hid]) { cur++; best = Math.max(best, cur); }
+        else cur = 0;
+      });
+      return best;
+    }
+
+    function getMonthRate(hid) {
+      var now = new Date();
+      var month = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+      var daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+      var daysElapsed = Math.min(now.getDate(), daysInMonth);
+      var done = 0;
+      for (var i = 1; i <= daysElapsed; i++) {
+        var ds = month + '-' + String(i).padStart(2,'0');
+        if (habitLogs[ds] && habitLogs[ds][hid]) done++;
+      }
+      return daysElapsed > 0 ? Math.round(done / daysElapsed * 100) : 0;
+    }
+
+    function getWeeklyRates(hid) {
+      var rates = [];
+      for (var w = -7; w <= 0; w++) {
+        var wMonday = new Date(today);
+        var wDow = today.getDay();
+        wMonday.setDate(today.getDate() - (wDow === 0 ? 6 : wDow - 1) + w * 7);
+        var done = 0;
+        for (var i = 0; i < 7; i++) {
+          var wd = new Date(wMonday); wd.setDate(wMonday.getDate() + i);
+          var ds = wd.toISOString().split('T')[0];
+          if (ds > todayStr2) break;
+          if (habitLogs[ds] && habitLogs[ds][hid]) done++;
+        }
+        var wLabel = new Date(wMonday).toLocaleDateString('sv-SE', { day:'numeric', month:'short' });
+        rates.push({ datum: wLabel, rate: done });
+      }
+      return rates;
+    }
+
+    var addHabit = function() {
+      if (!newHabit.name.trim()) return;
+      var h2 = { id: Date.now(), name: newHabit.name.trim(), type: newHabit.type, emoji: newHabit.emoji };
+      setHabits(function(prev) { return prev.concat(h2); });
+      setNewHabit({ name: '', type: 'good', emoji: '✅' });
+      setHabitTab('week');
+      showToast('✅ Vana tillagd!');
+    };
+
+    var removeHabit = function(hid) {
+      setHabits(function(prev) { return prev.filter(function(h2){ return h2.id !== hid; }); });
+      showToast('Vana borttagen');
+    };
+
+    var emojiOptions = ['✅','🏃','💪','🥗','💧','📖','🧘','😴','🚫','🍰','🍞','📝','🎯','🚶','🧹','💊','🌿','☕'];
+
+    return h('div', { className: 'max-w-2xl mx-auto' },
+
+      // Sub-tabs
+      h('div', { className: 'flex gap-2 mb-5' },
+        ['week','stats','add'].map(function(t) {
+          var labels = { week: '📅 Vecka', stats: '📊 Analys', add: '+ Ny vana' };
+          return h('button', { key: t, onClick: function(){ setHabitTab(t); },
+            className: 'px-4 py-2 rounded-lg text-sm font-medium ' + (habitTab === t ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-indigo-50')
+          }, labels[t]);
+        })
+      ),
+
+      // WEEK VIEW
+      habitTab === 'week' ? h('div', null,
+        // Week navigation
+        h('div', { className: 'flex items-center justify-between mb-4 bg-white rounded-xl p-3 shadow-sm' },
+          h('button', { onClick: function(){ setWeekOffset(function(o){ return o-1; }); }, className: 'px-3 py-1 rounded-lg hover:bg-gray-100 text-lg' }, '‹'),
+          h('span', { className: 'font-semibold text-gray-700' }, weekLabel),
+          h('button', { onClick: function(){ setWeekOffset(function(o){ return Math.min(o+1, 0); }); }, disabled: weekOffset === 0, className: 'px-3 py-1 rounded-lg hover:bg-gray-100 text-lg disabled:opacity-30' }, '›')
+        ),
+
+        habits.length === 0
+          ? h('div', { className: 'bg-white rounded-xl p-12 text-center shadow-md' },
+              h('div', { className: 'text-4xl mb-3' }, '🎯'),
+              h('p', { className: 'text-gray-500 mb-4' }, 'Inga vanor ännu'),
+              h('button', { onClick: function(){ setHabitTab('add'); }, className: 'bg-indigo-600 text-white px-6 py-2 rounded-lg' }, '+ Lägg till vana')
+            )
+          : h('div', { className: 'bg-white rounded-xl shadow-md overflow-hidden' },
+              // Header row
+              h('div', { className: 'grid gap-px bg-gray-100', style: { gridTemplateColumns: '1fr repeat(7, 36px)' } },
+                h('div', { className: 'bg-white px-4 py-2 text-xs text-gray-400 font-medium' }, 'Vana'),
+                weekDays.map(function(date, i) {
+                  var isToday = date === todayStr2;
+                  return h('div', { key: date, className: 'bg-white py-2 text-center' },
+                    h('div', { className: 'text-xs text-gray-400' }, DAY_NAMES[i]),
+                    h('div', { className: 'text-xs font-bold ' + (isToday ? 'text-indigo-600' : 'text-gray-500') },
+                      new Date(date).getDate())
+                  );
+                })
+              ),
+              // Habit rows
+              habits.map(function(habit) {
+                var streak = getStreak(habit.id);
+                return h('div', { key: habit.id, className: 'grid gap-px bg-gray-100', style: { gridTemplateColumns: '1fr repeat(7, 36px)' } },
+                  h('div', { className: 'bg-white px-4 py-3 flex items-center gap-2' },
+                    h('span', { className: 'text-lg' }, habit.emoji),
+                    h('div', null,
+                      h('p', { className: 'text-sm font-medium text-gray-800 leading-tight' }, habit.name),
+                      streak > 0 ? h('p', { className: 'text-xs text-orange-500' }, '🔥 ' + streak) : null
+                    )
+                  ),
+                  weekDays.map(function(date) {
+                    var done = habitLogs[date] && habitLogs[date][habit.id];
+                    var isFuture = date > todayStr2;
+                    var isGood = habit.type === 'good' ? done : !done && !isFuture && date <= todayStr2;
+                    var color = isFuture ? 'bg-gray-50'
+                      : done && habit.type === 'good' ? 'bg-green-400'
+                      : done && habit.type === 'bad'  ? 'bg-red-400'
+                      : !done && habit.type === 'bad' && date <= todayStr2 ? 'bg-green-100'
+                      : 'bg-red-100';
+                    return h('div', { key: date, className: 'bg-white py-1 px-1' },
+                      h('button', {
+                        onClick: function(){ if (!isFuture) toggleHabitLog(habit.id, date); },
+                        disabled: isFuture,
+                        className: 'w-full h-8 rounded-md ' + color + ' transition-colors ' + (isFuture ? '' : 'hover:opacity-80')
+                      }, done ? (habit.type==='good'?'✓':'✗') : '')
+                    );
+                  })
+                );
+              })
+            )
+      ) : null,
+
+      // STATS VIEW
+      habitTab === 'stats' ? h('div', { className: 'space-y-4' },
+        habits.length === 0
+          ? h('p', { className: 'text-gray-400 text-center py-12' }, 'Inga vanor att analysera ännu')
+          : habits.map(function(habit) {
+              var streak = getStreak(habit.id);
+              var best = getBestStreak(habit.id);
+              var rate = getMonthRate(habit.id);
+              var weekRates = getWeeklyRates(habit.id);
+              return h('div', { key: habit.id, className: 'bg-white rounded-xl p-5 shadow-md' },
+                h('div', { className: 'flex items-center justify-between mb-4' },
+                  h('div', { className: 'flex items-center gap-2' },
+                    h('span', { className: 'text-2xl' }, habit.emoji),
+                    h('div', null,
+                      h('p', { className: 'font-bold text-gray-800' }, habit.name),
+                      h('p', { className: 'text-xs text-gray-400' }, habit.type === 'good' ? 'Bra vana' : 'Vana att undvika')
+                    )
+                  ),
+                  h('button', { onClick: function(){ removeHabit(habit.id); }, className: 'text-red-400 hover:text-red-600 text-sm' }, '🗑 Ta bort')
+                ),
+                h('div', { className: 'grid grid-cols-3 gap-3 mb-4' },
+                  h('div', { className: 'bg-orange-50 rounded-lg p-3 text-center' },
+                    h('p', { className: 'text-2xl font-bold text-orange-500' }, streak + '🔥'),
+                    h('p', { className: 'text-xs text-gray-500' }, 'Nuvarande svit')
+                  ),
+                  h('div', { className: 'bg-indigo-50 rounded-lg p-3 text-center' },
+                    h('p', { className: 'text-2xl font-bold text-indigo-600' }, best),
+                    h('p', { className: 'text-xs text-gray-500' }, 'Bästa svit')
+                  ),
+                  h('div', { className: 'bg-green-50 rounded-lg p-3 text-center' },
+                    h('p', { className: 'text-2xl font-bold text-green-600' }, rate + '%'),
+                    h('p', { className: 'text-xs text-gray-500' }, 'Denna månad')
+                  )
+                ),
+                h('p', { className: 'text-xs text-gray-400 mb-2' }, 'Fullföljda dagar per vecka (senaste 8 veckorna)'),
+                h(SvgBarChart, { data: weekRates, dataKey: 'rate', color: habit.type === 'good' ? '#4f46e5' : '#ef4444', height: 100 })
+              );
+            })
+      ) : null,
+
+      // ADD HABIT VIEW
+      habitTab === 'add' ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
+        h('h2', { className: 'text-lg font-bold text-gray-800 mb-5' }, 'Ny vana'),
+        h('div', { className: 'space-y-4' },
+          h('input', { type:'text', value: newHabit.name, onChange: function(e){ setNewHabit(Object.assign({},newHabit,{name:e.target.value})); },
+            placeholder: 'Namn, t.ex. "30 min promenad"', className: 'w-full px-4 py-3 border rounded-lg outline-none' }),
+          h('div', null,
+            h('p', { className: 'text-sm font-medium text-gray-700 mb-2' }, 'Typ'),
+            h('div', { className: 'flex gap-3' },
+              h('button', { onClick: function(){ setNewHabit(Object.assign({},newHabit,{type:'good'})); },
+                className: 'flex-1 py-3 rounded-lg border-2 font-medium ' + (newHabit.type==='good' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500')
+              }, '✅ Bra vana'),
+              h('button', { onClick: function(){ setNewHabit(Object.assign({},newHabit,{type:'bad'})); },
+                className: 'flex-1 py-3 rounded-lg border-2 font-medium ' + (newHabit.type==='bad' ? 'border-red-400 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500')
+              }, '🚫 Undvika')
+            )
+          ),
+          h('div', null,
+            h('p', { className: 'text-sm font-medium text-gray-700 mb-2' }, 'Emoji'),
+            h('div', { className: 'flex flex-wrap gap-2' },
+              emojiOptions.map(function(em) {
+                return h('button', { key: em, onClick: function(){ setNewHabit(Object.assign({},newHabit,{emoji:em})); },
+                  className: 'w-10 h-10 rounded-lg text-xl ' + (newHabit.emoji===em ? 'bg-indigo-100 border-2 border-indigo-400' : 'bg-gray-50 hover:bg-gray-100')
+                }, em);
+              })
+            )
+          ),
+          h('button', { onClick: addHabit, disabled: !newHabit.name.trim(),
+            className: 'w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 disabled:opacity-40 font-medium'
+          }, '+ Lägg till vana')
+        )
+      ) : null
+    );
+  }
+
   function renderSettings() {
     return h('div', { className: 'max-w-lg mx-auto space-y-6' },
 
@@ -1093,6 +1346,7 @@ function WeightStepTracker() {
         h(NavButton, { id:'workouts',  label:'Träning' }),
         h(NavButton, { id:'history',   label:'Historik' }),
         h(NavButton, { id:'weekly',    label:'Veckor' }),
+        h(NavButton, { id:'habits',    label:'🎯 Vanor' }),
         h(NavButton, { id:'settings',  label:'⚙️ Inställningar' }),
         h('button', { onClick:function(){setShowImport(!showImport);}, className:'px-4 py-2 rounded-lg font-medium whitespace-nowrap bg-white text-gray-700 border border-indigo-200 hover:bg-indigo-50' }, 'Backup')
       ),
@@ -1127,6 +1381,7 @@ function WeightStepTracker() {
       view === 'goals'     ? renderGoals()     : null,
       view === 'history'   ? renderHistory()   : null,
       view === 'weekly'    ? renderWeekly()    : null,
+      view === 'habits'    ? renderHabits()    : null,
       view === 'settings'  ? renderSettings()  : null
     )
   );
