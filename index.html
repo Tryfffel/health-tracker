@@ -132,7 +132,7 @@ const IntensityDots = ({ level }) =>
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 function WeightStepTracker() {
-  const todayStr = () => new Date().toISOString().split('T')[0];
+  const todayStr = () => { var d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 
   const [entries, setEntries]       = useState([]);
   const [workouts, setWorkouts]     = useState([]);
@@ -812,7 +812,7 @@ function WeightStepTracker() {
     var mondayD = new Date(todayD); mondayD.setDate(todayD.getDate() - (dow===0?6:dow-1));
     var weekWorkouts = workouts.filter(function(w){ var d=new Date(w.date); d.setHours(0,0,0,0); return d>=mondayD && d<=todayD; });
     var weekMinutes = weekWorkouts.reduce(function(s,w){return s+w.duration;},0);
-    var todayStr2 = todayD.toISOString().split('T')[0];
+    var todayStr2 = todayD.getFullYear()+'-'+String(todayD.getMonth()+1).padStart(2,'0')+'-'+String(todayD.getDate()).padStart(2,'0');
     var DAY_NAMES = ['M','T','O','T','F','L','S'];
 
     // All-time stats
@@ -841,25 +841,25 @@ function WeightStepTracker() {
     return h('div', null,
 
       // ── HERO WEEK CARD ──────────────────────────────────────────────────────
-      h('div', { className: 'bg-gradient-to-br from-orange-500 to-amber-500 rounded-2xl p-6 mb-6 text-white shadow-xl' },
+      h('div', { className: 'bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-6 mb-6 text-white shadow-xl' },
         h('div', { className: 'flex items-start justify-between mb-4' },
           h('div', null,
-            h('p', { className: 'text-orange-100 text-xs font-semibold uppercase tracking-widest mb-1' }, 'Denna vecka'),
+            h('p', { className: 'text-blue-100 text-xs font-semibold uppercase tracking-widest mb-1' }, 'Denna vecka'),
             h('p', { className: 'text-6xl font-black leading-none' }, weekWorkouts.length),
-            h('p', { className: 'text-orange-100 text-sm mt-1' }, 'träningspass' + (weekMinutes>0 ? ' · ' + weekMinutes + ' min' : ''))
+            h('p', { className: 'text-blue-100 text-sm mt-1' }, 'träningspass' + (weekMinutes>0 ? ' · ' + weekMinutes + ' min' : ''))
           ),
           h('div', { className: 'text-5xl' }, weekWorkouts.length===0 ? '😴' : weekWorkouts.length>=3 ? '🔥' : '💪')
         ),
-        h('p', { className: 'text-orange-100 text-sm mb-4' }, motivationMsg),
+        h('p', { className: 'text-blue-100 text-sm mb-4' }, motivationMsg),
         h('div', { className: 'flex gap-2' },
           ...[0,1,2,3,4,5,6].map(function(i) {
             var dayD = new Date(mondayD); dayD.setDate(mondayD.getDate()+i);
-            var dayStr = dayD.toISOString().split('T')[0];
+            var dayStr = dayD.getFullYear()+'-'+String(dayD.getMonth()+1).padStart(2,'0')+'-'+String(dayD.getDate()).padStart(2,'0');
             var had = workouts.some(function(w){ return w.date===dayStr; });
             var isToday = dayStr===todayStr2;
             return h('div', { key:i, className:'flex-1 flex flex-col items-center gap-1' },
-              h('div', { className:'w-full py-2 rounded-lg text-center text-xs font-bold ' + (had ? 'bg-white text-orange-500' : isToday ? 'border-2 border-white text-white' : 'bg-orange-400/40 text-orange-200') }, had ? '✓' : DAY_NAMES[i]),
-              h('p', { className:'text-orange-200 text-xs' }, DAY_NAMES[i])
+              h('div', { className:'w-full py-2 rounded-lg text-center text-xs font-bold ' + (had ? 'bg-white text-blue-600' : isToday ? 'border-2 border-white text-white' : 'bg-blue-400/40 text-blue-200') }, had ? '✓' : DAY_NAMES[i]),
+              h('p', { className:'text-blue-200 text-xs' }, DAY_NAMES[i])
             );
           })
         )
@@ -868,9 +868,9 @@ function WeightStepTracker() {
       // ── ALL-TIME STATS ──────────────────────────────────────────────────────
       h('div', { className: 'grid grid-cols-3 gap-3 mb-6' },
         h('div', { className: 'bg-white rounded-xl p-4 shadow-md text-center' },
-          h('p', { className: 'text-3xl font-black text-orange-500' }, workouts.length),
+          h('p', { className: 'text-3xl font-black text-blue-500' }, workouts.length),
           h('p', { className: 'text-xs text-gray-500 mt-1' }, 'Totala pass'),
-          bestWeek>0 ? h('p', { className:'text-xs text-orange-300 mt-0.5' }, 'Bästa vecka: '+bestWeek) : null
+          bestWeek>0 ? h('p', { className:'text-xs text-blue-300 mt-0.5' }, 'Bästa vecka: '+bestWeek) : null
         ),
         h('div', { className: 'bg-white rounded-xl p-4 shadow-md text-center' },
           h('p', { className: 'text-3xl font-black text-blue-500' }, totalHours+'h'),
@@ -886,7 +886,7 @@ function WeightStepTracker() {
       h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
         h('div', { className: 'flex items-center justify-between mb-5' },
           h('h2', { className: 'text-lg font-bold text-gray-800' }, '🎯 Årsmål ' + new Date().getFullYear()),
-          h('button', { onClick: function(){setView('goals');}, className:'text-xs text-orange-600 font-medium bg-orange-50 px-3 py-1 rounded-full hover:bg-orange-100' }, 'Ändra →')
+          h('button', { onClick: function(){setView('goals');}, className:'text-xs text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-full hover:bg-blue-100' }, 'Ändra →')
         ),
         h('div', { className: 'space-y-5' },
           h('div', null,
@@ -895,24 +895,24 @@ function WeightStepTracker() {
               h('span', { className:'text-sm font-bold ' + (yearProgress.onTrackSessions?'text-green-600':'text-orange-600') }, yearProgress.totalSessions + ' / ' + yearProgress.goalSessions)
             ),
             h('div', { className:'w-full bg-gray-100 rounded-full h-4 overflow-hidden' },
-              h('div', { className:'h-4 rounded-full ' + (yearProgress.onTrackSessions?'bg-gradient-to-r from-green-400 to-emerald-500':'bg-gradient-to-r from-orange-400 to-amber-500'), style:{ width: yearProgress.sessionsProgress+'%' } })
+              h('div', { className:'h-4 rounded-full ' + (yearProgress.onTrackSessions?'bg-gradient-to-r from-green-400 to-emerald-500':'bg-gradient-to-r from-blue-400 to-indigo-500'), style:{ width: yearProgress.sessionsProgress+'%' } })
             ),
-            h('p', { className:'text-xs mt-1.5 ' + (yearProgress.onTrackSessions?'text-green-600':'text-orange-500') }, yearProgress.onTrackSessions ? '✓ Före plan med '+yearProgress.aheadSessions+' pass 🎉' : Math.abs(yearProgress.aheadSessions)+' pass efter plan')
+            h('p', { className:'text-xs mt-1.5 ' + (yearProgress.onTrackSessions?'text-green-600':'text-blue-500') }, yearProgress.onTrackSessions ? '✓ Före plan med '+yearProgress.aheadSessions+' pass 🎉' : Math.abs(yearProgress.aheadSessions)+' pass efter plan')
           ),
           h('div', null,
             h('div', { className:'flex justify-between items-center mb-2' },
               h('span', { className:'text-sm font-semibold text-gray-700' }, '⏱ Träningstid'),
-              h('span', { className:'text-sm font-bold ' + (yearProgress.onTrackMinutes?'text-green-600':'text-orange-600') }, Math.round(yearProgress.totalMinutes/60)+'h / '+Math.round(yearProgress.goalMinutes/60)+'h')
+              h('span', { className:'text-sm font-bold ' + (yearProgress.onTrackMinutes?'text-green-600':'text-blue-600') }, Math.round(yearProgress.totalMinutes/60)+'h / '+Math.round(yearProgress.goalMinutes/60)+'h')
             ),
             h('div', { className:'w-full bg-gray-100 rounded-full h-4 overflow-hidden' },
-              h('div', { className:'h-4 rounded-full ' + (yearProgress.onTrackMinutes?'bg-gradient-to-r from-blue-400 to-indigo-500':'bg-gradient-to-r from-orange-400 to-amber-500'), style:{ width: yearProgress.minutesProgress+'%' } })
+              h('div', { className:'h-4 rounded-full ' + (yearProgress.onTrackMinutes?'bg-gradient-to-r from-blue-400 to-indigo-500':'bg-gradient-to-r from-blue-300 to-indigo-400'), style:{ width: yearProgress.minutesProgress+'%' } })
             ),
-            h('p', { className:'text-xs mt-1.5 ' + (yearProgress.onTrackMinutes?'text-green-600':'text-orange-500') }, yearProgress.onTrackMinutes ? '✓ Före plan med '+Math.abs(yearProgress.aheadMinutes)+' min 🎉' : Math.abs(yearProgress.aheadMinutes)+' min efter plan')
+            h('p', { className:'text-xs mt-1.5 ' + (yearProgress.onTrackMinutes?'text-green-600':'text-blue-500') }, yearProgress.onTrackMinutes ? '✓ Före plan med '+Math.abs(yearProgress.aheadMinutes)+' min 🎉' : Math.abs(yearProgress.aheadMinutes)+' min efter plan')
           )
         ),
         weekChartData.some(function(d){return d.pass>0;}) ? h('div', { className:'mt-5 pt-5 border-t' },
           h('p', { className:'text-xs text-gray-400 mb-2' }, 'Pass per vecka (senaste 8 veckorna)'),
-          h(SvgBarChart, { data: weekChartData, dataKey: 'pass', color: '#f97316', height: 100 })
+          h(SvgBarChart, { data: weekChartData, dataKey: 'pass', color: '#3b82f6', height: 100 })
         ) : null
       ),
 
@@ -922,7 +922,7 @@ function WeightStepTracker() {
         h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4' },
           h('div', { className: 'flex gap-2' },
             h('input', { type:'date', value:newWorkout.date, onChange:function(e){setNewWorkout(Object.assign({},newWorkout,{date:e.target.value}));}, className:'flex-1 px-4 py-3 border rounded-lg outline-none' }),
-            h('button', { onClick:function(){setNewWorkout(Object.assign({},newWorkout,{date:todayStr()}));}, className:'px-3 py-3 bg-orange-50 text-orange-600 rounded-lg text-sm hover:bg-orange-100 font-medium' }, 'Idag')
+            h('button', { onClick:function(){setNewWorkout(Object.assign({},newWorkout,{date:todayStr()}));}, className:'px-3 py-3 bg-blue-50 text-blue-600 rounded-lg text-sm hover:bg-blue-100 font-medium' }, 'Idag')
           ),
           h('select', { value:newWorkout.type, onChange:function(e){setNewWorkout(Object.assign({},newWorkout,{type:e.target.value}));}, className:'w-full px-4 py-3 border rounded-lg outline-none' },
             h('option', { value:'' }, 'Välj typ…'),
@@ -930,7 +930,7 @@ function WeightStepTracker() {
           ),
           h('div', null,
             h('input', { type:'number', value:newWorkout.duration, onChange:function(e){setNewWorkout(Object.assign({},newWorkout,{duration:e.target.value}));}, placeholder:'Minuter', className:'w-full px-4 py-3 border rounded-lg outline-none' }),
-            calPreview ? h('p', { className:'text-xs text-orange-500 font-medium mt-1' }, '🔥 ≈ '+calPreview+' kcal') : null
+            calPreview ? h('p', { className:'text-xs text-blue-500 font-medium mt-1' }, '🔥 ≈ '+calPreview+' kcal') : null
           ),
           h('div', null,
             h('label', { className:'text-xs text-gray-500 block mb-1' }, 'Intensitet'),
@@ -938,7 +938,7 @@ function WeightStepTracker() {
               ...['😴','🚶','⚡','💪','🔥'].map(function(emoji,idx) {
                 var i=idx+1;
                 return h('button', { key:i, onClick:function(){setNewWorkout(Object.assign({},newWorkout,{intensity:i.toString()}));},
-                  className:'flex-1 py-2.5 rounded-lg text-lg transition-all ' + (parseInt(newWorkout.intensity)===i ? 'bg-orange-500 shadow-md' : 'bg-gray-100 hover:bg-orange-100')
+                  className:'flex-1 py-2.5 rounded-lg text-lg transition-all ' + (parseInt(newWorkout.intensity)===i ? 'bg-blue-500 shadow-md' : 'bg-gray-100 hover:bg-blue-100')
                 }, emoji);
               })
             )
@@ -948,7 +948,7 @@ function WeightStepTracker() {
           )
         ),
         h('button', { onClick:addWorkout, disabled:!newWorkout.type||!newWorkout.duration,
-          className:'mt-4 w-full bg-gradient-to-r from-orange-500 to-amber-500 text-white py-4 rounded-xl hover:from-orange-600 hover:to-amber-600 disabled:opacity-40 font-bold shadow-md'
+          className:'mt-4 w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-4 rounded-xl hover:from-blue-600 hover:to-indigo-700 disabled:opacity-40 font-bold shadow-md'
         }, '💪 Spara träningspass')
       ),
 
@@ -956,7 +956,7 @@ function WeightStepTracker() {
       workouts.length > 0 ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
         h('div', { className:'flex items-center justify-between mb-5' },
           h('h2', { className:'text-lg font-bold text-gray-800' }, 'Träningshistorik'),
-          h('span', { className:'text-xs bg-orange-100 text-orange-600 font-bold px-3 py-1 rounded-full' }, workouts.length+' pass totalt')
+          h('span', { className:'text-xs bg-blue-100 text-blue-600 font-bold px-3 py-1 rounded-full' }, workouts.length+' pass totalt')
         ),
         h('div', { className:'space-y-3 max-h-96 overflow-y-auto' },
           ...workouts.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).slice(0,25).map(function(w) {
@@ -977,7 +977,7 @@ function WeightStepTracker() {
               h('div', { className:'flex items-center gap-3' },
                 h('div', { className:'text-right' },
                   h('p', { className:'font-bold text-gray-800' }, w.duration+' min'),
-                  h('p', { className:'text-xs text-orange-400 font-medium' }, '🔥 '+getCalories(w.type,w.duration,currentWeight)+' kcal')
+                  h('p', { className:'text-xs text-blue-400 font-medium' }, '🔥 '+getCalories(w.type,w.duration,currentWeight)+' kcal')
                 ),
                 h('button', { onClick:function(){deleteWorkout(w.id);}, className:'text-gray-200 hover:text-red-400 text-lg transition-colors' }, '✕')
               )
@@ -1107,7 +1107,7 @@ function WeightStepTracker() {
   function renderHabits() {
     var DAY_NAMES = ['M','T','O','T','F','L','S'];
     var today = new Date(); today.setHours(0,0,0,0);
-    var todayStr2 = today.toISOString().split('T')[0];
+    var todayStr2 = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
 
     // Compute 7 days of the displayed week
     var dow = today.getDay(); // 0=sun
