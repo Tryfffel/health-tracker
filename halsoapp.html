@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Hälsoapp</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    :root{
+      --bg:#0a0a0a;--card:#141414;--card2:#1c1c1c;--card3:#222;
+      --border:#262626;--border2:#303030;
+      --text:#e8e8e8;--text2:#9a9a9a;--text3:#5a5a5a;
+      --green:#6db86d;--green2:#4a9e4a;--green-dim:rgba(109,184,109,0.12);
+      --blue:#4a9ef0;--blue2:#2a7ed0;--blue-dim:rgba(74,158,240,0.12);
+      --purple:#9b7fe8;--purple2:#7a5ec8;--purple-dim:rgba(155,127,232,0.12);
+      --orange:#e08c40;--orange2:#c07020;--orange-dim:rgba(224,140,64,0.12);
+      --red:#e07070;--yellow:#d4b44a;
+      --radius:14px;--tab-h:64px;
+    }
+    html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.5;overflow-x:hidden}
+    body{display:flex;flex-direction:column;max-width:500px;margin:0 auto;position:relative}
+
+    /* ── HEADER ── */
+    .app-header{background:var(--card);border-bottom:1px solid var(--border);padding:14px 16px 10px;position:sticky;top:0;z-index:100}
+    .hdr-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .hdr-title{font-size:18px;font-weight:800;letter-spacing:-0.5px}
+    .hdr-title span{color:var(--green)}
+    .hdr-date{font-size:12px;color:var(--text2)}
+    .hdr-goal{font-size:11px;color:var(--text3);text-align:right}
+    .tracker-row{display:flex;gap:8px}
+    .tracker-item{flex:1;background:var(--card2);border-radius:10px;padding:7px 10px;border:1px solid var(--border)}
+    .trk-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px}
+    .trk-vals{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+    .trk-cur{font-size:15px;font-weight:700}
+    .trk-goal{font-size:11px;color:var(--text3)}
+    .pbar{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+    .pfill{height:100%;border-radius:2px;transition:width .4s ease}
+    .pfill.kcal{background:linear-gradient(90deg,#d4a042,#e07050)}
+    .pfill.prot{background:linear-gradient(90deg,var(--green2),var(--green))}
+    .hdr-hidden .tracker-row{display:none}
+
+    /* ── MAIN ── */
+    .main-content{flex:1;overflow-y:auto;padding-bottom:calc(var(--tab-h) + 16px)}
+    .section{display:none;padding:14px 14px 0}
+    .section.active{display:block}
+    .sec-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;margin-top:4px}
+
+    /* ── SUB TABS ── */
+    .sub-tabs{display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px}
+    .sub-tab{padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;border:1px solid var(--border);background:var(--card2);color:var(--text2);cursor:pointer;white-space:nowrap;transition:all .15s}
+    .sub-tab.active{color:#fff;border-color:transparent}
+    .sub-tab.green.active{background:var(--green2)}
+    .sub-tab.blue.active{background:var(--blue2)}
+    .sub-tab.purple.active{background:var(--purple2)}
+    .sub-tab.orange.active{background:var(--orange2)}
+
+    /* ── CARDS ── */
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}
+    .card-sm{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+    .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+    .stat-grid.cols3{grid-template-columns:1fr 1fr 1fr}
+    .stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+    .stat-val{font-size:22px;font-weight:800;margin-bottom:2px}
+    .stat-label{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px}
+    .stat-sub{font-size:11px;color:var(--text3);margin-top:2px}
+
+    /* ── MEAL CARD ── */
+    .meal-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:9px;display:flex;align-items:flex-start;gap:12px;cursor:pointer;user-select:none;transition:border-color .2s,opacity .2s}
+    .meal-card.checked{opacity:.5;border-color:var(--green2);background:rgba(109,184,109,.03)}
+    .meal-icon{font-size:26px;flex-shrink:0;margin-top:1px}
+    .meal-body{flex:1;min-width:0}
+    .meal-time{font-size:10px;color:var(--text3);font-weight:700;letter-spacing:.3px}
+    .meal-name{font-size:15px;font-weight:700;margin:1px 0 3px}
+    .meal-desc{font-size:12px;color:var(--text2);line-height:1.4}
+    .meal-macros{display:flex;gap:8px;margin-top:7px}
+    .mbadge{font-size:11px;padding:2px 9px;border-radius:20px;font-weight:600}
+    .mbadge.k{background:rgba(212,160,66,.15);color:#d4a042}
+    .mbadge.p{background:var(--green-dim);color:var(--green)}
+    .check-box{width:24px;height:24px;border-radius:7px;border:2px solid var(--border2);flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;transition:all .2s}
+    .meal-card.checked .check-box{background:var(--green2);border-color:var(--green2)}
+    .chk-svg{display:none}
+    .meal-card.checked .chk-svg{display:block}
+
+    /* ── WEEK MEAL ── */
+    .week-day-hdr{font-size:13px;font-weight:700;color:var(--green);margin-bottom:7px;display:flex;align-items:center;gap:8px}
+    .today-badge{font-size:10px;background:var(--green-dim);color:var(--green);padding:2px 8px;border-radius:20px;font-weight:700;border:1px solid rgba(109,184,109,.3)}
+    .week-meal{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:9px 12px;margin-bottom:5px;display:flex;align-items:center;gap:10px}
+    .wm-icon{font-size:18px;flex-shrink:0}
+    .wm-body{flex:1;min-width:0}
+    .wm-time{font-size:10px;color:var(--text3);font-weight:700}
+    .wm-name{font-size:13px;font-weight:600}
+    .wm-macros{font-size:11px;color:var(--text3);margin-top:1px}
+    .day-total{font-size:11px;color:var(--text3);text-align:right;margin-top:3px;margin-bottom:14px}
+
+    /* ── RECIPES ── */
+    .search-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;width:100%;font-size:14px;color:var(--text);outline:none;margin-bottom:10px}
+    .search-box::placeholder{color:var(--text3)}
+    .search-box:focus{border-color:var(--green2)}
+    .recipe-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:9px;overflow:hidden}
+    .recipe-hdr{padding:12px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+    .rh-left{display:flex;align-items:center;gap:10px}
+    .r-icon{font-size:20px}
+    .r-name{font-size:14px;font-weight:700}
+    .r-toggle{font-size:17px;color:var(--text3);transition:transform .2s}
+    .recipe-card.open .r-toggle{transform:rotate(90deg)}
+    .recipe-body{display:none;padding:0 14px 14px;border-top:1px solid var(--border)}
+    .recipe-card.open .recipe-body{display:block}
+    .rb-sec{font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.5px;margin:10px 0 6px}
+    .ing-list{display:flex;flex-direction:column;gap:5px}
+    .ing-row{display:flex;align-items:center;gap:8px;background:var(--card2);border-radius:8px;padding:7px 10px}
+    .ing-amt{width:58px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 6px;font-size:14px;font-weight:700;color:var(--green);text-align:center;outline:none;-webkit-appearance:none;transition:border-color .15s}
+    .ing-amt:focus{border-color:var(--green2)}
+    .ing-unit{font-size:11px;color:var(--text3);min-width:30px}
+    .ing-name-r{font-size:13px;color:var(--text2);flex:1}
+    .reset-row{display:flex;justify-content:flex-end;margin-top:8px}
+    .reset-btn{background:none;border:1px solid var(--border);color:var(--text3);font-size:11px;padding:3px 10px;border-radius:6px;cursor:pointer}
+    .reset-btn:hover{color:var(--green);border-color:var(--green2)}
+    .recipe-method{font-size:13px;color:var(--text2);line-height:1.6}
+    .recipe-hint{font-size:11px;color:var(--text3);margin-bottom:10px;padding:0 2px}
+
+    /* ── SHOPPING ── */
+    .shop-cat-title{font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px;margin-top:4px}
+    .shop-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:5px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;transition:opacity .2s}
+    .shop-item.bought{opacity:.4}
+    .si-chk{width:20px;height:20px;border-radius:6px;border:2px solid var(--border2);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .2s}
+    .shop-item.bought .si-chk{background:var(--green2);border-color:var(--green2)}
+    .si-name{font-size:14px;font-weight:500;flex:1}
+    .shop-item.bought .si-name{text-decoration:line-through;color:var(--text3)}
+    .si-qty{font-size:12px;color:var(--text3)}
+    .reset-shop-btn{background:none;border:1px solid var(--border);color:var(--text2);padding:8px;border-radius:10px;font-size:13px;cursor:pointer;width:100%;margin-bottom:12px}
+
+    /* ── WORKOUT ── */
+    .workout-hero{background:linear-gradient(135deg,#1a3a6e,#1e2a5e);border:1px solid #2a4a8e;border-radius:var(--radius);padding:20px;margin-bottom:10px}
+    .wh-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+    .wh-count{font-size:52px;font-weight:900;color:#fff;line-height:1}
+    .wh-label{font-size:13px;color:rgba(255,255,255,.6);margin-top:4px}
+    .wh-msg{font-size:12px;color:rgba(255,255,255,.6);margin-bottom:14px}
+    .week-days-grid{display:flex;gap:5px}
+    .wd-cell{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+    .wd-dot{width:100%;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;transition:all .15s}
+    .wd-dot.done{background:rgba(255,255,255,.95);color:#1a3a6e}
+    .wd-dot.today{background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.5);color:rgba(255,255,255,.8)}
+    .wd-dot.empty{background:rgba(255,255,255,.07);color:rgba(255,255,255,.3)}
+    .wd-lbl{font-size:9px;color:rgba(255,255,255,.4)}
+    .add-form{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}
+    .form-title{font-size:14px;font-weight:700;color:var(--text2);margin-bottom:12px}
+    .form-row{display:flex;gap:8px;margin-bottom:8px}
+    .form-input{flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);outline:none}
+    .form-input:focus{border-color:var(--blue2)}
+    .form-input::placeholder{color:var(--text3)}
+    .form-select{flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);outline:none;-webkit-appearance:none}
+    .today-btn{background:var(--card3);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;white-space:nowrap}
+    .intensity-row{display:flex;gap:6px;margin-bottom:8px}
+    .int-btn{flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:8px 4px;font-size:18px;cursor:pointer;text-align:center;transition:all .15s}
+    .int-btn.active{background:var(--blue2);border-color:var(--blue)}
+    .save-btn{width:100%;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px}
+    .save-btn.green{background:var(--green2);color:#fff}
+    .save-btn.blue{background:var(--blue2);color:#fff}
+    .save-btn.purple{background:var(--purple2);color:#fff}
+    .save-btn:disabled{opacity:.4;cursor:default}
+    .workout-history{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:10px}
+    .wh-item{padding:12px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+    .wh-item:last-child{border-bottom:none}
+    .whi-left{display:flex;align-items:center;gap:10px}
+    .whi-emoji{font-size:24px}
+    .whi-name{font-size:14px;font-weight:600}
+    .whi-date{font-size:11px;color:var(--text3);margin-top:1px}
+    .whi-right{text-align:right}
+    .whi-dur{font-size:14px;font-weight:700;color:var(--blue)}
+    .whi-kcal{font-size:11px;color:var(--text3);margin-top:1px}
+    .del-btn{background:none;border:none;color:var(--text3);font-size:14px;cursor:pointer;padding:4px 8px;margin-left:6px}
+    .del-btn:hover{color:var(--red)}
+
+    /* ── YEARLY GOAL BAR ── */
+    .goal-bar-wrap{margin-bottom:14px}
+    .goal-bar-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+    .goal-bar-label{font-size:13px;font-weight:600;color:var(--text2)}
+    .goal-bar-val{font-size:13px;font-weight:700}
+    .goal-bar-bg{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:4px}
+    .goal-bar-fill{height:100%;border-radius:4px;transition:width .5s}
+    .goal-bar-fill.blue{background:linear-gradient(90deg,var(--blue2),var(--blue))}
+    .goal-bar-fill.green{background:linear-gradient(90deg,var(--green2),var(--green))}
+    .goal-bar-sub{font-size:11px;color:var(--text3)}
+
+    /* ── WEIGHT / HEALTH ── */
+    .weight-prog-bar{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}
+    .wp-labels{display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:7px}
+    .wp-bar-bg{height:10px;background:var(--border);border-radius:5px;overflow:hidden;margin-bottom:8px}
+    .wp-bar-fill{height:100%;border-radius:5px;background:linear-gradient(90deg,var(--purple2),var(--purple));transition:width .5s}
+    .wp-status{font-size:12px;text-align:center;font-weight:600}
+    .chart-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}
+    .chart-lbl{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:10px}
+    .weight-input-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}
+    .wi-title{font-size:14px;font-weight:700;color:var(--text2);margin-bottom:12px}
+    .wi-row{display:flex;gap:8px;margin-bottom:8px}
+    .wi-input{flex:1;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:15px;color:var(--text);outline:none;text-align:center;-webkit-appearance:none}
+    .wi-input:focus{border-color:var(--purple2)}
+    .wi-input::placeholder{color:var(--text3);font-size:13px}
+    .mood-row{display:flex;gap:5px;margin-bottom:8px}
+    .mood-btn{flex:1;background:var(--card2);border:2px solid var(--border);border-radius:8px;padding:8px 4px;font-size:18px;cursor:pointer;text-align:center;transition:all .15s}
+    .mood-btn.active{border-color:var(--purple2);background:var(--purple-dim)}
+    .weight-log-list{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:10px}
+    .wl-item{padding:10px 14px;display:flex;align-items:center;border-bottom:1px solid var(--border);gap:8px}
+    .wl-item:last-child{border-bottom:none}
+    .wl-date{font-size:13px;color:var(--text2);flex:1}
+    .wl-w{font-size:14px;font-weight:700}
+    .wl-delta{font-size:12px;min-width:42px;text-align:right}
+    .wl-delta.neg{color:var(--green)}
+    .wl-delta.pos{color:var(--red)}
+    .wl-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px}
+    .wl-del:hover{color:var(--red)}
+    .wl-mood{font-size:14px}
+
+    /* ── HABITS ── */
+    .habit-grid-hdr{display:grid;align-items:center;background:var(--card2);border-radius:10px 10px 0 0;border:1px solid var(--border);border-bottom:none;overflow:hidden}
+    .habit-grid-row{display:grid;align-items:center;border:1px solid var(--border);border-top:none;background:var(--card)}
+    .habit-grid-row:last-child{border-radius:0 0 10px 10px}
+    .hg-name{padding:10px 12px;font-size:13px;font-weight:600;min-width:0}
+    .hg-name-sm{font-size:11px;color:var(--text3);margin-top:1px}
+    .hg-day{display:flex;align-items:center;justify-content:center;padding:8px 2px}
+    .hg-day-hdr{display:flex;flex-direction:column;align-items:center;padding:8px 2px}
+    .hg-day-name{font-size:9px;color:var(--text3);font-weight:700}
+    .hg-day-num{font-size:11px;font-weight:700;color:var(--text2)}
+    .hab-cell{width:100%;min-height:32px;border-radius:5px;border:none;cursor:pointer;font-size:13px;font-weight:700;transition:all .15s;display:flex;align-items:center;justify-content:center}
+    .hab-cell.done-good{background:rgba(109,184,109,.3);color:var(--green)}
+    .hab-cell.miss-good{background:rgba(224,112,112,.1);color:rgba(224,112,112,.4)}
+    .hab-cell.done-bad{background:rgba(224,112,112,.3);color:var(--red)}
+    .hab-cell.miss-bad{background:rgba(109,184,109,.1);color:rgba(109,184,109,.4)}
+    .hab-cell.future{background:var(--card3);color:transparent;cursor:default}
+    .hab-cell.today-border{outline:2px solid var(--purple);outline-offset:-2px}
+    .week-nav{display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:10px}
+    .week-nav button{background:none;border:none;color:var(--text2);font-size:18px;cursor:pointer;padding:2px 8px}
+    .week-nav button:disabled{opacity:.25;cursor:default}
+    .week-nav span{font-size:13px;font-weight:600;color:var(--text)}
+    .habit-stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}
+    .hsc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .hsc-title{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700}
+    .hsc-mini-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+    .hsc-mini{background:var(--card2);border-radius:8px;padding:10px;text-align:center}
+    .hsc-mini-val{font-size:20px;font-weight:800;margin-bottom:2px}
+    .hsc-mini-lbl{font-size:10px;color:var(--text3);text-transform:uppercase}
+    .svg-bar-dark{width:100%}
+
+    /* ── HISTORY TABLE ── */
+    .hist-table{width:100%;border-collapse:collapse}
+    .hist-table th{text-align:left;padding:8px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);border-bottom:1px solid var(--border2)}
+    .hist-table td{padding:9px 12px;font-size:13px;border-bottom:1px solid var(--border)}
+    .hist-table tr:last-child td{border-bottom:none}
+    .hist-table tr:hover td{background:var(--card2)}
+
+    /* ── SETTINGS ── */
+    .settings-section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}
+    .ss-title{font-size:14px;font-weight:700;color:var(--text2);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+    .ss-label{font-size:12px;color:var(--text3);margin-bottom:5px;margin-top:8px;display:block}
+    .ss-input{width:100%;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);outline:none}
+    .ss-input:focus{border-color:var(--purple2)}
+    .rate-btns{display:flex;gap:6px;flex-wrap:wrap}
+    .rate-btn{padding:8px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s}
+    .rate-btn.active{background:var(--purple2);border-color:var(--purple);color:#fff}
+    .backup-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+    .backup-btn{flex:1;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text2);font-size:13px;font-weight:600;cursor:pointer;text-align:center;min-width:120px}
+    .backup-btn:hover{border-color:var(--purple2);color:var(--purple)}
+    .textarea{width:100%;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--text);outline:none;font-family:monospace;resize:vertical}
+    .textarea:focus{border-color:var(--purple2)}
+
+    /* ── PROGRESS PILL ── */
+    .pill{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+    .pill.green{background:var(--green-dim);color:var(--green)}
+    .pill.red{background:rgba(224,112,112,.12);color:var(--red)}
+    .pill.blue{background:var(--blue-dim);color:var(--blue)}
+    .pill.yellow{background:rgba(212,180,74,.12);color:var(--yellow)}
+
+    /* ── EMPTY STATE ── */
+    .empty{text-align:center;padding:40px 20px;color:var(--text3)}
+    .empty-icon{font-size:38px;margin-bottom:10px}
+
+    /* ── TOAST ── */
+    .toast{position:fixed;top:16px;left:50%;transform:translateX(-50%) translateY(-80px);z-index:500;background:var(--card2);border:1px solid var(--border2);border-radius:12px;padding:10px 18px;font-size:13px;font-weight:600;color:var(--text);box-shadow:0 8px 32px rgba(0,0,0,.5);transition:transform .3s cubic-bezier(.34,1.56,.64,1);white-space:nowrap;max-width:90vw;text-align:center}
+    .toast.show{transform:translateX(-50%) translateY(0)}
+    .toast.ok{border-color:var(--green2);color:var(--green)}
+    .toast.err{border-color:var(--red);color:var(--red)}
+
+    /* ── BOTTOM NAV ── */
+    .tab-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:500px;height:var(--tab-h);background:var(--card);border-top:1px solid var(--border);display:flex;z-index:200;padding-bottom:env(safe-area-inset-bottom)}
+    .tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--text3);background:none;border:none;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;transition:color .15s;user-select:none}
+    .tab-icon{font-size:21px;transition:transform .15s}
+    .tab-btn.active{color:var(--green)}
+    .tab-btn.active .tab-icon{transform:scale(1.1)}
+    .tab-btn[data-tab="traning"].active{color:var(--blue)}
+    .tab-btn[data-tab="halsa"].active{color:var(--purple)}
+    .tab-btn[data-tab="mer"].active{color:var(--orange)}
+
+    ::-webkit-scrollbar{width:3px}
+    ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+    @media(min-width:500px){.tab-nav{border-left:1px solid var(--border);border-right:1px solid var(--border)}}
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="app-header" id="app-header">
+  <div class="hdr-top">
+    <div>
+      <div class="hdr-title">🌿 <span>Hälso</span>app</div>
+      <div class="hdr-date" id="hdr-date"></div>
+    </div>
+    <div class="hdr-goal">Mål: 1800 kcal · 175g protein</div>
+  </div>
+  <div class="tracker-row">
+    <div class="tracker-item">
+      <div class="trk-label">⚡ Kalorier</div>
+      <div class="trk-vals"><span class="trk-cur" id="trk-kcal">0</span><span class="trk-goal">/ 1800 kcal</span></div>
+      <div class="pbar"><div class="pfill kcal" id="bar-kcal" style="width:0%"></div></div>
+    </div>
+    <div class="tracker-item">
+      <div class="trk-label">💪 Protein</div>
+      <div class="trk-vals"><span class="trk-cur" id="trk-prot">0g</span><span class="trk-goal">/ 175g</span></div>
+      <div class="pbar"><div class="pfill prot" id="bar-prot" style="width:0%"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main-content">
+
+  <!-- IDAG -->
+  <div class="section active" id="sec-today">
+    <div class="sec-title" id="today-title">Idag</div>
+    <div id="today-meals"></div>
+  </div>
+
+  <!-- KOST -->
+  <div class="section" id="sec-kost">
+    <div class="sub-tabs" id="sub-kost">
+      <button class="sub-tab green active" onclick="setSubTab('kost','vecka',this)">📅 Vecka</button>
+      <button class="sub-tab green" onclick="setSubTab('kost','recept',this)">📖 Recept</button>
+      <button class="sub-tab green" onclick="setSubTab('kost','handla',this)">🛒 Handla</button>
+    </div>
+    <div id="kost-content"></div>
+  </div>
+
+  <!-- TRÄNING -->
+  <div class="section" id="sec-traning">
+    <div id="traning-content"></div>
+  </div>
+
+  <!-- HÄLSA -->
+  <div class="section" id="sec-halsa">
+    <div class="sub-tabs" id="sub-halsa">
+      <button class="sub-tab purple active" onclick="setSubTab('halsa','vikt',this)">⚖️ Vikt</button>
+      <button class="sub-tab purple" onclick="setSubTab('halsa','vanor',this)">🎯 Vanor</button>
+      <button class="sub-tab purple" onclick="setSubTab('halsa','historik',this)">📋 Historik</button>
+    </div>
+    <div id="halsa-content"></div>
+  </div>
+
+  <!-- MER -->
+  <div class="section" id="sec-mer">
+    <div class="sub-tabs" id="sub-mer">
+      <button class="sub-tab orange active" onclick="setSubTab('mer','inst',this)">⚙️ Inställningar</button>
+      <button class="sub-tab orange" onclick="setSubTab('mer','backup',this)">💾 Backup</button>
+    </div>
+    <div id="mer-content"></div>
+  </div>
+
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- BOTTOM NAV -->
+<nav class="tab-nav">
+  <button class="tab-btn active" data-tab="today" onclick="switchTab('today',this)">
+    <span class="tab-icon">🍽️</span>Idag
+  </button>
+  <button class="tab-btn" data-tab="kost" onclick="switchTab('kost',this)">
+    <span class="tab-icon">📖</span>Kost
+  </button>
+  <button class="tab-btn" data-tab="traning" onclick="switchTab('traning',this)">
+    <span class="tab-icon">💪</span>Träning
+  </button>
+  <button class="tab-btn" data-tab="halsa" onclick="switchTab('halsa',this)">
+    <span class="tab-icon">❤️</span>Hälsa
+  </button>
+  <button class="tab-btn" data-tab="mer" onclick="switchTab('mer',this)">
+    <span class="tab-icon">⚙️</span>Mer
+  </button>
+</nav>
+
+<script>
+'use strict';
+/* ================================================================
+   PART 2 – DATA
+   ================================================================ */
+const WEEK=[
+  {day:'Måndag',meals:[
+    {time:'07:00',name:'Proteinshake',desc:'2 scoops proteinpulver + 3dl mandelmjölk',kcal:250,protein:45,icon:'🥤'},
+    {time:'12:30',name:'Tacotallrik',desc:'180g stekt tofu, 100g svarta bönor, 50g jalapeños, 35g grönkål, 50g tomat, 20g rödlök, guacamole',kcal:540,protein:44,icon:'🌮'},
+    {time:'15:00',name:'Kvarg med bär',desc:'300g kvarg + bär',kcal:220,protein:30,icon:'🍓'},
+    {time:'18:00',name:'Tofu med broccoliröra',desc:'180g tofu, 100g broccoli, 60g champinjoner, 60g squash, 50g tomat, 30g fetaost, jalapeños',kcal:480,protein:42,icon:'🥦'}
+  ]},
+  {day:'Tisdag',meals:[
+    {time:'07:00',name:'Proteinshake',desc:'2 scoops proteinpulver + 3dl mandelmjölk',kcal:250,protein:45,icon:'🥤'},
+    {time:'12:30',name:'Paprikatofu med bönpasta',desc:'180g tofu, 40g bönpasta, 100g paprika, 40g tomat, 1 vitlöksklyfta, 30g fetaost',kcal:530,protein:43,icon:'🫑'},
+    {time:'15:00',name:'Proteinglass',desc:'30g proteinpulver + 3dl mandelmjölk (fryst)',kcal:160,protein:25,icon:'🍦'},
+    {time:'18:00',name:'Tofu med rotfrukter & grönkål',desc:'180g tofu, 70g morot, 70g palsternacka, 150g grönkål, 30g fetaost',kcal:500,protein:40,icon:'🥕'}
+  ]},
+  {day:'Onsdag',meals:[
+    {time:'07:00',name:'Proteinshake',desc:'2 scoops proteinpulver + 3dl mandelmjölk',kcal:250,protein:45,icon:'🥤'},
+    {time:'12:30',name:'Tofu & ägg med quinoa',desc:'150g tofu, 2 ägg, 100g quinoa, spenat, sojasås, sesamolja',kcal:560,protein:48,icon:'🥚'},
+    {time:'15:00',name:'Cottage cheese',desc:'300g cottage cheese + gurka + örtsalt',kcal:200,protein:32,icon:'🧀'},
+    {time:'18:00',name:'Tempeh med kikärtor & rotfrukter',desc:'150g tempeh, 100g kikärtor, 80g morot, 80g palsternacka, tahini',kcal:540,protein:40,icon:'🌾'}
+  ]},
+  {day:'Torsdag',meals:[
+    {time:'07:00',name:'Proteinshake',desc:'2 scoops proteinpulver + 3dl mandelmjölk',kcal:250,protein:45,icon:'🥤'},
+    {time:'12:30',name:'Kebabtallrik',desc:'180g tofu (grillkryddad), 60g avokado, 60g tomat, 60g gurka, 20g bladspenat, 15g jalapeños, vitlökssås',kcal:520,protein:40,icon:'🥙'},
+    {time:'15:00',name:'Proteinglass',desc:'30g proteinpulver + 3dl mandelmjölk (fryst)',kcal:160,protein:25,icon:'🍦'},
+    {time:'18:00',name:'Tofu med brysselkål & halloumi',desc:'150g tofu, 100g brysselkål, 100g grönkål, 50g squash, 40g halloumi',kcal:510,protein:42,icon:'🥗'}
+  ]},
+  {day:'Fredag',meals:[
+    {time:'07:00',name:'Proteinshake',desc:'2 scoops proteinpulver + 3dl mandelmjölk',kcal:250,protein:45,icon:'🥤'},
+    {time:'12:30',name:'Bönpasta med tofu & tomatsås',desc:'180g tofu, 40g bönpasta, 120g krossade tomater, lök, vitlök, 10g ruccola',kcal:520,protein:42,icon:'🍝'},
+    {time:'15:00',name:'Kvarg med vanilj',desc:'300g kvarg + vaniljextrakt',kcal:210,protein:30,icon:'🫙'},
+    {time:'18:00',name:'Spenatsoppa med rökt tofu',desc:'180g rökt tofu, 200g spenat, kokosmjölk, vitlök, ingefära, chili',kcal:480,protein:38,icon:'🥣'}
+  ]},
+  {day:'Lördag',meals:[
+    {time:'07:00',name:'Proteinshake',desc:'2 scoops proteinpulver + 3dl mandelmjölk',kcal:250,protein:45,icon:'🥤'},
+    {time:'12:30',name:'Äggomelett med tofu & sötpotatis',desc:'3 ägg, 120g tofu, 150g sötpotatis, paprika, spenat',kcal:580,protein:50,icon:'🍳'},
+    {time:'15:00',name:'Proteinglass',desc:'30g proteinpulver + 3dl mandelmjölk (fryst)',kcal:160,protein:25,icon:'🍦'},
+    {time:'18:00',name:'Tempeh med svarta bönor & paprika',desc:'150g tempeh, 150g svarta bönor, 100g paprika, tomatsås, vitlök, fetaost',kcal:520,protein:42,icon:'🌶️'}
+  ]},
+  {day:'Söndag',meals:[
+    {time:'07:00',name:'Proteinshake',desc:'2 scoops proteinpulver + 3dl mandelmjölk',kcal:250,protein:45,icon:'🥤'},
+    {time:'12:30',name:'Tacotallrik med kikärtor',desc:'180g tofu, 100g kikärtor, 50g jalapeños, 35g grönkål, 50g tomat, rödlök, guacamole',kcal:540,protein:44,icon:'🌮'},
+    {time:'15:00',name:'Cottage cheese med paprika',desc:'300g cottage cheese + paprika',kcal:200,protein:32,icon:'🫑'},
+    {time:'18:00',name:'Tofu med edamame & quinoa',desc:'150g tofu, 150g edamame, 80g quinoa, sojasås, sesamolja, ingefära',kcal:550,protein:45,icon:'🫛'}
+  ]}
+];
+
+const RECIPES_DEF=[
+  {name:'Proteinshake',icon:'🥤',
+   ingredients:[{amount:2,unit:'scoops',item:'proteinpulver'},{amount:300,unit:'ml',item:'mandelmjölk (osötad)'}],
+   method:'Mixa proteinpulver och mandelmjölk. Servera direkt eller med is. Smaksätt valfritt med kakao, vanilj eller jordgubb.'},
+  {name:'Proteinglass',icon:'🍦',
+   ingredients:[{amount:30,unit:'g',item:'proteinpulver'},{amount:300,unit:'ml',item:'mandelmjölk (osötad)'}],
+   method:'Mixa ihop. Smaksätt valfritt. Häll i form och frys 3–4 timmar.'},
+  {name:'Tacotallrik',icon:'🌮',
+   ingredients:[{amount:180,unit:'g',item:'tofu'},{amount:100,unit:'g',item:'svarta bönor'},{amount:50,unit:'g',item:'jalapeños'},{amount:35,unit:'g',item:'grönkål'},{amount:50,unit:'g',item:'tomat'},{amount:20,unit:'g',item:'rödlök'},{amount:0.5,unit:'st',item:'avokado'}],
+   method:'Stek tofun i rapsolja tills gyllenbrun. Värm bönorna. Stek grönkålen lätt. Mosa avokadon med limejuice och salt till guacamole. Lägg upp och toppa med jalapeños, tomat och rödlök.'},
+  {name:'Tofu med broccoliröra',icon:'🥦',
+   ingredients:[{amount:180,unit:'g',item:'tofu'},{amount:100,unit:'g',item:'broccoli'},{amount:60,unit:'g',item:'champinjoner'},{amount:60,unit:'g',item:'squash'},{amount:50,unit:'g',item:'tomat'},{amount:30,unit:'g',item:'fetaost'},{amount:30,unit:'g',item:'jalapeños'}],
+   method:'Stek tofun gyllenbrun. Bryn broccoli, champinjoner, squash och tomat i samma panna. Tillsätt fetaosten sista minuten – låt smälta. Toppa med jalapeños.'},
+  {name:'Paprikatofu med bönpasta',icon:'🫑',
+   ingredients:[{amount:180,unit:'g',item:'tofu'},{amount:40,unit:'g',item:'bönpasta (torr)'},{amount:100,unit:'g',item:'paprika'},{amount:40,unit:'g',item:'tomat'},{amount:1,unit:'st',item:'vitlöksklyfta'},{amount:30,unit:'g',item:'fetaost'}],
+   method:'Koka bönpastan. Stek tofun. Stek vitlök, paprika och tomat. Häll i pasta och rör ner fetaosten. Servera med tofun.'},
+  {name:'Tofu med rotfrukter & grönkål',icon:'🥕',
+   ingredients:[{amount:180,unit:'g',item:'tofu'},{amount:70,unit:'g',item:'morot'},{amount:70,unit:'g',item:'palsternacka'},{amount:150,unit:'g',item:'grönkål'},{amount:30,unit:'g',item:'fetaost'}],
+   method:'Skär rotfrukterna i 1 cm skivor. Woka tofu och rotfrukter tills mjuka. Tillsätt grönkålen sista 3 min och fetaosten sista minuten.'},
+  {name:'Tofu & ägg med quinoa',icon:'🥚',
+   ingredients:[{amount:150,unit:'g',item:'tofu'},{amount:2,unit:'st',item:'ägg'},{amount:100,unit:'g',item:'quinoa (torr)'},{amount:80,unit:'g',item:'spenat'},{amount:2,unit:'msk',item:'sojasås'},{amount:1,unit:'tsk',item:'sesamolja'}],
+   method:'Koka quinoan. Stek tofun. Scramble äggen. Woka spenat snabbt. Lägg upp och ringla sojasås och sesamolja.'},
+  {name:'Tempeh med kikärtor & rotfrukter',icon:'🌾',
+   ingredients:[{amount:150,unit:'g',item:'tempeh'},{amount:100,unit:'g',item:'kikärtor'},{amount:80,unit:'g',item:'morot'},{amount:80,unit:'g',item:'palsternacka'},{amount:2,unit:'msk',item:'tahini'}],
+   method:'Stek tempeh tills gyllenbrun. Woka rotfrukter och kikärtor. Servera med tahini ringad över.'},
+  {name:'Kebabtallrik',icon:'🥙',
+   ingredients:[{amount:180,unit:'g',item:'tofu'},{amount:60,unit:'g',item:'avokado'},{amount:60,unit:'g',item:'tomat'},{amount:60,unit:'g',item:'gurka'},{amount:20,unit:'g',item:'bladspenat'},{amount:15,unit:'g',item:'jalapeños'},{amount:100,unit:'g',item:'silkestofu (sås)'},{amount:1,unit:'st',item:'vitlöksklyfta'},{amount:0.5,unit:'st',item:'citron (pressad)'}],
+   method:'Krydda tofun med paprika, spiskummin, koriander, salt. Stek gyllenbrun. Mixa silkestofu, vitlök, citron, salt till vitlökssås. Lägg upp med grönsaker.'},
+  {name:'Tofu med brysselkål & halloumi',icon:'🥗',
+   ingredients:[{amount:150,unit:'g',item:'tofu'},{amount:100,unit:'g',item:'brysselkål'},{amount:100,unit:'g',item:'grönkål'},{amount:50,unit:'g',item:'squash'},{amount:40,unit:'g',item:'halloumi'}],
+   method:'Stek tofun. Tillsätt brysselkål och squash. Lägg i grönkål och halloumi sista minuten.'},
+  {name:'Bönpasta med tofu & tomatsås',icon:'🍝',
+   ingredients:[{amount:180,unit:'g',item:'tofu'},{amount:40,unit:'g',item:'bönpasta (torr)'},{amount:120,unit:'g',item:'krossade tomater'},{amount:1,unit:'st',item:'lök'},{amount:2,unit:'st',item:'vitlöksklyftor'},{amount:10,unit:'g',item:'ruccola'}],
+   method:'Stek lök och vitlök mjuka. Tillsätt krossade tomater, sjud 10–15 min. Stek tofun. Koka bönpasta. Blanda ihop. Servera med ruccola.'},
+  {name:'Spenatsoppa med rökt tofu',icon:'🥣',
+   ingredients:[{amount:180,unit:'g',item:'rökt tofu'},{amount:200,unit:'g',item:'spenat'},{amount:100,unit:'ml',item:'kokosmjölk'},{amount:2,unit:'st',item:'vitlöksklyftor'},{amount:1,unit:'tsk',item:'riven ingefära'},{amount:1,unit:'tsk',item:'chili'}],
+   method:'Fräs vitlök och ingefära. Tillsätt spenat, låt falla ihop. Häll i kokosmjölk och mixa slätt. Smaka av. Skär rökt tofu i kuber och lägg i soppan.'},
+  {name:'Äggomelett med tofu & sötpotatis',icon:'🍳',
+   ingredients:[{amount:3,unit:'st',item:'ägg'},{amount:120,unit:'g',item:'tofu'},{amount:150,unit:'g',item:'sötpotatis'},{amount:60,unit:'g',item:'paprika'},{amount:60,unit:'g',item:'spenat'}],
+   method:'Koka sötpotatis. Stek tofu. Vispa ägg och stek omelett med paprika och spenat. Servera med sötpotatis.'},
+  {name:'Tempeh med svarta bönor & paprika',icon:'🌶️',
+   ingredients:[{amount:150,unit:'g',item:'tempeh'},{amount:150,unit:'g',item:'svarta bönor'},{amount:100,unit:'g',item:'paprika'},{amount:100,unit:'g',item:'krossade tomater'},{amount:2,unit:'st',item:'vitlöksklyftor'},{amount:30,unit:'g',item:'fetaost'}],
+   method:'Stek tempeh gyllenbrun. Stek vitlök och paprika. Tillsätt bönor och tomater, sjud 5 min. Rör ner fetaost. Servera med tempeh.'},
+  {name:'Tofu med edamame & quinoa',icon:'🫛',
+   ingredients:[{amount:150,unit:'g',item:'tofu'},{amount:150,unit:'g',item:'edamame'},{amount:80,unit:'g',item:'quinoa (torr)'},{amount:2,unit:'msk',item:'sojasås'},{amount:1,unit:'tsk',item:'sesamolja'},{amount:1,unit:'tsk',item:'riven ingefära'}],
+   method:'Koka quinoan. Stek tofu. Värm edamame. Blanda sojasås, sesamolja och ingefära till dressing. Häll över allt.'}
+];
+
+const SHOPPING={
+  'Proteiner 🥩':[{name:'Proteinpulver',qty:'14 scoops (~420g)'},{name:'Tofu (fast)',qty:'~1.8 kg'},{name:'Rökt tofu',qty:'180g'},{name:'Tempeh',qty:'450g'},{name:'Silkestofu',qty:'100g'},{name:'Ägg',qty:'8 st'}],
+  'Mejeri 🧀':[{name:'Kvarg (naturell)',qty:'900g'},{name:'Cottage cheese',qty:'900g'},{name:'Fetaost',qty:'~180g'},{name:'Halloumi',qty:'40g'}],
+  'Grönsaker & frukt 🥦':[{name:'Broccoli',qty:'100g'},{name:'Grönkål',qty:'~470g'},{name:'Spenat (färsk)',qty:'~450g'},{name:'Paprika',qty:'~400g'},{name:'Tomat',qty:'~350g'},{name:'Rödlök',qty:'~80g'},{name:'Gurka',qty:'~100g'},{name:'Avokado',qty:'2 st'},{name:'Morot',qty:'~230g'},{name:'Palsternacka',qty:'~230g'},{name:'Brysselkål',qty:'100g'},{name:'Squash',qty:'~160g'},{name:'Sötpotatis',qty:'150g'},{name:'Jalapeños',qty:'~165g'},{name:'Champinjoner',qty:'60g'},{name:'Ruccola',qty:'10g'},{name:'Edamame',qty:'150g'}],
+  'Baljväxter & spannmål 🌾':[{name:'Svarta bönor (konserv)',qty:'~400g'},{name:'Kikärtor (konserv)',qty:'~300g'},{name:'Bönpasta',qty:'~120g'},{name:'Quinoa',qty:'~260g'}],
+  'Övrigt 🛍️':[{name:'Mandelmjölk (osötad)',qty:'~4.5 liter'},{name:'Kokosmjölk',qty:'1 burk'},{name:'Krossade tomater',qty:'~360g'},{name:'Tahini',qty:'1 förp.'},{name:'Sojasås',qty:'1 flaska'},{name:'Sesamolja',qty:'1 flaska'},{name:'Rapsolja',qty:'1 förp.'},{name:'Vitlök',qty:'1 huvud'},{name:'Ingefära',qty:'1 rot'},{name:'Lök',qty:'2 st'},{name:'Citron / lime',qty:'2 st'},{name:'Vaniljextrakt',qty:'1 flaska'},{name:'Örtsalt',qty:'1 förp.'}]
+};
+
+const WORKOUT_TYPES=['Styrketräning','Löpning','Promenad','Cykling','Simning','Yoga','Pilates','Fotboll','Tennis','Golf','Skidåkning','Innebandy','Dans','Boxning','Klättring','Crossfit','Spinning','Gruppträning','Annat'];
+const WORKOUT_EMOJI={Styrketräning:'🏋️',Löpning:'🏃',Promenad:'🚶',Cykling:'🚴',Simning:'🏊',Yoga:'🧘',Pilates:'🤸',Fotboll:'⚽',Tennis:'🎾',Golf:'⛳',Skidåkning:'⛷️',Innebandy:'🏒',Dans:'💃',Boxning:'🥊',Klättring:'🧗',Crossfit:'🏅',Spinning:'🔄',Gruppträning:'👥',Annat:'💪'};
+const WORKOUT_METS={Styrketräning:5,Löpning:9,Promenad:3.5,Cykling:7,Simning:7,Yoga:2.5,Pilates:3,Fotboll:7,Tennis:7,Golf:4,Skidåkning:7,Innebandy:8,Dans:5,Boxning:9,Klättring:8,Crossfit:10,Spinning:8,Gruppträning:6,Annat:5};
+const INT_EMOJI=['','😴','🚶','⚡','💪','🔥'];
+const MOOD_EMOJI=['😴','😔','😐','😊','🤩'];
+
+/* ================================================================
+   PART 3 – STATE, UTILS, RENDER: IDAG + KOST
+   ================================================================ */
+
+/* ---- STATE ---- */
+const APP={
+  tab:'today',
+  subKost:'vecka',
+  subHalsa:'vikt',
+  subMer:'inst',
+  weekOffset:0,
+  habitSubTab:'week',
+  newWorkout:{date:'',type:'',duration:'',intensity:3,comment:''},
+  newWeight:{date:'',weight:'',steps:'',mood:'',comment:''},
+  newHabit:{name:'',type:'good',emoji:'✅'},
+  importText:''
+};
+
+function ls(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}}
+function lss(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+
+function getSettings(){
+  return ls('ha_settings')||{
+    goalWeight:87,startWeight:90,startDate:'2026-03-03',goalDate:'2026-03-26',
+    height:180,targetRate:0.5,
+    yearlyGoal:{sessions:100,minutes:5000}
+  };
+}
+function saveSettings(s){lss('ha_settings',s);}
+function getWeightLog(){return ls('ha_weight_log')||[{date:'2026-03-03',weight:90.0,steps:null,mood:null,comment:''}];}
+function saveWeightLog(l){lss('ha_weight_log',l);}
+function getWorkouts(){return ls('ha_workouts')||[];}
+function saveWorkouts(w){lss('ha_workouts',w);}
+function getHabits(){return ls('ha_habits')||[];}
+function saveHabits(h){lss('ha_habits',h);}
+function getHabitLogs(){return ls('ha_habit_logs')||{};}
+function saveHabitLogs(l){lss('ha_habit_logs',l);}
+
+/* ---- UTILS ---- */
+const TODAY=new Date();
+const TODAY_STR=TODAY.toISOString().split('T')[0];
+const DAY_IDX=(TODAY.getDay()+6)%7; // Mon=0
+const MO_NAMES=['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
+const DAY_NAMES_LONG=['Måndag','Tisdag','Onsdag','Torsdag','Fredag','Lördag','Söndag'];
+const DAY_NAMES_SHORT=['M','T','O','T','F','L','S'];
+
+function fmtDate(ds){const d=new Date(ds);return d.getDate()+' '+MO_NAMES[d.getMonth()];}
+function fmtDateFull(ds){const d=new Date(ds);return d.getDate()+' '+MO_NAMES[d.getMonth()]+' '+d.getFullYear();}
+function fmtDateWeekday(ds){const d=new Date(ds);return d.toLocaleDateString('sv-SE',{weekday:'short',day:'numeric',month:'short'});}
+function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function getMondayOf(d){const dt=new Date(d);dt.setHours(0,0,0,0);const dow=dt.getDay();dt.setDate(dt.getDate()-(dow===0?6:dow-1));return dt;}
+function getWeekDays(mondayDate,offset){
+  const mon=new Date(mondayDate);mon.setDate(mon.getDate()+offset*7);
+  return Array.from({length:7},(_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return d.toISOString().split('T')[0];});
+}
+function getBMI(weight,height){if(!height||!weight)return null;const h=height/100;return parseFloat((weight/(h*h)).toFixed(1));}
+function getBMILabel(bmi){if(bmi<18.5)return{txt:'Undervikt',color:'#4a9ef0'};if(bmi<25)return{txt:'Normalvikt',color:'#6db86d'};if(bmi<30)return{txt:'Övervikt',color:'#d4b44a'};return{txt:'Fetma',color:'#e07070'};}
+function calcKcal(type,min,weight){return Math.round((WORKOUT_METS[type]||5)*(weight||80)*(min/60));}
+
+function showToast(msg,type){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.className='toast '+(type||'ok');
+  void el.offsetWidth;el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),2800);
+}
+
+/* ---- TAB SWITCHING ---- */
+function switchTab(name,btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sec-'+name).classList.add('active');
+  btn.classList.add('active');
+  APP.tab=name;
+  // Show/hide header tracker
+  const hdr=document.getElementById('app-header');
+  hdr.classList.toggle('hdr-hidden',name!=='today');
+  renderSection(name);
+}
+
+function setSubTab(section,sub,btn){
+  const map={kost:'subKost',halsa:'subHalsa',mer:'subMer'};
+  APP[map[section]]=sub;
+  document.querySelectorAll(`#sub-${section} .sub-tab`).forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderSection(section);
+}
+
+function renderSection(name){
+  if(name==='today'){renderToday();}
+  else if(name==='kost'){renderKost();}
+  else if(name==='traning'){renderTraning();}
+  else if(name==='halsa'){renderHalsa();}
+  else if(name==='mer'){renderMer();}
+}
+
+/* ---- UPDATE TRACKER ---- */
+function updateTracker(){
+  const checked=ls('ha_checked_'+TODAY_STR)||{};
+  const meals=WEEK[DAY_IDX].meals;
+  let kcal=0,prot=0;
+  meals.forEach((m,i)=>{if(checked[i]){kcal+=m.kcal;prot+=m.protein;}});
+  document.getElementById('trk-kcal').textContent=kcal;
+  document.getElementById('trk-prot').textContent=prot+'g';
+  document.getElementById('bar-kcal').style.width=Math.min(100,(kcal/1800)*100)+'%';
+  document.getElementById('bar-prot').style.width=Math.min(100,(prot/175)*100)+'%';
+}
+
+/* ================================================================
+   RENDER: IDAG
+   ================================================================ */
+function renderToday(){
+  const data=WEEK[DAY_IDX];
+  const checked=ls('ha_checked_'+TODAY_STR)||{};
+  document.getElementById('today-title').textContent=data.day+'s meny';
+  const c=document.getElementById('today-meals');
+  c.innerHTML='';
+  data.meals.forEach((m,i)=>{
+    const isChk=!!checked[i];
+    const el=document.createElement('div');
+    el.className='meal-card'+(isChk?' checked':'');
+    el.innerHTML=`
+      <div class="meal-icon">${m.icon}</div>
+      <div class="meal-body">
+        <div class="meal-time">${m.time}</div>
+        <div class="meal-name">${m.name}</div>
+        <div class="meal-desc">${m.desc}</div>
+        <div class="meal-macros">
+          <span class="mbadge k">⚡ ${m.kcal} kcal</span>
+          <span class="mbadge p">💪 ${m.protein}g</span>
+        </div>
+      </div>
+      <div class="check-box">
+        <svg class="chk-svg" width="12" height="9" viewBox="0 0 12 9" fill="none">
+          <path d="M1 4L4.5 7.5L11 1" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>`;
+    el.onclick=()=>{
+      const ch=ls('ha_checked_'+TODAY_STR)||{};
+      ch[i]=!ch[i];lss('ha_checked_'+TODAY_STR,ch);
+      el.classList.toggle('checked',!!ch[i]);
+      updateTracker();
+    };
+    c.appendChild(el);
+  });
+}
+
+/* ================================================================
+   RENDER: KOST
+   ================================================================ */
+function renderKost(){
+  const c=document.getElementById('kost-content');
+  if(APP.subKost==='vecka') c.innerHTML=buildVecka();
+  else if(APP.subKost==='recept'){c.innerHTML=buildReceptHTML();attachReceptEvents();}
+  else if(APP.subKost==='handla') c.innerHTML=buildHandla();
+}
+
+/* -- VECKA -- */
+function buildVecka(){
+  let h='';
+  WEEK.forEach((day,di)=>{
+    const isToday=di===DAY_IDX;
+    h+=`<div class="week-day-hdr">${day.day}${isToday?' <span class="today-badge">Idag</span>':''}</div>`;
+    day.meals.forEach(m=>{
+      h+=`<div class="week-meal">
+        <div class="wm-icon">${m.icon}</div>
+        <div class="wm-body">
+          <div class="wm-time">${m.time}</div>
+          <div class="wm-name">${m.name}</div>
+          <div class="wm-macros">⚡ ${m.kcal} kcal &nbsp;·&nbsp; 💪 ${m.protein}g protein</div>
+        </div>
+      </div>`;
+    });
+    const tk=day.meals.reduce((s,m)=>s+m.kcal,0);
+    const tp=day.meals.reduce((s,m)=>s+m.protein,0);
+    h+=`<div class="day-total">Totalt: ${tk} kcal · ${tp}g protein</div>`;
+  });
+  return h;
+}
+
+/* -- RECEPT -- */
+function getSavedAmounts(ri){return ls('ha_recipe_'+ri)||{};}
+function saveAmount(ri,ii,val){const s=getSavedAmounts(ri);s[ii]=val;lss('ha_recipe_'+ri,s);}
+function resetAmounts(ri){localStorage.removeItem('ha_recipe_'+ri);
+  document.querySelectorAll(`[data-ri="${ri}"]`).forEach(inp=>{
+    const ii=parseInt(inp.dataset.ii);
+    inp.value=RECIPES_DEF[ri].ingredients[ii].amount;
+  });
+}
+
+function buildReceptHTML(filter=''){
+  const q=(filter||'').toLowerCase().trim();
+  const filtered=RECIPES_DEF.map((r,i)=>({...r,_i:i}))
+    .filter(r=>!q||r.name.toLowerCase().includes(q)||r.ingredients.some(g=>g.item.toLowerCase().includes(q)));
+  if(!filtered.length) return '<div class="empty"><div class="empty-icon">🔍</div>Inga recept hittades</div>';
+  return `
+    <input type="search" class="search-box" id="recipe-search" placeholder="🔍  Sök recept, ingrediens…" value="${filter}" oninput="updateRecipeSearch(this.value)">
+    <div class="recipe-hint">Klicka för att öppna · Ändra mängder direkt i fälten</div>
+    ${filtered.map(r=>{
+      const ri=r._i;
+      const saved=getSavedAmounts(ri);
+      const ings=r.ingredients.map((ing,ii)=>({...ing,amount:saved[ii]!==undefined?saved[ii]:ing.amount}));
+      return `<div class="recipe-card" id="rc-${ri}">
+        <div class="recipe-hdr" onclick="toggleRecipe(${ri})">
+          <div class="rh-left"><span class="r-icon">${r.icon}</span><span class="r-name">${r.name}</span></div>
+          <span class="r-toggle">›</span>
+        </div>
+        <div class="recipe-body">
+          <div class="rb-sec">Ingredienser</div>
+          <div class="ing-list">
+            ${ings.map((ing,ii)=>`<div class="ing-row">
+              <div style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+                <input type="number" class="ing-amt" data-ri="${ri}" data-ii="${ii}"
+                  value="${ing.amount}" step="${ing.amount<5?0.5:5}" min="0"
+                  onchange="saveAmount(${ri},${ii},parseFloat(this.value)||0)"
+                  onclick="event.stopPropagation()">
+                <span class="ing-unit">${ing.unit}</span>
+              </div>
+              <span class="ing-name-r">${ing.item}</span>
+            </div>`).join('')}
+          </div>
+          <div class="reset-row">
+            <button class="reset-btn" onclick="resetAmounts(${ri});event.stopPropagation()">↺ Återställ mängder</button>
+          </div>
+          <div class="rb-sec" style="margin-top:12px">Tillagning</div>
+          <p class="recipe-method">${r.method}</p>
+        </div>
+      </div>`;
+    }).join('')}`;
+}
+
+function attachReceptEvents(){}
+function toggleRecipe(ri){document.getElementById('rc-'+ri)?.classList.toggle('open');}
+function updateRecipeSearch(val){
+  document.getElementById('kost-content').innerHTML=buildReceptHTML(val);
+  attachReceptEvents();
+}
+
+/* -- HANDLA -- */
+function buildHandla(){
+  const bought=ls('ha_shopping')||{};
+  let h=`<button class="reset-shop-btn" onclick="resetShopping()">↺ Återställ lista</button>`;
+  Object.entries(SHOPPING).forEach(([cat,items])=>{
+    h+=`<div class="sec-title">${cat}</div>`;
+    items.forEach((item,i)=>{
+      const key=cat+'_'+i;
+      const isBought=!!bought[key];
+      const chk=isBought?`<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`:'';
+      h+=`<div class="shop-item${isBought?' bought':''}" onclick="toggleShop('${key}',this)">
+        <div class="si-chk">${chk}</div>
+        <span class="si-name">${item.name}</span>
+        <span class="si-qty">${item.qty}</span>
+      </div>`;
+    });
+  });
+  return h;
+}
+
+function toggleShop(key,el){
+  const bought=ls('ha_shopping')||{};
+  bought[key]=!bought[key];lss('ha_shopping',bought);
+  el.classList.toggle('bought',!!bought[key]);
+  const c=el.querySelector('.si-chk');
+  c.innerHTML=bought[key]?`<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`:'';
+}
+function resetShopping(){lss('ha_shopping',{});renderKost();}
+
+/* ================================================================
+   PART 4 – TRÄNING, HÄLSA, MER, INIT
+   ================================================================ */
+
+/* ================================================================
+   RENDER: TRÄNING
+   ================================================================ */
+function renderTraning(){
+  const c=document.getElementById('traning-content');
+  const workouts=getWorkouts();
+  const S=getSettings();
+  const curWeight=getWeightLog().slice(-1)[0]?.weight||80;
+
+  // Week grid
+  const mon=getMondayOf(TODAY);
+  const weekDays=getWeekDays(mon,0);
+  const weekW=workouts.filter(w=>weekDays.includes(w.date));
+  const weekMin=weekW.reduce((s,w)=>s+w.duration,0);
+  const weekMsg=weekW.length===0?'💪 Inga pass ännu — börja idag!':weekW.length>=3?'🏆 Bra vecka! Du är på god väg.':'🔥 Bra start! Fortsätt!';
+
+  const dayGrid=weekDays.map((ds,i)=>{
+    const done=workouts.some(w=>w.date===ds);
+    const isT=ds===TODAY_STR;
+    const cls=done?'done':isT?'today':'empty';
+    const lbl=done?'✓':DAY_NAMES_SHORT[i];
+    return `<div class="wd-cell"><div class="wd-dot ${cls}">${lbl}</div><div class="wd-lbl">${DAY_NAMES_SHORT[i]}</div></div>`;
+  }).join('');
+
+  // Yearly progress
+  const yr=new Date().getFullYear();
+  const yrW=workouts.filter(w=>new Date(w.date).getFullYear()===yr);
+  const yrSess=yrW.length;
+  const yrMin=yrW.reduce((s,w)=>s+w.duration,0);
+  const sessPct=Math.min(100,(yrSess/S.yearlyGoal.sessions)*100).toFixed(1);
+  const minPct=Math.min(100,(yrMin/S.yearlyGoal.minutes)*100).toFixed(1);
+  const weeksElapsed=Math.floor((TODAY-new Date(yr,0,1))/(7*86400000))+1;
+  const expSess=Math.round((S.yearlyGoal.sessions/52)*weeksElapsed);
+  const expMin=Math.round((S.yearlyGoal.minutes/52)*weeksElapsed);
+
+  // All-time
+  const totalH=Math.round(yrMin/60);
+  const totalKcal=Math.round(yrW.reduce((s,w)=>s+calcKcal(w.type,w.duration,curWeight),0)/1000);
+
+  // Add form
+  const nw=APP.newWorkout;
+  const calPrev=nw.type&&nw.duration?calcKcal(nw.type,parseInt(nw.duration),curWeight):null;
+  const typeOpts=WORKOUT_TYPES.map(t=>`<option value="${t}"${nw.type===t?' selected':''}>${WORKOUT_EMOJI[t]||'💪'} ${t}</option>`).join('');
+  const intBtns=[1,2,3,4,5].map(i=>`<button class="int-btn${nw.intensity===i?' active':''}" onclick="setIntensity(${i})">${INT_EMOJI[i]}</button>`).join('');
+
+  // History
+  const hist=workouts.slice().sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,20);
+  const histHTML=hist.length?hist.map(w=>`
+    <div class="wh-item">
+      <div class="whi-left">
+        <div class="whi-emoji">${WORKOUT_EMOJI[w.type]||'💪'}</div>
+        <div><div class="whi-name">${w.type} ${INT_EMOJI[w.intensity||3]}</div>
+        <div class="whi-date">${fmtDateWeekday(w.date)}${w.comment?' · '+w.comment:''}</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <div class="whi-right">
+          <div class="whi-dur" style="color:var(--blue)">${w.duration} min</div>
+          <div class="whi-kcal">🔥 ${calcKcal(w.type,w.duration,curWeight)} kcal</div>
+        </div>
+        <button class="del-btn" onclick="deleteWorkout(${w.id})">✕</button>
+      </div>
+    </div>`).join(''):'<div class="empty" style="padding:20px"><div class="empty-icon">🏋️</div>Inga pass loggade ännu</div>';
+
+  c.innerHTML=`
+    <div class="workout-hero">
+      <div class="wh-top">
+        <div>
+          <div style="font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Denna vecka</div>
+          <div class="wh-count">${weekW.length}</div>
+          <div class="wh-label">pass${weekMin>0?' · '+weekMin+' min':''}</div>
+        </div>
+        <div style="font-size:42px">${weekW.length===0?'😴':weekW.length>=3?'🔥':'💪'}</div>
+      </div>
+      <div class="wh-msg">${weekMsg}</div>
+      <div class="week-days-grid">${dayGrid}</div>
+    </div>
+
+    <div class="stat-grid cols3" style="margin-bottom:10px">
+      <div class="stat-card" style="border-color:var(--blue-dim)">
+        <div class="stat-val" style="color:var(--blue)">${yrSess}</div>
+        <div class="stat-label">Pass i år</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:var(--blue)">${totalH}h</div>
+        <div class="stat-label">Total tid</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:var(--green)">${totalKcal}k</div>
+        <div class="stat-label">kcal (i år)</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <span style="font-size:14px;font-weight:700;color:var(--text2)">🎯 Årsmål ${yr}</span>
+      </div>
+      <div class="goal-bar-wrap">
+        <div class="goal-bar-hdr">
+          <span class="goal-bar-label">🏋️ Träningspass</span>
+          <span class="goal-bar-val" style="color:${yrSess>=expSess?'var(--green)':'var(--blue)'}">${yrSess} / ${S.yearlyGoal.sessions}</span>
+        </div>
+        <div class="goal-bar-bg"><div class="goal-bar-fill blue" style="width:${sessPct}%"></div></div>
+        <div class="goal-bar-sub">${yrSess>=expSess?'✓ '+Math.abs(yrSess-expSess)+' pass före plan 🎉':Math.abs(yrSess-expSess)+' pass efter plan'}</div>
+      </div>
+      <div class="goal-bar-wrap">
+        <div class="goal-bar-hdr">
+          <span class="goal-bar-label">⏱ Träningstid</span>
+          <span class="goal-bar-val" style="color:${yrMin>=expMin?'var(--green)':'var(--blue)'}">${Math.round(yrMin/60)}h / ${Math.round(S.yearlyGoal.minutes/60)}h</span>
+        </div>
+        <div class="goal-bar-bg"><div class="goal-bar-fill green" style="width:${minPct}%"></div></div>
+        <div class="goal-bar-sub">${yrMin>=expMin?'✓ '+Math.abs(yrMin-expMin)+' min före plan 🎉':Math.abs(yrMin-expMin)+' min efter plan'}</div>
+      </div>
+    </div>
+
+    <div class="add-form">
+      <div class="form-title">+ Logga träningspass</div>
+      <div class="form-row">
+        <input type="date" class="form-input" id="wo-date" value="${nw.date||TODAY_STR}" onchange="APP.newWorkout.date=this.value" style="flex:2">
+        <button class="today-btn" onclick="document.getElementById('wo-date').value=TODAY_STR;APP.newWorkout.date=TODAY_STR">Idag</button>
+      </div>
+      <div class="form-row">
+        <select class="form-select" id="wo-type" onchange="APP.newWorkout.type=this.value;renderSection('traning')">
+          <option value="">Välj typ…</option>${typeOpts}
+        </select>
+      </div>
+      <div class="form-row">
+        <input type="number" class="form-input" id="wo-dur" placeholder="Minuter" value="${nw.duration}" onchange="APP.newWorkout.duration=this.value;renderSection('traning')">
+        ${calPrev?`<div style="display:flex;align-items:center;padding:0 10px;font-size:12px;color:var(--orange);font-weight:600;white-space:nowrap">🔥 ${calPrev} kcal</div>`:''}
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Intensitet</div>
+      <div class="intensity-row">${intBtns}</div>
+      <input type="text" class="form-input" id="wo-comment" placeholder="Kommentar (valfritt)" value="${nw.comment}" onchange="APP.newWorkout.comment=this.value" style="margin-bottom:8px">
+      <button class="save-btn blue" onclick="saveWorkout()" ${!nw.type||!nw.duration?'disabled':''}>💪 Spara pass</button>
+    </div>
+
+    <div class="workout-history">${histHTML}</div>`;
+}
+
+function setIntensity(i){APP.newWorkout.intensity=i;renderSection('traning');}
+function saveWorkout(){
+  const nw=APP.newWorkout;
+  if(!nw.type||!nw.duration)return;
+  const w=getWorkouts();
+  w.push({id:Date.now(),date:document.getElementById('wo-date').value||TODAY_STR,type:nw.type,duration:parseInt(nw.duration),intensity:nw.intensity,comment:nw.comment});
+  saveWorkouts(w);APP.newWorkout={date:'',type:'',duration:'',intensity:3,comment:''};
+  showToast('💪 Träningspass sparat!');renderSection('traning');
+}
+function deleteWorkout(id){
+  saveWorkouts(getWorkouts().filter(w=>w.id!==id));showToast('Borttaget');renderSection('traning');
+}
+
+/* ================================================================
+   RENDER: HÄLSA
+   ================================================================ */
+let weightChartInst=null;
+
+function renderHalsa(){
+  if(APP.subHalsa==='vikt') renderVikt();
+  else if(APP.subHalsa==='vanor') renderVanor();
+  else if(APP.subHalsa==='historik') renderHistorik();
+}
+
+/* -- VIKT -- */
+function renderVikt(){
+  const c=document.getElementById('halsa-content');
+  const S=getSettings();
+  const log=getWeightLog();
+  const latest=log[log.length-1];
+  const cur=latest?.weight||S.startWeight;
+  const lost=S.startWeight-cur;
+  const left=Math.max(0,cur-S.goalWeight);
+  const pct=Math.max(0,Math.min(100,(lost/Math.abs(S.startWeight-S.goalWeight))*100));
+  const bmi=getBMI(cur,S.height);
+  const bmiInfo=bmi?getBMILabel(bmi):null;
+
+  // Status vs plan
+  const startMs=new Date(S.startDate).getTime();
+  const goalMs=new Date(S.goalDate).getTime();
+  const totalDays=(goalMs-startMs)/86400000;
+  const daysPassed=Math.max(0,(TODAY.getTime()-startMs)/86400000);
+  const expected=S.startWeight-((S.startWeight-S.goalWeight)/totalDays)*daysPassed;
+  const diff=cur-expected;
+  let statusTxt,statusCol;
+  if(Math.abs(diff)<0.1){statusTxt='✅ Exakt i fas med planen!';statusCol='var(--green)';}
+  else if(diff<0){statusTxt=`🚀 ${Math.abs(diff).toFixed(1)} kg före planen — bra jobbat!`;statusCol='var(--green)';}
+  else{statusTxt=`⚠️ ${diff.toFixed(1)} kg efter planen`;statusCol='var(--yellow)';}
+
+  // Streak
+  const sorted=[...log].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  let streak=0;if(sorted.length){const lat=new Date(sorted[0].date);lat.setHours(0,0,0,0);const tod=new Date();tod.setHours(0,0,0,0);if((tod-lat)/86400000<=1){streak=1;let prev=new Date(sorted[0].date);prev.setHours(0,0,0,0);for(let i=1;i<sorted.length;i++){const d=new Date(sorted[i].date);d.setHours(0,0,0,0);if((prev-d)/86400000===1){streak++;prev=d;}else break;}}}
+
+  const nw=APP.newWeight;
+  c.innerHTML=`
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-val" style="color:var(--purple)">${cur.toFixed(1)}</div>
+        <div class="stat-label">Aktuell vikt (kg)</div>
+        <div class="stat-sub">${streak>0?'🔥 '+streak+' dagars svit':''}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:var(--green)">${left.toFixed(1)}</div>
+        <div class="stat-label">Kg kvar till målet</div>
+        <div class="stat-sub">Mål: ${S.goalWeight} kg</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:${lost>0?'var(--green)':'var(--red)'}">${lost>0?'-'+lost.toFixed(1):'+'+Math.abs(lost).toFixed(1)}</div>
+        <div class="stat-label">Sedan start</div>
+        <div class="stat-sub">Start: ${S.startWeight} kg</div>
+      </div>
+      ${bmi?`<div class="stat-card">
+        <div class="stat-val" style="color:${bmiInfo.color}">${bmi}</div>
+        <div class="stat-label">BMI</div>
+        <div class="stat-sub" style="color:${bmiInfo.color}">${bmiInfo.txt}</div>
+      </div>`:`<div class="stat-card"><div class="stat-val" style="color:var(--text3)">–</div><div class="stat-label">BMI (ange längd i Mer)</div></div>`}
+    </div>
+
+    <div class="weight-prog-bar">
+      <div class="wp-labels">
+        <span>${S.startWeight} kg · ${fmtDate(S.startDate)}</span>
+        <span style="font-weight:700">${cur.toFixed(1)} kg</span>
+        <span>${S.goalWeight} kg · ${fmtDate(S.goalDate)}</span>
+      </div>
+      <div class="wp-bar-bg"><div class="wp-bar-fill" id="wp-fill" style="width:${pct}%"></div></div>
+      <div class="wp-status" style="color:${statusCol}">${statusTxt}</div>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-lbl">📈 Viktkurva</div>
+      <canvas id="weight-chart" height="200"></canvas>
+    </div>
+
+    <div class="weight-input-card">
+      <div class="wi-title">Logga vikt</div>
+      <div class="wi-row">
+        <input type="date" class="wi-input" id="wi-date" value="${nw.date||TODAY_STR}" style="flex:2">
+        <button class="today-btn" onclick="document.getElementById('wi-date').value=TODAY_STR">Idag</button>
+      </div>
+      <div class="wi-row">
+        <input type="number" class="wi-input" id="wi-weight" step="0.1" min="40" max="250" placeholder="Vikt (kg)" value="${nw.weight}">
+        <input type="number" class="wi-input" id="wi-steps" placeholder="Steg" value="${nw.steps}">
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Humör / energi (valfritt)</div>
+      <div class="mood-row">
+        ${MOOD_EMOJI.map((e,i)=>`<button class="mood-btn${nw.mood===i+1?' active':''}" onclick="toggleMood(${i+1})">${e}</button>`).join('')}
+      </div>
+      <input type="text" class="wi-input" id="wi-comment" placeholder="Kommentar (valfritt)" value="${nw.comment}" style="width:100%;margin-bottom:8px;text-align:left">
+      <button class="save-btn purple" onclick="saveWeight()">⚖️ Spara vikt</button>
+    </div>
+
+    <div class="weight-log-list">
+      ${[...log].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,20).map((e,i,arr)=>{
+        const prev=arr[i+1];const d=prev?(e.weight-prev.weight).toFixed(1):null;
+        const dn=d!==null?parseFloat(d):0;
+        const isStart=e.date===S.startDate;
+        return `<div class="wl-item">
+          <div style="flex:1">
+            <div class="wl-date">${fmtDateFull(e.date)}</div>
+            ${e.steps||e.comment?`<div style="font-size:11px;color:var(--text3)">${e.steps?'👟 '+e.steps.toLocaleString():''}${e.comment?' · '+e.comment:''}</div>`:''}
+          </div>
+          <div class="wl-w">${e.weight.toFixed(1)} kg</div>
+          ${d!==null?`<span class="wl-delta ${dn<=0?'neg':'pos'}">${dn>0?'+':''}${d}</span>`:'<span class="wl-delta"></span>'}
+          ${e.mood?`<span class="wl-mood">${MOOD_EMOJI[e.mood-1]}</span>`:''}
+          ${!isStart?`<button class="wl-del" onclick="deleteWeight('${e.date}')">✕</button>`:''}
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  renderWeightChart();
+}
+
+function toggleMood(v){APP.newWeight.mood=APP.newWeight.mood===v?'':v;renderVikt();}
+
+function saveWeight(){
+  const w=parseFloat(document.getElementById('wi-weight').value);
+  if(!w||w<40||w>250){showToast('Ange en giltig vikt','err');return;}
+  const date=document.getElementById('wi-date').value||TODAY_STR;
+  const steps=parseInt(document.getElementById('wi-steps').value)||null;
+  const comment=document.getElementById('wi-comment').value||'';
+  const log=getWeightLog();
+  const idx=log.findIndex(e=>e.date===date);
+  const entry={date,weight:w,steps,mood:APP.newWeight.mood||null,comment};
+  if(idx>=0)log[idx]=entry;else log.push(entry);
+  log.sort((a,b)=>new Date(a.date)-new Date(b.date));
+  saveWeightLog(log);
+  APP.newWeight={date:'',weight:'',steps:'',mood:'',comment:''};
+  showToast('⚖️ Vikt sparad!');renderVikt();
+}
+
+function deleteWeight(date){
+  const S=getSettings();if(date===S.startDate)return;
+  saveWeightLog(getWeightLog().filter(e=>e.date!==date));showToast('Borttaget');renderVikt();
+}
+
+function renderWeightChart(){
+  const log=getWeightLog();const S=getSettings();
+  if(log.length<1)return;
+  const startMs=new Date(S.startDate).getTime();
+  const goalMs=new Date(S.goalDate).getTime();
+  const totalDays=(goalMs-startMs)/86400000;
+  const endMs=Math.max(goalMs,TODAY.getTime());
+  const allDates=[];
+  for(let d=startMs;d<=endMs+86400000;d+=86400000)allDates.push(new Date(d).toISOString().split('T')[0]);
+  const actualMap={};log.forEach(e=>actualMap[e.date]=e.weight);
+  const actualData=allDates.map(d=>actualMap[d]!==undefined?actualMap[d]:null);
+  // 7-day moving average
+  const avgData=allDates.map((d,idx)=>{
+    const pts=allDates.slice(Math.max(0,idx-6),idx+1).map(dd=>actualMap[dd]).filter(v=>v!==undefined);
+    return pts.length?parseFloat((pts.reduce((s,v)=>s+v,0)/pts.length).toFixed(2)):null;
+  });
+  const goalData=allDates.map(d=>{
+    const n=(new Date(d).getTime()-startMs)/86400000;
+    if(n<0)return null;
+    const ratio=Math.min(1,n/totalDays);
+    return parseFloat((S.startWeight-(S.startWeight-S.goalWeight)*ratio).toFixed(2));
+  });
+  const labels=allDates.map(d=>fmtDate(d));
+  const canvas=document.getElementById('weight-chart');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  if(weightChartInst){weightChartInst.destroy();weightChartInst=null;}
+  weightChartInst=new Chart(ctx,{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'Din vikt',data:actualData,borderColor:'#9b7fe8',backgroundColor:'rgba(155,127,232,0.08)',borderWidth:2,pointRadius:3,pointBackgroundColor:'#9b7fe8',pointBorderColor:'#141414',pointBorderWidth:1.5,tension:0.3,spanGaps:false,fill:true},
+      {label:'7-dagars snitt',data:avgData,borderColor:'#c8a8f8',borderWidth:2.5,pointRadius:0,tension:0.4,spanGaps:true,fill:false},
+      {label:'Mål ('+S.goalWeight+' kg)',data:goalData,borderColor:'#d4b44a',borderWidth:1.5,borderDash:[6,4],pointRadius:0,tension:0,fill:false}
+    ]},
+    options:{
+      responsive:true,interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{labels:{color:'#5a5a5a',font:{size:11},boxWidth:20,padding:12}},
+        tooltip:{backgroundColor:'#1c1c1c',borderColor:'#303030',borderWidth:1,titleColor:'#e8e8e8',bodyColor:'#9a9a9a',callbacks:{label:c=>`${c.dataset.label}: ${c.raw!==null?c.raw+' kg':'–'}`}}
+      },
+      scales:{
+        x:{ticks:{color:'#5a5a5a',font:{size:10},maxTicksLimit:8},grid:{color:'rgba(255,255,255,0.04)'},border:{color:'#262626'}},
+        y:{ticks:{color:'#5a5a5a',font:{size:11},callback:v=>v+'kg'},grid:{color:'rgba(255,255,255,0.06)'},border:{color:'#262626'}}
+      }
+    }
+  });
+}
+
+
+/* -- VANOR -- */
+function renderVanor(){
+  const c=document.getElementById('halsa-content');
+  const habits=getHabits();const logs=getHabitLogs();
+  const mon=getMondayOf(TODAY);
+  const weekDays=getWeekDays(mon,APP.weekOffset);
+  const wLabel=APP.weekOffset===0?'Denna vecka':APP.weekOffset===-1?'Förra veckan':fmtDate(weekDays[0])+' – '+fmtDate(weekDays[6]);
+
+  const subBtns=`<div style="display:flex;gap:6px;margin-bottom:12px;overflow-x:auto">
+    ${[['week','📅 Vecka'],['stats','📊 Statistik'],['add','+ Ny vana']].map(([k,l])=>`
+      <button style="padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;border:1px solid var(--border);background:${APP.habitSubTab===k?'var(--orange2)':'var(--card2)'};color:${APP.habitSubTab===k?'#fff':'var(--text2)'};cursor:pointer;white-space:nowrap" onclick="APP.habitSubTab='${k}';renderHalsa()">${l}</button>`).join('')}
+  </div>`;
+
+  let content='';
+
+  if(APP.habitSubTab==='week'){
+    const nav=`<div class="week-nav">
+      <button onclick="APP.weekOffset--;renderHalsa()">‹</button>
+      <span>${wLabel}</span>
+      <button onclick="APP.weekOffset=Math.min(0,APP.weekOffset+1);renderHalsa()" ${APP.weekOffset>=0?'disabled':''}>›</button>
+    </div>`;
+
+    if(!habits.length){
+      content=`${nav}<div class="empty"><div class="empty-icon">🎯</div>Inga vanor ännu<br><button class="save-btn orange" style="margin-top:12px;width:auto;padding:8px 20px" onclick="APP.habitSubTab='add';renderHalsa()">+ Lägg till</button></div>`;
+    } else {
+      const cols=`1fr repeat(7,34px)`;
+      const hdr=`<div class="habit-grid-hdr" style="grid-template-columns:${cols}">
+        <div class="hg-name" style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px">Vana</div>
+        ${weekDays.map((d,i)=>{const isT=d===TODAY_STR;return `<div class="hg-day-hdr"><div class="hg-day-name">${DAY_NAMES_SHORT[i]}</div><div class="hg-day-num" style="${isT?'color:var(--purple)':''}">${new Date(d).getDate()}</div></div>`;}).join('')}
+      </div>`;
+      const rows=habits.map(h2=>{
+        const streak=getHabitStreak(h2.id,logs);
+        const cells=weekDays.map(d=>{
+          const done=!!(logs[d]&&logs[d][h2.id]);
+          const isFut=d>TODAY_STR;const isT=d===TODAY_STR;
+          let cls='future';
+          if(!isFut){cls=done?(h2.type==='good'?'done-good':'done-bad'):(h2.type==='good'?'miss-good':'miss-bad');}
+          const lbl=!isFut&&done?(h2.type==='good'?'✓':'✗'):'';
+          return `<div class="hg-day"><button class="hab-cell ${cls}${isT?' today-border':''}" ${isFut?'disabled':''} onclick="toggleHabitLog('${h2.id}','${d}')">${lbl}</button></div>`;
+        }).join('');
+        return `<div class="habit-grid-row" style="grid-template-columns:${cols}">
+          <div class="hg-name"><span style="font-size:16px">${h2.emoji}</span> ${h2.name}${streak>0?`<div class="hg-name-sm">🔥 ${streak} dagars svit</div>`:''}
+          </div>${cells}
+        </div>`;
+      }).join('');
+      content=`${nav}<div style="margin-bottom:10px">${hdr}${rows}</div>`;
+    }
+  }
+
+  else if(APP.habitSubTab==='stats'){
+    if(!habits.length){content='<div class="empty"><div class="empty-icon">📊</div>Inga vanor att analysera</div>';}
+    else{content=habits.map(h2=>{
+      const streak=getHabitStreak(h2.id,logs);
+      const best=getBestStreak(h2.id,logs);
+      const rate=getMonthRate(h2.id,logs);
+      return `<div class="habit-stat-card">
+        <div class="hsc-top">
+          <div class="hsc-title"><span style="font-size:22px">${h2.emoji}</span>${h2.name}</div>
+          <button onclick="deleteHabit(${h2.id})" style="background:none;border:none;color:var(--text3);font-size:13px;cursor:pointer">🗑 Ta bort</button>
+        </div>
+        <div class="hsc-mini-grid">
+          <div class="hsc-mini"><div class="hsc-mini-val" style="color:var(--orange)">${streak}🔥</div><div class="hsc-mini-lbl">Nuv. svit</div></div>
+          <div class="hsc-mini"><div class="hsc-mini-val" style="color:var(--purple)">${best}</div><div class="hsc-mini-lbl">Bästa svit</div></div>
+          <div class="hsc-mini"><div class="hsc-mini-val" style="color:var(--green)">${rate}%</div><div class="hsc-mini-lbl">Denna mån.</div></div>
+        </div>
+      </div>`;}).join('');}
+  }
+
+  else if(APP.habitSubTab==='add'){
+    const emojiOpts=['✅','🏃','💪','🥗','💧','📖','🧘','😴','🚫','🍰','📝','🎯','🚶','💊','🌿','☕'].map(e=>`<button style="width:38px;height:38px;border-radius:8px;font-size:18px;background:${APP.newHabit.emoji===e?'var(--orange-dim)':'var(--card2)'};border:${APP.newHabit.emoji===e?'2px solid var(--orange)':'1px solid var(--border)'};cursor:pointer" onclick="APP.newHabit.emoji='${e}';renderHalsa()">${e}</button>`).join('');
+    content=`<div class="settings-section">
+      <div class="ss-title">🎯 Ny vana</div>
+      <input class="ss-input" id="new-habit-name" placeholder='T.ex. "30 min promenad"' value="${APP.newHabit.name}" onchange="APP.newHabit.name=this.value" style="margin-bottom:10px">
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button style="flex:1;padding:10px;border-radius:8px;border:2px solid ${APP.newHabit.type==='good'?'var(--green)':'var(--border)'};background:${APP.newHabit.type==='good'?'var(--green-dim)':'var(--card2)'};color:${APP.newHabit.type==='good'?'var(--green)':'var(--text2)'};font-weight:600;cursor:pointer;font-size:13px" onclick="APP.newHabit.type='good';renderHalsa()">✅ Bra vana</button>
+        <button style="flex:1;padding:10px;border-radius:8px;border:2px solid ${APP.newHabit.type==='bad'?'var(--red)':'var(--border)'};background:${APP.newHabit.type==='bad'?'rgba(224,112,112,.1)':'var(--card2)'};color:${APP.newHabit.type==='bad'?'var(--red)':'var(--text2)'};font-weight:600;cursor:pointer;font-size:13px" onclick="APP.newHabit.type='bad';renderHalsa()">🚫 Undvika</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Välj emoji</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px">${emojiOpts}</div>
+      <button class="save-btn orange" onclick="addHabit()" ${!APP.newHabit.name.trim()?'disabled':''}>+ Lägg till vana</button>
+    </div>`;
+  }
+
+  c.innerHTML=subBtns+content;
+}
+
+function getHabitStreak(hid,logs){
+  let s=0,d=new Date(TODAY);d.setHours(0,0,0,0);
+  while(true){const ds=d.toISOString().split('T')[0];if(logs[ds]&&logs[ds][hid]){s++;d.setDate(d.getDate()-1);}else break;}return s;
+}
+function getBestStreak(hid,logs){
+  let best=0,cur=0;Object.keys(logs).sort().forEach(ds=>{if(logs[ds]&&logs[ds][hid]){cur++;best=Math.max(best,cur);}else cur=0;});return best;
+}
+function getMonthRate(hid,logs){
+  const now=new Date();const month=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const daysEl=Math.min(now.getDate(),new Date(now.getFullYear(),now.getMonth()+1,0).getDate());
+  let done=0;for(let i=1;i<=daysEl;i++){const ds=month+'-'+String(i).padStart(2,'0');if(logs[ds]&&logs[ds][hid])done++;}
+  return daysEl>0?Math.round(done/daysEl*100):0;
+}
+function toggleHabitLog(hid,date){
+  const logs=getHabitLogs();
+  if(!logs[date])logs[date]={};
+  logs[date][hid]=!logs[date][hid];
+  saveHabitLogs(logs);renderHalsa();
+}
+function addHabit(){
+  const name=document.getElementById('new-habit-name')?.value||APP.newHabit.name;
+  if(!name.trim())return;
+  const habits=getHabits();
+  habits.push({id:Date.now(),name:name.trim(),type:APP.newHabit.type,emoji:APP.newHabit.emoji});
+  saveHabits(habits);APP.newHabit={name:'',type:'good',emoji:'✅'};
+  showToast('✅ Vana tillagd!');APP.habitSubTab='week';renderHalsa();
+}
+function deleteHabit(id){
+  saveHabits(getHabits().filter(h=>h.id!==id));showToast('Vana borttagen');renderHalsa();
+}
+
+/* -- HISTORIK -- */
+function renderHistorik(){
+  const c=document.getElementById('halsa-content');
+  const log=[...getWeightLog()].sort((a,b)=>new Date(b.date)-new Date(a.date));
+  if(!log.length){c.innerHTML='<div class="empty"><div class="empty-icon">📋</div>Ingen data ännu</div>';return;}
+  c.innerHTML=`<div class="card" style="overflow-x:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-size:14px;font-weight:700;color:var(--text2)">Mätningshistorik</span>
+      <span class="pill purple">${log.length} mätningar</span>
+    </div>
+    <table class="hist-table" style="width:100%">
+      <thead><tr>
+        <th>Datum</th><th>Vikt</th><th>Δ</th><th>Steg</th><th>Hum.</th><th></th>
+      </tr></thead>
+      <tbody>${log.map((e,i)=>{
+        const prev=log[i+1];const d=prev?(e.weight-prev.weight).toFixed(1):null;const dn=d?parseFloat(d):0;
+        const S=getSettings();const isStart=e.date===S.startDate;
+        return `<tr>
+          <td style="color:var(--text2)">${fmtDateWeekday(e.date)}</td>
+          <td style="font-weight:700">${e.weight.toFixed(1)} kg</td>
+          <td style="color:${d&&dn<=0?'var(--green)':'var(--red)'};font-weight:600">${d?(dn>0?'+':'')+d:'–'}</td>
+          <td style="color:var(--text3)">${e.steps?e.steps.toLocaleString():'–'}</td>
+          <td>${e.mood?MOOD_EMOJI[e.mood-1]:'–'}</td>
+          <td>${!isStart?`<button class="del-btn" onclick="deleteWeight('${e.date}')">✕</button>`:''}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+/* ================================================================
+   RENDER: MER (Inställningar, Backup)
+   ================================================================ */
+function renderMer(){
+  const c=document.getElementById('mer-content');
+  const S=getSettings();
+  if(APP.subMer==='inst') c.innerHTML=buildInst(S);
+  else if(APP.subMer==='backup') c.innerHTML=buildBackup();
+}
+
+function buildInst(S){
+  return `
+    <div class="settings-section">
+      <div class="ss-title">⚖️ Viktkontroll</div>
+      <label class="ss-label">Målvikt (kg)</label>
+      <input class="ss-input" type="number" step="0.5" id="s-goal" value="${S.goalWeight}" onchange="updSetting('goalWeight',parseFloat(this.value))">
+      <label class="ss-label">Startdatum</label>
+      <input class="ss-input" type="date" id="s-sdate" value="${S.startDate}" onchange="updSetting('startDate',this.value)">
+      <label class="ss-label">Startvikt (kg)</label>
+      <input class="ss-input" type="number" step="0.5" id="s-sw" value="${S.startWeight}" onchange="updSetting('startWeight',parseFloat(this.value))">
+      <label class="ss-label">Måldatum</label>
+      <input class="ss-input" type="date" id="s-gdate" value="${S.goalDate}" onchange="updSetting('goalDate',this.value)">
+      <label class="ss-label">Önskat tempo</label>
+      <div class="rate-btns">${[0.25,0.5,0.75,1.0].map(r=>`<button class="rate-btn${S.targetRate===r?' active':''}" onclick="updSetting('targetRate',${r})">${r} kg/v</button>`).join('')}</div>
+      <label class="ss-label">Din längd (cm) — för BMI</label>
+      <input class="ss-input" type="number" id="s-height" value="${S.height}" onchange="updSetting('height',parseFloat(this.value))">
+    </div>
+    <div class="settings-section">
+      <div class="ss-title">🎯 Årsmål träning</div>
+      <label class="ss-label">Antal pass per år</label>
+      <input class="ss-input" type="number" id="s-ysess" value="${S.yearlyGoal.sessions}" onchange="updYearlyGoal('sessions',parseInt(this.value))">
+      <label class="ss-label">Total träningstid (minuter)</label>
+      <input class="ss-input" type="number" id="s-ymin" value="${S.yearlyGoal.minutes}" onchange="updYearlyGoal('minutes',parseInt(this.value))">
+    </div>`;
+}
+
+
+function buildBackup(){
+  return `
+    <div class="settings-section">
+      <div class="ss-title">💾 Backup & Import</div>
+      <div class="backup-row">
+        <button class="backup-btn" onclick="exportData()">⬇️ Ladda ner backup</button>
+        <label class="backup-btn" style="cursor:pointer">📂 Återställ från fil<input type="file" accept=".json" style="display:none" onchange="importFromFile(event)"></label>
+      </div>
+      <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px">
+        <label class="ss-label" style="margin-top:0">Importera historisk viktdata (ett värde per rad: 03-nov 91.1)</label>
+        <textarea class="textarea" id="import-txt" rows="5" placeholder="03-nov 91,1&#10;04-nov 90,8&#10;…" onchange="APP.importText=this.value">${APP.importText}</textarea>
+        <button class="save-btn purple" onclick="importHistorical()" style="margin-top:8px">Importera</button>
+      </div>
+    </div>`;
+}
+
+function updSetting(key,val){const S=getSettings();S[key]=val;saveSettings(S);showToast('Sparat ✓');}
+function updYearlyGoal(key,val){const S=getSettings();S.yearlyGoal[key]=val;saveSettings(S);showToast('Sparat ✓');}
+
+
+function exportData(){
+  const data={weightLog:getWeightLog(),workouts:getWorkouts(),habits:getHabits(),habitLogs:getHabitLogs(),settings:getSettings(),exportDate:new Date().toISOString()};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download='halsoapp_'+TODAY_STR+'.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+  showToast('💾 Backup nedladdad!');
+}
+function importFromFile(e){
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();r.onload=ev=>{
+    try{const d=JSON.parse(ev.target.result);
+      if(d.weightLog)saveWeightLog(d.weightLog);
+      if(d.workouts)saveWorkouts(d.workouts);
+      if(d.habits)saveHabits(d.habits);
+      if(d.habitLogs)saveHabitLogs(d.habitLogs);
+      if(d.settings)saveSettings(d.settings);
+      showToast('✓ Data importerad!');renderSection(APP.tab);
+    }catch(err){showToast('Kunde inte läsa filen','err');}
+  };r.readAsText(file);
+}
+function importHistorical(){
+  const txt=document.getElementById('import-txt')?.value||APP.importText;
+  const months={jan:'01',feb:'02',mar:'03',apr:'04',maj:'05',jun:'06',jul:'07',aug:'08',sep:'09',okt:'10',nov:'11',dec:'12'};
+  const imported=[];
+  txt.trim().split('\n').forEach(line=>{
+    const m=line.trim().match(/(\d+)-(\w+)\s+([\d,.]+)/);
+    if(m){const mon=months[m[2].toLowerCase()];const w=parseFloat(m[3].replace(',','.'));
+      if(mon&&!isNaN(w))imported.push({date:`2025-${mon}-${m[1].padStart(2,'0')}`,weight:w,steps:null,mood:null,comment:'',id:Date.now()+imported.length+Math.random()});}
+  });
+  if(!imported.length){showToast('Ingen giltig data','err');return;}
+  const existing=getWeightLog();const map={};
+  [...existing,...imported].forEach(e=>map[e.date]=e);
+  saveWeightLog(Object.values(map).sort((a,b)=>new Date(a.date)-new Date(b.date)));
+  APP.importText='';showToast('✓ Importerade '+imported.length+' mätningar!');renderSection(APP.tab);
+}
+
+/* ================================================================
+   INIT
+   ================================================================ */
+function init(){
+  const today=new Date();
+  document.getElementById('hdr-date').textContent=DAY_NAMES_LONG[DAY_IDX]+', '+today.getDate()+' '+MO_NAMES[today.getMonth()]+' '+today.getFullYear();
+
+  updateTracker();
+  renderToday();
+}
+
+init();
+</script>
+</body>
+</html>
