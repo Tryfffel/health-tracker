@@ -12,11 +12,23 @@
 <div id="root"></div>
 <div id="error-display" style="display:none;padding:20px;background:#fee2e2;color:#991b1b;font-family:monospace;font-size:13px;white-space:pre-wrap;margin:20px;border-radius:8px;"></div>
 <script>
-window.addEventListener('error', function(e) {
+function showErr(msg) {
   var el = document.getElementById('error-display');
   el.style.display = 'block';
-  el.textContent = 'FEL: ' + e.message + '\nRad: ' + e.lineno + '\nFil: ' + e.filename;
+  el.textContent += msg + '\n---\n';
+}
+window.addEventListener('error', function(e) {
+  showErr('JS FEL: ' + e.message + ' | rad:' + e.lineno + ' | fil:' + (e.filename||'?') + ' | col:' + e.colno);
 });
+window.addEventListener('unhandledrejection', function(e) {
+  var r = e.reason;
+  showErr('PROMISE FEL: ' + (r && r.stack ? r.stack : String(r)));
+});
+var _ce = console.error.bind(console);
+console.error = function() {
+  showErr('CONSOLE: ' + Array.from(arguments).map(String).join(' '));
+  _ce.apply(console, arguments);
+};
 </script>
 <script>
 // localStorage polyfill matching the window.storage API
