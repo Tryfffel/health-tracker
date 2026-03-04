@@ -1353,14 +1353,15 @@ function WeightStepTracker() {
   function renderHabits() {
     var DAY_NAMES = ['M','T','O','T','F','L','S'];
     var todayStr2 = todayStr();
-    // Use noon to avoid UTC/DST midnight edge cases in Sweden (UTC+1)
+    // Compute day-of-week WITHOUT getDay() — use known Monday anchor (2000-01-03)
     var _tp = todayStr2.split('-');
-    var today = new Date(parseInt(_tp[0]), parseInt(_tp[1])-1, parseInt(_tp[2]), 12, 0, 0);
-    var dow = today.getDay(); // 0=sun, guaranteed local
-    var monOffset = (dow === 0 ? -6 : 1 - dow) + weekOffset * 7;
+    var _anchor = new Date(2000, 0, 3, 12, 0, 0); // Monday
+    var _today12 = new Date(parseInt(_tp[0]), parseInt(_tp[1])-1, parseInt(_tp[2]), 12, 0, 0);
+    var _daysSinceAnchor = Math.round((_today12 - _anchor) / 86400000);
+    var dowMon = ((_daysSinceAnchor % 7) + 7) % 7; // 0=Mon,1=Tue,2=Wed,...,6=Sun
     var weekDays = [];
     for (var i = 0; i < 7; i++) {
-      var d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + monOffset + i, 12, 0, 0);
+      var d = new Date(parseInt(_tp[0]), parseInt(_tp[1])-1, parseInt(_tp[2]) - dowMon + i + weekOffset * 7, 12, 0, 0);
       weekDays.push(localDS(d));
     }
     var weekLabel = (weekOffset === 0) ? 'Denna vecka' : (weekOffset === -1 ? 'Förra veckan' : new Date(weekDays[0]).toLocaleDateString('sv-SE', { day:'numeric', month:'short' }) + ' – ' + new Date(weekDays[6]).toLocaleDateString('sv-SE', { day:'numeric', month:'short' }));
@@ -1466,7 +1467,7 @@ function WeightStepTracker() {
                   return h('div', { key: date, className: 'bg-white py-2 text-center' },
                     h('div', { className: 'text-xs text-gray-400' }, DAY_NAMES[i]),
                     h('div', { className: 'text-xs font-bold ' + (isToday ? 'text-indigo-600' : 'text-gray-500') },
-                      new Date(date).getDate())
+                      parseInt(date.split('-')[2]))
                   );
                 })
               ),
