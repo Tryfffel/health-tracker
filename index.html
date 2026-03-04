@@ -4,32 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hälsodagbok</title>
-  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100">
 <div id="root"></div>
-<div id="error-display" style="display:none;padding:20px;background:#fee2e2;color:#991b1b;font-family:monospace;font-size:13px;white-space:pre-wrap;margin:20px;border-radius:8px;"></div>
-<script>
-function showErr(msg) {
-  var el = document.getElementById('error-display');
-  el.style.display = 'block';
-  el.textContent += msg + '\n---\n';
-}
-window.addEventListener('error', function(e) {
-  showErr('JS FEL: ' + e.message + ' | rad:' + e.lineno + ' | fil:' + (e.filename||'?') + ' | col:' + e.colno);
-});
-window.addEventListener('unhandledrejection', function(e) {
-  var r = e.reason;
-  showErr('PROMISE FEL: ' + (r && r.stack ? r.stack : String(r)));
-});
-var _ce = console.error.bind(console);
-console.error = function() {
-  showErr('CONSOLE: ' + Array.from(arguments).map(String).join(' '));
-  _ce.apply(console, arguments);
-};
-</script>
+
+
 <script>
 // localStorage polyfill matching the window.storage API
 window.storage = {
@@ -203,8 +185,6 @@ function WeightStepTracker() {
       if (results[7] && results[7].value) { var hl=JSON.parse(results[7].value); setHabitLogs((hl&&typeof hl==='object'&&!Array.isArray(hl))?hl:{}); }
     } catch (err) {
       console.log('Ingen sparad data', err);
-      localStorage.removeItem('habits');
-      localStorage.removeItem('habit-logs');
     } finally {
       setLoading(false);
     }
@@ -1529,28 +1509,7 @@ function WeightStepTracker() {
   );
 }
 
-class ErrorBoundary extends React.Component {
-  constructor(p) { super(p); this.state = { err: null }; }
-  static getDerivedStateFromError(e) { return { err: e }; }
-  render() {
-    if (this.state.err) {
-      var el = document.getElementById('error-display');
-      el.style.display='block';
-      el.textContent = ['RENDER FEL:', this.state.err.message, this.state.err.stack].join(' | ');
-      return null;
-    }
-    return this.props.children;
-  }
-}
-try {
-  ReactDOM.createRoot(document.getElementById('root')).render(
-    h(ErrorBoundary, null, h(WeightStepTracker, null))
-  );
-} catch(e) {
-  var el = document.getElementById('error-display');
-  el.style.display='block';
-  el.textContent = 'INIT FEL: ' + e.message + ' | ' + e.stack;
-}
+ReactDOM.createRoot(document.getElementById('root')).render(h(WeightStepTracker, null));
 
 </script>
 </body>
