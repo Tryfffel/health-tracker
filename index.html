@@ -159,6 +159,27 @@ function WeightStepTracker() {
   const [habitTab, setHabitTab]     = useState('week');
   useEffect(() => { loadData(); }, []);
   useEffect(() => { if (!loading) saveData(); }, [entries, workouts, habits, habitLogs, goalWeight, targetRate, yearlyGoal, height, loading]);
+
+  // Diet state
+  var todayDietStr = new Date().toISOString().split('T')[0];
+  var dietChecked = React.useState({}); var checkedMeals = dietChecked[0]; var setCheckedMeals = dietChecked[1];
+  var dietBought = React.useState({}); var boughtItems = dietBought[0]; var setBoughtItems = dietBought[1];
+  var dietSearch = React.useState(''); var recipeSearch = dietSearch[0]; var setRecipeSearch = dietSearch[1];
+  var dietOpen = React.useState(null); var openRecipe = dietOpen[0]; var setOpenRecipe = dietOpen[1];
+  var dietFavs = React.useState([]); var recipeFavs = dietFavs[0]; var setRecipeFavs = dietFavs[1];
+  var dietFilter = React.useState('alla'); var recipeFilter = dietFilter[0]; var setRecipeFilter = dietFilter[1];
+  useEffect(function(){
+    var cm=localStorage.getItem('diet-checked-'+todayDietStr);
+    var rf=localStorage.getItem('diet-favs');
+    var bi=localStorage.getItem('diet-bought');
+    if(cm) setCheckedMeals(JSON.parse(cm));
+    if(rf) setRecipeFavs(JSON.parse(rf));
+    if(bi) setBoughtItems(JSON.parse(bi));
+  }, []);
+  useEffect(function(){ localStorage.setItem('diet-checked-'+todayDietStr, JSON.stringify(checkedMeals)); }, [checkedMeals]);
+  useEffect(function(){ localStorage.setItem('diet-favs', JSON.stringify(recipeFavs)); }, [recipeFavs]);
+  useEffect(function(){ localStorage.setItem('diet-bought', JSON.stringify(boughtItems)); }, [boughtItems]);
+
   // Read URL params injected by iOS Shortcut: ?steps=8500&date=2026-02-25
   const loadData = async () => {
     try {
@@ -1228,25 +1249,6 @@ function WeightStepTracker() {
     );
   }
 
-  // Diet state
-  var todayDietStr = new Date().toISOString().split('T')[0];
-  var dietChecked = React.useState({}); var checkedMeals = dietChecked[0]; var setCheckedMeals = dietChecked[1];
-  var dietBought = React.useState({}); var boughtItems = dietBought[0]; var setBoughtItems = dietBought[1];
-  var dietSearch = React.useState(''); var recipeSearch = dietSearch[0]; var setRecipeSearch = dietSearch[1];
-  var dietOpen = React.useState(null); var openRecipe = dietOpen[0]; var setOpenRecipe = dietOpen[1];
-  var dietFavs = React.useState([]); var recipeFavs = dietFavs[0]; var setRecipeFavs = dietFavs[1];
-  var dietFilter = React.useState('alla'); var recipeFilter = dietFilter[0]; var setRecipeFilter = dietFilter[1];
-  useEffect(function(){
-    var cm=localStorage.getItem('diet-checked-'+todayDietStr);
-    var rf=localStorage.getItem('diet-favs');
-    var bi=localStorage.getItem('diet-bought');
-    if(cm) setCheckedMeals(JSON.parse(cm));
-    if(rf) setRecipeFavs(JSON.parse(rf));
-    if(bi) setBoughtItems(JSON.parse(bi));
-  }, []);
-  useEffect(function(){ localStorage.setItem('diet-checked-'+todayDietStr, JSON.stringify(checkedMeals)); }, [checkedMeals]);
-  useEffect(function(){ localStorage.setItem('diet-favs', JSON.stringify(recipeFavs)); }, [recipeFavs]);
-  useEffect(function(){ localStorage.setItem('diet-bought', JSON.stringify(boughtItems)); }, [boughtItems]);
 
   // Diet data
   var MEAL_NAMES = ['Frukost','Lunch','Middag','Kvallsmat'];
