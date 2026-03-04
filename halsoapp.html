@@ -4,20 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hälsodagbok</title>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Hälsodagbok">
+  <link rel="manifest" href="manifest.json">
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100">
 <div id="root"></div>
-<div id="error-display" style="display:none;padding:20px;background:#fee2e2;color:#991b1b;font-family:monospace;font-size:13px;white-space:pre-wrap;margin:20px;border-radius:8px;"></div>
-<script>
-window.addEventListener('error', function(e) {
-  var el = document.getElementById('error-display');
-  el.style.display = 'block';
-  el.textContent = 'FEL: ' + e.message + '\nRad: ' + e.lineno + '\nFil: ' + e.filename;
-});
-</script>
+
+
 <script>
 // localStorage polyfill matching the window.storage API
 window.storage = {
@@ -145,16 +144,30 @@ function WeightStepTracker() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [newHabit, setNewHabit]     = useState({ name: '', type: 'good', emoji: '✅' });
   const [habitTab, setHabitTab]     = useState('week');
-  // Diet state
-  var todayStr2 = (function(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
-  var [checkedMeals, setCheckedMeals] = useState({});
-  var [recipeAmounts, setRecipeAmounts] = useState({});
-  var [boughtItems, setBoughtItems] = useState({});
-  var [recipeSearch, setRecipeSearch] = useState('');
-  var [openRecipe, setOpenRecipe] = useState(null);
-
   useEffect(() => { loadData(); }, []);
   useEffect(() => { if (!loading) saveData(); }, [entries, workouts, habits, habitLogs, goalWeight, targetRate, yearlyGoal, height, loading]);
+
+  // Diet state
+  var todayDietStr = new Date().toISOString().split('T')[0];
+  var dietChecked = React.useState({}); var checkedMeals = dietChecked[0]; var setCheckedMeals = dietChecked[1];
+  var dietBought = React.useState({}); var boughtItems = dietBought[0]; var setBoughtItems = dietBought[1];
+  var dietSearch = React.useState(''); var recipeSearch = dietSearch[0]; var setRecipeSearch = dietSearch[1];
+  var dietOpen = React.useState(null); var openRecipe = dietOpen[0]; var setOpenRecipe = dietOpen[1];
+  var dietFavs = React.useState([]); var recipeFavs = dietFavs[0]; var setRecipeFavs = dietFavs[1];
+  var dietFilter = React.useState('alla'); var recipeFilter = dietFilter[0]; var setRecipeFilter = dietFilter[1];
+  useEffect(function(){
+    var cm=localStorage.getItem('diet-checked-'+todayDietStr);
+    var rf=localStorage.getItem('diet-favs');
+    var bi=localStorage.getItem('diet-bought');
+    if(cm) setCheckedMeals(JSON.parse(cm));
+    if(rf) setRecipeFavs(JSON.parse(rf));
+    if(bi) setBoughtItems(JSON.parse(bi));
+  }, []);
+  useEffect(function(){ localStorage.setItem('diet-checked-'+todayDietStr, JSON.stringify(checkedMeals)); }, [checkedMeals]);
+  useEffect(function(){ localStorage.setItem('diet-favs', JSON.stringify(recipeFavs)); }, [recipeFavs]);
+  useEffect(function(){ localStorage.setItem('diet-bought', JSON.stringify(boughtItems)); }, [boughtItems]);
+
+  // Read URL params injected by iOS Shortcut: ?steps=8500&date=2026-02-25
   const loadData = async () => {
     try {
       const results = await Promise.all([
@@ -166,22 +179,15 @@ function WeightStepTracker() {
         window.storage.get('target-rate'),
         window.storage.get('habits'),
         window.storage.get('habit-logs'),
-        window.storage.get('diet-checked-' + todayStr2),
-        window.storage.get('diet-recipes'),
-        window.storage.get('diet-shopping'),
-        window.storage.set('diet-checked-' + todayStr2, JSON.stringify(checkedMeals)),
-        window.storage.set('diet-recipes', JSON.stringify(recipeAmounts)),
-        window.storage.set('diet-shopping', JSON.stringify(boughtItems)),]);
+      ]);
       if (results[0] && results[0].value) setEntries(JSON.parse(results[0].value));
       if (results[1] && results[1].value) setWorkouts(JSON.parse(results[1].value));
       if (results[2] && results[2].value) setGoalWeight(parseFloat(results[2].value));
       if (results[3] && results[3].value) setYearlyGoal(JSON.parse(results[3].value));
-      if (results[4] && results[4].value) setHeight(parseFloat(results[4].value));      if (results[7] && results[7].value) setTargetRate(parseFloat(results[7].value));
-      if (results[8] && results[8].value) setHabits(JSON.parse(results[8].value));
-      if (results[9] && results[9].value) setHabitLogs(JSON.parse(results[9].value));
-      if (results[11] && results[11].value) setCheckedMeals(JSON.parse(results[11].value));
-      if (results[12] && results[12].value) setRecipeAmounts(JSON.parse(results[12].value));
-      if (results[13] && results[13].value) setBoughtItems(JSON.parse(results[13].value));
+      if (results[4] && results[4].value) setHeight(parseFloat(results[4].value));
+      if (results[5] && results[5].value) setTargetRate(parseFloat(results[5].value));
+      if (results[6] && results[6].value) { var h=JSON.parse(results[6].value); setHabits(Array.isArray(h)?h:[]); }
+      if (results[7] && results[7].value) { var hl=JSON.parse(results[7].value); setHabitLogs((hl&&typeof hl==='object'&&!Array.isArray(hl))?hl:{}); }
     } catch (err) {
       console.log('Ingen sparad data', err);
     } finally {
@@ -192,16 +198,17 @@ function WeightStepTracker() {
     try {
       await Promise.all([
         window.storage.set('weight-entries', JSON.stringify(entries)),
-        window.storage.set('workouts',        JSON.stringify(workouts)),
-        window.storage.set('goal-weight',     goalWeight.toString()),
-        window.storage.set('yearly-goal',     JSON.stringify(yearlyGoal)),
-        window.storage.set('user-height',     height.toString()),
-        window.storage.set('target-rate',     targetRate.toString()),
-        window.storage.set('habits',          JSON.stringify(habits)),
-        window.storage.set('habit-logs',      JSON.stringify(habitLogs)),
+        window.storage.set('workouts',       JSON.stringify(workouts)),
+        window.storage.set('goal-weight',    goalWeight.toString()),
+        window.storage.set('yearly-goal',    JSON.stringify(yearlyGoal)),
+        window.storage.set('user-height',    height.toString()),
+        window.storage.set('target-rate',    targetRate.toString()),
+        window.storage.set('habits',         JSON.stringify(habits)),
+        window.storage.set('habit-logs',     JSON.stringify(habitLogs)),
       ]);
     } catch (err) { console.error(err); }
   };
+
   const addEntry = () => {
     if (!newEntry.weight) return;
     const entry = {
@@ -416,23 +423,72 @@ function WeightStepTracker() {
     return { latest: latest, diff: diff, toGoal: toGoal, totalLoss: totalLoss, avgSteps: avgSteps, bmi: bmi, bmiCat: bmiCat, streak: getStreak() };
   };
   const getPrediction = function() {
-    if (entries.length < 7) return null;
-    const sorted = entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
-    const recent = sorted.slice(-30);
+    if (entries.length < 5) return null;
+    var sorted = entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+    var recent = sorted.slice(-60);
     if (recent.length < 5) return null;
     var n = recent.length, sumX=0, sumY=0, sumXY=0, sumX2=0;
     var t0 = new Date(recent[0].date).getTime();
     recent.forEach(function(e) {
-      var x = (new Date(e.date).getTime()-t0)/86400000, y = e.weight;
+      var x = (new Date(e.date).getTime()-t0)/86400000, y=e.weight;
       sumX+=x; sumY+=y; sumXY+=x*y; sumX2+=x*x;
     });
-    var slope = (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX);
+    var denom = n*sumX2 - sumX*sumX;
+    if (denom === 0) return null;
+    var slope = (n*sumXY - sumX*sumY) / denom;
     var intercept = (sumY - slope*sumX) / n;
-    if (slope >= 0) return { gaining: true, kgPerWeek: parseFloat((slope*7).toFixed(2)) };
-    var currentX = (new Date(recent[recent.length-1].date).getTime()-t0)/86400000;
-    var daysToGoal = (goalWeight - intercept)/slope - currentX;
-    if (daysToGoal < 0 || daysToGoal > 365*3) return null;
-    return { weeksToGoal: Math.round(daysToGoal/7), kgPerWeek: parseFloat(Math.abs(slope*7).toFixed(2)), gaining: false };
+    // R² calculation
+    var yMean = sumY/n;
+    var ssTot=0, ssRes=0;
+    recent.forEach(function(e) {
+      var x=(new Date(e.date).getTime()-t0)/86400000, y=e.weight;
+      var yPred=slope*x+intercept;
+      ssTot+=Math.pow(y-yMean,2); ssRes+=Math.pow(y-yPred,2);
+    });
+    var r2 = ssTot > 0 ? Math.max(0, 1 - ssRes/ssTot) : 0;
+    var kgPerWeek = parseFloat((slope*7).toFixed(2));
+    if (slope >= 0) return { gaining: true, kgPerWeek: Math.abs(kgPerWeek), r2: parseFloat(r2.toFixed(2)) };
+    // Days to goal from last entry
+    var lastX = (new Date(recent[recent.length-1].date).getTime()-t0)/86400000;
+    var daysToGoal = (goalWeight - intercept)/slope - lastX;
+    // Confidence scenarios based on std dev of residuals
+    var residuals = recent.map(function(e) {
+      var x=(new Date(e.date).getTime()-t0)/86400000;
+      return e.weight - (slope*x+intercept);
+    });
+    var stdDev = Math.sqrt(residuals.reduce(function(s,r){return s+r*r;},0)/n);
+    var slopeOpt = slope * 1.3, slopePes = slope * 0.5;
+    var daysOpt = (goalWeight - intercept - stdDev)/slope - lastX;
+    var daysPes = daysToGoal * 1.8;
+    // Projection data points (next ~120 days)
+    var projDays = Math.min(Math.max(Math.ceil(daysToGoal * 1.15), 30), 150);
+    var projPoints = [];
+    for (var d = 7; d <= projDays; d += 7) {
+      var projDate = new Date(recent[recent.length-1].date);
+      projDate.setDate(projDate.getDate() + d);
+      var x = lastX + d;
+      projPoints.push({
+        datum: projDate.toLocaleDateString('sv-SE',{month:'short',day:'numeric'}),
+        prognos: parseFloat((slope*x+intercept).toFixed(2)),
+        prognosOpt: parseFloat(((slope*1.3)*x+intercept-stdDev*0.5).toFixed(2)),
+        prognosPes: parseFloat(((slope*0.5)*x+intercept+stdDev*0.5).toFixed(2)),
+      });
+    }
+    if (daysToGoal < 0 || daysToGoal > 365*4) return { gaining: false, kgPerWeek: Math.abs(kgPerWeek), r2: parseFloat(r2.toFixed(2)), noGoal: true };
+    var goalDate = new Date(recent[recent.length-1].date);
+    goalDate.setDate(goalDate.getDate() + Math.round(daysToGoal));
+    var goalDateOpt = new Date(recent[recent.length-1].date);
+    goalDateOpt.setDate(goalDateOpt.getDate() + Math.max(1,Math.round(daysOpt)));
+    var goalDatePes = new Date(recent[recent.length-1].date);
+    goalDatePes.setDate(goalDatePes.getDate() + Math.round(daysPes));
+    return {
+      gaining: false, kgPerWeek: Math.abs(kgPerWeek), r2: parseFloat(r2.toFixed(2)),
+      weeksToGoal: Math.round(daysToGoal/7),
+      goalDate: goalDate.toLocaleDateString('sv-SE',{day:'numeric',month:'long',year:'numeric'}),
+      goalDateOpt: goalDateOpt.toLocaleDateString('sv-SE',{day:'numeric',month:'long',year:'numeric'}),
+      goalDatePes: goalDatePes.toLocaleDateString('sv-SE',{day:'numeric',month:'long',year:'numeric'}),
+      projPoints: projPoints, stdDev: parseFloat(stdDev.toFixed(2))
+    };
   };
   const getMonthlySummary = function() {
     var now = new Date();
@@ -461,7 +517,7 @@ function WeightStepTracker() {
   };
   const getChartData = function() {
     const sorted = entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
-    return sorted.map(function(entry, idx) {
+    var historical = sorted.map(function(entry, idx) {
       const w7 = sorted.slice(Math.max(0, idx - 6), idx + 1);
       return {
         datum:   new Date(entry.date).toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' }),
@@ -473,6 +529,7 @@ function WeightStepTracker() {
         snitt7:  parseFloat((w7.reduce(function(s,e){return s+e.weight;},0) / w7.length).toFixed(2)),
       };
     });
+    return historical;
   };
   const stats          = getStats();
   const weeklyStats    = getWeeklyStats();
@@ -480,6 +537,110 @@ function WeightStepTracker() {
   const yearProgress   = getYearlyProgress();
   const chartData      = getChartData();
   const prediction     = getPrediction();
+
+  const getWeeklyReport = function() {
+    if (entries.length < 2) return null;
+    var now = new Date(); now.setHours(0,0,0,0);
+    var dow = now.getDay();
+    var monday = new Date(now); monday.setDate(now.getDate() - (dow===0?6:dow-1));
+    var lastMon = new Date(monday); lastMon.setDate(monday.getDate()-7);
+    var lastSun = new Date(monday); lastSun.setDate(monday.getDate()-1);
+    var lastWeekEntries = entries.filter(function(e){
+      var d=new Date(e.date); return d>=lastMon && d<=lastSun;
+    });
+    if (lastWeekEntries.length < 2) return null;
+    var weights = lastWeekEntries.map(function(e){return e.weight;}).sort(function(a,b){return a-b;});
+    var avgW = (weights.reduce(function(s,v){return s+v;},0)/weights.length).toFixed(1);
+    var change = (lastWeekEntries[lastWeekEntries.length-1].weight - lastWeekEntries[0].weight).toFixed(1);
+    var lastWeekWorkouts = workouts.filter(function(w){
+      var d=new Date(w.date); return d>=lastMon && d<=lastSun;
+    });
+    var totalMin = lastWeekWorkouts.reduce(function(s,w){return s+w.duration;},0);
+    var steps = lastWeekEntries.filter(function(e){return e.steps;});
+    var avgSteps = steps.length ? Math.round(steps.reduce(function(s,e){return s+e.steps;},0)/steps.length) : 0;
+    return {
+      weekLabel: lastMon.toLocaleDateString('sv-SE',{month:'short',day:'numeric'}) + '–' + lastSun.toLocaleDateString('sv-SE',{month:'short',day:'numeric'}),
+      avgW: avgW, change: parseFloat(change),
+      workouts: lastWeekWorkouts.length, totalMin: totalMin,
+      avgSteps: avgSteps, logDays: lastWeekEntries.length
+    };
+  };
+
+  const getInsights = function() {
+    if (entries.length < 7) return [];
+    var insights = [];
+    var sorted = entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+
+    // Best day of week for weight loss
+    var dayDiffs = {};
+    for (var i = 1; i < sorted.length; i++) {
+      var prev = sorted[i-1], cur = sorted[i];
+      var diff = cur.weight - prev.weight;
+      var day = new Date(cur.date).getDay();
+      if (!dayDiffs[day]) dayDiffs[day] = [];
+      dayDiffs[day].push(diff);
+    }
+    var dayNames = ['söndag','måndag','tisdag','onsdag','torsdag','fredag','lördag'];
+    var bestDay = null, bestAvg = 0;
+    Object.keys(dayDiffs).forEach(function(d) {
+      var avg = dayDiffs[d].reduce(function(s,v){return s+v;},0)/dayDiffs[d].length;
+      if (bestDay === null || avg < bestAvg) { bestDay = parseInt(d); bestAvg = avg; }
+    });
+    if (bestDay !== null && bestAvg < -0.05) {
+      insights.push({ icon:'📅', text: 'Du tappar mest vikt på ' + dayNames[bestDay] + 'ar (snitt ' + bestAvg.toFixed(2) + ' kg)' });
+    }
+
+    // Steps vs weight correlation
+    var stepsEntries = sorted.filter(function(e){return e.steps && e.steps > 0;});
+    if (stepsEntries.length >= 5) {
+      var highSteps = stepsEntries.filter(function(e){return e.steps >= 8000;});
+      var lowSteps  = stepsEntries.filter(function(e){return e.steps < 8000;});
+      if (highSteps.length >= 3 && lowSteps.length >= 3) {
+        var avgHigh = highSteps.reduce(function(s,e){return s+e.weight;},0)/highSteps.length;
+        var avgLow  = lowSteps.reduce(function(s,e){return s+e.weight;},0)/lowSteps.length;
+        if (avgHigh < avgLow - 0.3) {
+          insights.push({ icon:'👟', text: 'Dagar med 8000+ steg: snitt ' + avgHigh.toFixed(1) + ' kg. Under 8000: ' + avgLow.toFixed(1) + ' kg' });
+        }
+      }
+    }
+
+    // Workout weeks vs non-workout weeks
+    if (workouts.length >= 4) {
+      var weekMap = {};
+      workouts.forEach(function(w){
+        var wk = w.date.slice(0,7) + '-W' + getWeekNumber(new Date(w.date));
+        weekMap[wk] = (weekMap[wk]||0) + 1;
+      });
+      var activeWeeks = Object.keys(weekMap).filter(function(w){return weekMap[w]>=3;});
+      if (activeWeeks.length >= 2) {
+        insights.push({ icon:'💪', text: 'Veckor med 3+ träningspass: bättre viktprogress. Ditt snitt: ' + (workouts.length / Math.max(1,Object.keys(weekMap).length)).toFixed(1) + ' pass/vecka' });
+      }
+    }
+
+    // Trend last 14 days
+    if (sorted.length >= 14) {
+      var last14 = sorted.slice(-14);
+      var first14w = last14[0].weight, last14w = last14[last14.length-1].weight;
+      var rate14 = (last14w - first14w) / 2;
+      if (Math.abs(rate14) > 0.05) {
+        var dir = rate14 < 0 ? '↓ minskar' : '↑ ökar';
+        insights.push({ icon:'📈', text: 'Senaste 2 veckorna: trend ' + dir + ' med ' + Math.abs(rate14).toFixed(2) + ' kg/vecka' });
+      }
+    }
+
+    // Best weight ever
+    var minW = Math.min.apply(null, sorted.map(function(e){return e.weight;}));
+    var minEntry = sorted.find(function(e){return e.weight===minW;});
+    var latest = sorted[sorted.length-1];
+    if (latest.weight - minW > 0.5) {
+      insights.push({ icon:'🏆', text: 'Lägsta vikt: ' + minW + ' kg (' + new Date(minEntry.date).toLocaleDateString('sv-SE',{month:'short',day:'numeric'}) + '). Nu ' + (latest.weight-minW).toFixed(1) + ' kg därifrån' });
+    }
+
+    return insights;
+  };
+
+  const weeklyReport = getWeeklyReport();
+  const insights = getInsights();
   const monthlySummary = getMonthlySummary();
   const NavButton = function(props) {
     return h('button', {
@@ -562,29 +723,64 @@ function WeightStepTracker() {
       ) : null,
       // Prediction + Monthly summary row
       h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-6' },
-        h('div', { className: 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-5' },
-          h('div', { className: 'flex items-center gap-2 mb-3' },
-            h('span', { className: 'text-2xl' }, '🎯'),
-            h('h3', { className: 'font-bold text-gray-800' }, 'Prognos till målet')
-          ),
-          stats ? (function() {
-            var kgLeft = parseFloat((stats.latest.weight - goalWeight).toFixed(1));
-            if (kgLeft <= 0) return h('p', { className: 'text-green-600 font-bold' }, '🏆 Du har nått ditt mål!');
-            var weeksTarget = Math.round(kgLeft / targetRate);
-            var targetDate = new Date(); targetDate.setDate(targetDate.getDate() + weeksTarget * 7);
-            var dateStr = targetDate.toLocaleDateString('sv-SE', { day:'numeric', month:'long', year:'numeric' });
-            return h('div', null,
-              h('p', { className: 'text-3xl font-bold text-green-700 mb-1' }, weeksTarget + ' veckor'),
-              h('p', { className: 'text-sm text-gray-600 mb-1' }, 'tills du når ' + goalWeight + ' kg (ca ' + dateStr + ')'),
-              h('p', { className: 'text-xs text-gray-400 mb-3' }, 'baserat på ' + targetRate + ' kg/vecka'),
-              prediction && prediction.gaining
-                ? h('p', { className: 'text-xs text-red-500' }, '⚠️ Nuvarande trend: +' + prediction.kgPerWeek + ' kg/vecka — justera kosten för att nå målet')
-                : prediction
-                  ? h('p', { className: 'text-xs text-indigo-600' }, '📊 Nuvarande trend: −' + prediction.kgPerWeek + ' kg/vecka')
-                  : null
-            );
-          })() : h('p', { className: 'text-gray-400 text-sm' }, 'Lägg till mätningar för att se prognos')
-        ),
+        prediction && !prediction.gaining && !prediction.noGoal
+          ? h('div', { className: 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-5' },
+              h('div', { className: 'flex items-center gap-2 mb-3' },
+                h('span', { className: 'text-2xl' }, '🎯'),
+                h('h3', { className: 'font-bold text-gray-800' }, 'AI Prognos till målet')
+              ),
+              h('div', { className: 'grid grid-cols-3 gap-2 mb-3' },
+                h('div', { className: 'bg-green-100 rounded-lg p-2 text-center' },
+                  h('p', { className: 'text-xs text-green-600 font-medium' }, '🏆 Bäst fall'),
+                  h('p', { className: 'text-xs font-bold text-green-700 mt-1' }, prediction.goalDateOpt)
+                ),
+                h('div', { className: 'bg-white border-2 border-emerald-300 rounded-lg p-2 text-center' },
+                  h('p', { className: 'text-xs text-emerald-600 font-bold' }, '📊 Realistisk'),
+                  h('p', { className: 'text-xs font-bold text-emerald-700 mt-1' }, prediction.goalDate)
+                ),
+                h('div', { className: 'bg-gray-50 rounded-lg p-2 text-center' },
+                  h('p', { className: 'text-xs text-gray-400 font-medium' }, '🐌 Sämre fall'),
+                  h('p', { className: 'text-xs font-bold text-gray-500 mt-1' }, prediction.goalDatePes)
+                )
+              ),
+              h('p', { className: 'text-sm text-gray-600 mb-2' },
+                '📉 Trend: −' + prediction.kgPerWeek + ' kg/vecka · ',
+                h('span', { className: 'font-semibold text-indigo-700' }, prediction.weeksToGoal + ' veckor kvar')
+              ),
+              h('div', { className: 'flex items-center gap-2' },
+                h('div', { className: 'flex-1 bg-gray-200 rounded-full h-2' },
+                  h('div', { className: 'bg-indigo-500 h-2 rounded-full transition-all', style: { width: Math.round(prediction.r2 * 100) + '%' } })
+                ),
+                h('p', { className: 'text-xs text-gray-400 whitespace-nowrap' }, 'Konfidens: ' + Math.round(prediction.r2 * 100) + '%')
+              )
+            )
+          : prediction && prediction.gaining
+            ? h('div', { className: 'bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-xl p-5' },
+                h('div', { className: 'flex items-center gap-2 mb-3' },
+                  h('span', { className: 'text-2xl' }, '⚠️'),
+                  h('h3', { className: 'font-bold text-gray-800' }, 'AI Prognos')
+                ),
+                h('p', { className: 'text-red-600 font-medium mb-2' }, 'Viktuppgång: +' + prediction.kgPerWeek + ' kg/vecka'),
+                h('p', { className: 'text-xs text-gray-500' }, 'Rör på dig mer och justera kosten för att vända trenden')
+              )
+            : h('div', { className: 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-5' },
+                h('div', { className: 'flex items-center gap-2 mb-3' },
+                  h('span', { className: 'text-2xl' }, '🎯'),
+                  h('h3', { className: 'font-bold text-gray-800' }, 'Prognos till målet')
+                ),
+                stats ? (function() {
+                  var kgLeft = parseFloat((stats.latest.weight - goalWeight).toFixed(1));
+                  if (kgLeft <= 0) return h('p', { className: 'text-green-600 font-bold' }, '🏆 Du har nått ditt mål!');
+                  var weeksTarget = Math.round(kgLeft / targetRate);
+                  var targetDate = new Date(); targetDate.setDate(targetDate.getDate() + weeksTarget * 7);
+                  var dateStr = targetDate.toLocaleDateString('sv-SE', { day:'numeric', month:'long', year:'numeric' });
+                  return h('div', null,
+                    h('p', { className: 'text-3xl font-bold text-green-700 mb-1' }, weeksTarget + ' veckor'),
+                    h('p', { className: 'text-sm text-gray-600 mb-1' }, 'tills du når ' + goalWeight + ' kg (ca ' + dateStr + ')'),
+                    h('p', { className: 'text-xs text-gray-400' }, 'baserat på ' + targetRate + ' kg/vecka · lägg till fler mätningar för AI-prognos')
+                  );
+                })() : h('p', { className: 'text-gray-400 text-sm' }, 'Lägg till mätningar för att se prognos')
+              ),
         monthlySummary ? h('div', { className: 'bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-5' },
           h('div', { className: 'flex items-center gap-2 mb-3' },
             h('span', { className: 'text-2xl' }, '📋'),
@@ -601,6 +797,51 @@ function WeightStepTracker() {
           )
         ) : null
       ),
+      // Weekly auto-report
+      weeklyReport ? h('div', { className: 'bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 rounded-xl p-5 shadow-sm mb-4' },
+        h('div', { className: 'flex items-center gap-2 mb-3' },
+          h('span', { className: 'text-xl' }, '📋'),
+          h('h2', { className: 'font-bold text-gray-800' }, 'Veckorapport ' + weeklyReport.weekLabel)
+        ),
+        h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-3' },
+          h('div', { className: 'bg-white rounded-lg p-3 text-center shadow-sm' },
+            h('p', { className: 'text-2xl font-bold ' + (weeklyReport.change <= 0 ? 'text-green-600' : 'text-red-500') },
+              (weeklyReport.change > 0 ? '+' : '') + weeklyReport.change + ' kg'),
+            h('p', { className: 'text-xs text-gray-500 mt-1' }, 'Viktförändring')
+          ),
+          h('div', { className: 'bg-white rounded-lg p-3 text-center shadow-sm' },
+            h('p', { className: 'text-2xl font-bold text-indigo-600' }, weeklyReport.avgW + ' kg'),
+            h('p', { className: 'text-xs text-gray-500 mt-1' }, 'Snittevikt')
+          ),
+          h('div', { className: 'bg-white rounded-lg p-3 text-center shadow-sm' },
+            h('p', { className: 'text-2xl font-bold text-orange-500' }, weeklyReport.workouts + ' 💪'),
+            h('p', { className: 'text-xs text-gray-500 mt-1' }, weeklyReport.totalMin + ' min träning')
+          ),
+          h('div', { className: 'bg-white rounded-lg p-3 text-center shadow-sm' },
+            h('p', { className: 'text-2xl font-bold text-blue-500' },
+              weeklyReport.avgSteps > 0 ? (weeklyReport.avgSteps >= 1000 ? Math.round(weeklyReport.avgSteps/1000*10)/10+'k' : weeklyReport.avgSteps) : '—'),
+            h('p', { className: 'text-xs text-gray-500 mt-1' }, 'Snitt steg/dag')
+          )
+        ),
+        h('p', { className: 'text-xs text-gray-400 mt-3 text-center' }, weeklyReport.logDays + ' loggade dagar · ' +
+          (weeklyReport.change <= -0.5 ? '🔥 Bra jobbat!' : weeklyReport.change <= 0 ? '👍 På rätt spår' : '💡 Justera kosten lite denna vecka'))
+      ) : null,
+      // Smart insights
+      insights.length > 0 ? h('div', { className: 'bg-gradient-to-br from-violet-50 to-indigo-50 border border-indigo-100 rounded-xl p-5 shadow-sm mb-6' },
+        h('div', { className: 'flex items-center gap-2 mb-3' },
+          h('span', { className: 'text-xl' }, '🧠'),
+          h('h2', { className: 'font-bold text-gray-800' }, 'Smarta insikter'),
+          h('span', { className: 'text-xs text-indigo-400 ml-auto' }, 'baserat på din data')
+        ),
+        h('div', { className: 'space-y-2' },
+          insights.map(function(ins, i) {
+            return h('div', { key: i, className: 'flex items-start gap-3 bg-white rounded-lg px-4 py-3 shadow-sm' },
+              h('span', { className: 'text-lg mt-0.5' }, ins.icon),
+              h('p', { className: 'text-sm text-gray-700 leading-snug' }, ins.text)
+            );
+          })
+        )
+      ) : null,
       // Weight chart (with BMI)
       h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
         h('h2', { className: 'text-lg font-bold text-gray-800 mb-1' }, 'Viktutveckling'),
@@ -611,6 +852,40 @@ function WeightStepTracker() {
           { key: 'målvikt', color: '#10b981', width: 1.5, name: 'Målvikt', dashed: true }
         ]})
       ),
+      // Prediction projection chart
+      prediction && !prediction.gaining && prediction.projPoints && prediction.projPoints.length > 0
+        ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
+            h('div', { className: 'flex items-center gap-3 mb-1' },
+              h('h2', { className: 'text-lg font-bold text-gray-800' }, '📈 Viktprognos — linjär regression'),
+              h('span', { className: 'ml-auto text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded-full font-medium' },
+                'R² = ' + prediction.r2 + ' · ' + Math.round(prediction.r2 * 100) + '% konfidens'
+              )
+            ),
+            h('p', { className: 'text-xs text-gray-400 mb-4' },
+              'Historik (sista 30 dagarna) + prognos: realistisk · bäst fall · sämre fall'
+            ),
+            h(SvgLineChart, {
+              data: (function() {
+                var hist = chartData.slice(-30).map(function(d) {
+                  return { datum: d.datum, historisk: d.vikt, snitt7: d.snitt7, målvikt: goalWeight };
+                });
+                var proj = prediction.projPoints.map(function(p) {
+                  return { datum: p.datum, prognos: p.prognos, prognosOpt: p.prognosOpt, prognosPes: p.prognosPes, målvikt: goalWeight };
+                });
+                return hist.concat(proj);
+              })(),
+              height: 280,
+              lines: [
+                { key: 'historisk',  color: '#c7d2fe', width: 1.5, name: 'Historisk vikt' },
+                { key: 'snitt7',     color: '#4f46e5', width: 2,   name: '7-dagarssnitt' },
+                { key: 'prognos',    color: '#10b981', width: 2.5, name: 'Prognos' },
+                { key: 'prognosOpt', color: '#6ee7b7', width: 1.5, name: 'Bäst fall', dashed: true },
+                { key: 'prognosPes', color: '#fca5a5', width: 1.5, name: 'Sämre fall', dashed: true },
+                { key: 'målvikt',    color: '#f59e0b', width: 1.5, name: 'Målvikt', dashed: true }
+              ]
+            })
+          )
+        : null,
       // BMI chart
       chartData.some(function(d){ return d.bmi; }) ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
         h('h2', { className: 'text-lg font-bold text-gray-800 mb-1' }, 'BMI-historik'),
@@ -649,7 +924,7 @@ function WeightStepTracker() {
             bmiPreview ? h('span', { className: 'absolute right-3 top-3.5 text-xs text-gray-400' }, 'BMI: ' + bmiPreview) : null
           ),
           h('div', { className: 'flex gap-2' },
-            h('input', { type:'number', value: newEntry.steps, onChange: function(e){setNewEntry(Object.assign({},newEntry,{steps:e.target.value}));}, placeholder:'Steg (valfritt)', className:'flex-1 px-4 py-3 border rounded-lg outline-none' })
+            h('input', { type:'number', value: newEntry.steps, onChange: function(e){setNewEntry(Object.assign({},newEntry,{steps:e.target.value}));}, placeholder:'Steg (valfritt)', className:'flex-1 px-4 py-3 border rounded-lg outline-none' }),
           ),
           h('div', null,
             h('p', { className: 'text-sm text-gray-600 mb-2' }, 'Energi & humör (valfritt)'),
@@ -1185,155 +1460,122 @@ function WeightStepTracker() {
       ) : null
     );
   }
+
   function renderSettings() {
-    return h('div', { className: 'max-w-2xl mx-auto space-y-6' },
+    return h('div', { className: 'max-w-lg mx-auto space-y-4' },
       h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
-        h('h2', { className: 'text-lg font-bold text-gray-800 mb-5' }, '⚙️ Inställningar'),
+        h('h2', { className: 'text-xl font-bold mb-5 text-gray-800' }, '⚙️ Inställningar'),
         h('div', { className: 'space-y-5' },
           h('div', null,
-            h('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, '🎯 Målvikt (kg)'),
-            h('input', { type: 'number', value: goalWeight, step: '0.5',
-              onChange: function(e) { setGoalWeight(parseFloat(e.target.value) || 0); },
-              className: 'w-full px-4 py-3 border rounded-lg outline-none focus:border-indigo-400'
-            })
+            h('label', { className: 'text-sm font-medium text-gray-700 block mb-1' }, 'Målvikt (kg)'),
+            h('input', { type:'number', step:'0.5', value:goalWeight, onChange:function(e){setGoalWeight(parseFloat(e.target.value)||0);}, className:'w-full px-4 py-3 border rounded-lg outline-none' })
           ),
           h('div', null,
-            h('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, '📉 Målviktnedgång per vecka (kg)'),
-            h('input', { type: 'number', value: targetRate, step: '0.1', min: '0', max: '2',
-              onChange: function(e) { setTargetRate(parseFloat(e.target.value) || 0); },
-              className: 'w-full px-4 py-3 border rounded-lg outline-none focus:border-indigo-400'
-            })
+            h('label', { className: 'text-sm font-medium text-gray-700 block mb-1' }, 'Önskat tempo (kg/vecka)'),
+            h('div', { className: 'flex gap-2 flex-wrap' },
+              [0.25, 0.5, 0.75, 1.0].map(function(rate) {
+                return h('button', {
+                  key: rate, onClick: function(){ setTargetRate(rate); },
+                  className: 'px-4 py-2 rounded-lg text-sm font-medium border-2 ' + (targetRate === rate ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300')
+                }, rate + ' kg/v');
+              })
+            ),
+            h('p', { className: 'text-xs text-gray-400 mt-1' }, 'Rekommenderat: 0,5 kg/vecka')
           ),
           h('div', null,
-            h('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, '📏 Längd (cm)'),
-            h('input', { type: 'number', value: height, step: '1',
-              onChange: function(e) { setHeight(parseFloat(e.target.value) || 0); },
-              className: 'w-full px-4 py-3 border rounded-lg outline-none focus:border-indigo-400'
-            })
+            h('label', { className: 'text-sm font-medium text-gray-700 block mb-1' }, 'Din längd (cm) – för BMI'),
+            h('input', { type:'number', value:height, onChange:function(e){setHeight(parseFloat(e.target.value)||0);}, className:'w-full px-4 py-3 border rounded-lg outline-none' })
           ),
-          h('div', null,
-            h('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, '🏆 Årligt mål'),
-            h('div', { className: 'grid grid-cols-2 gap-4' },
+          h('div', { className: 'border-t pt-5' },
+            h('p', { className: 'text-sm font-semibold text-gray-700 mb-3' }, 'Arsmål ' + new Date().getFullYear()),
+            h('div', { className: 'grid grid-cols-2 gap-3' },
               h('div', null,
-                h('p', { className: 'text-xs text-gray-500 mb-1' }, 'Träningspass (st)'),
-                h('input', { type: 'number', value: yearlyGoal.sessions, step: '1',
-                  onChange: function(e) { setYearlyGoal(Object.assign({}, yearlyGoal, { sessions: parseInt(e.target.value) || 0 })); },
-                  className: 'w-full px-4 py-3 border rounded-lg outline-none focus:border-indigo-400'
-                })
+                h('label', { className: 'text-xs text-gray-500' }, 'Träningspass'),
+                h('input', { type:'number', value:yearlyGoal.sessions, onChange:function(e){setYearlyGoal(Object.assign({},yearlyGoal,{sessions:parseInt(e.target.value)||0}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1' })
               ),
               h('div', null,
-                h('p', { className: 'text-xs text-gray-500 mb-1' }, 'Minuter totalt'),
-                h('input', { type: 'number', value: yearlyGoal.minutes, step: '100',
-                  onChange: function(e) { setYearlyGoal(Object.assign({}, yearlyGoal, { minutes: parseInt(e.target.value) || 0 })); },
-                  className: 'w-full px-4 py-3 border rounded-lg outline-none focus:border-indigo-400'
-                })
+                h('label', { className: 'text-xs text-gray-500' }, 'Total tid (minuter)'),
+                h('input', { type:'number', value:yearlyGoal.minutes, onChange:function(e){setYearlyGoal(Object.assign({},yearlyGoal,{minutes:parseInt(e.target.value)||0}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1' })
               )
             )
           )
-        ),
-        h('p', { className: 'text-xs text-gray-400 mt-6 pt-6 border-t' }, 'Ändringarna sparas automatiskt')
+        )
       )
     );
   }
 
-  // ─── DIET DATA ───────────────────────────────────────────────────────────
-  var WEEK_DAYS = ['Måndag','Tisdag','Onsdag','Torsdag','Fredag','Lördag','Söndag'];
-  var MEAL_NAMES = ['Frukost','Lunch','Middag','Kvällsmat'];
-  var MEAL_EMOJI = ['🌅','🥗','🍽️','🌙'];
+
+  // Diet data
+  var MEAL_NAMES = ['Frukost','Lunch','Middag','Kvallsmat'];
+  var MEAL_EMOJI = ['sunrise','salad','plate','moon'];
+  var MEAL_ICON = { 'sunrise':'🌅', 'salad':'🥗', 'plate':'🍽', 'moon':'🌙' };
   var WEEK_MENU_DEF = [
-    { day:'Måndag',    meals:['Havregrynsgröt med bär','Quinoasallad','Grönsakspasta','Kvarg med nötter'] },
-    { day:'Tisdag',    meals:['Äggröra på fullkornstoast','Linssoppa','Vegetarisk tacos','Banan och mandlar'] },
-    { day:'Onsdag',    meals:['Smoothiebowl','Hummus wrap','Röd linsgryta','Äpple och jordnötssmör'] },
-    { day:'Torsdag',   meals:['Yoghurt med granola','Bulgursallad','Panerad halloumi med ris','Dadlar med mandlar'] },
-    { day:'Fredag',    meals:['Fullkornsfrallor med ost','Tomatsoppa','Vegetarisk pizza','Nötmix'] },
-    { day:'Lördag',    meals:['Pannkakor med sylt','Avocadotoast','Kikärtscurry','Mörk choklad'] },
-    { day:'Söndag',    meals:['Omelett med grönsaker','Ceasarsallad','Ugnsbakad rotfruktslåda','Naturell yoghurt'] }
+    { day:'Mandag',    meals:['Aggomelett med tofu och sotpotatis','Tacotallrik','Tofu med broccolirora','Proteinglass'] },
+    { day:'Tisdag',    meals:['Aggomelett med tofu och sotpotatis','Paprikatofu med bonpasta','Tofu med rotfrukter och gronkal','Proteinglass'] },
+    { day:'Onsdag',    meals:['Aggomelett med tofu och sotpotatis','Tofu och agg med quinoa','Tempeh med kikartor och rotfrukter','Proteinglass'] },
+    { day:'Torsdag',   meals:['Aggomelett med tofu och sotpotatis','Kebabtallrik','Tofu med brysselkal och halloumi','Proteinglass'] },
+    { day:'Fredag',    meals:['Aggomelett med tofu och sotpotatis','Bonpasta med tofu och tomatsas','Spenatsoppa med rokt tofu','Proteinglass'] },
+    { day:'Lordag',    meals:['Aggomelett med tofu och sotpotatis','Tacotallrik','Tempeh med svarta bonor och paprika','Proteinglass'] },
+    { day:'Sondag',    meals:['Aggomelett med tofu och sotpotatis','Tofu och agg med quinoa','Tofu med edamame och quinoa','Proteinglass'] }
   ];
   var RECIPES_DEF = [
-    { name:'Havregrynsgröt', emoji:'🥣', kcal:350, protein:12,
-      ingredients:[{a:80,u:'g',n:'havregryn'},{a:3,u:'dl',n:'havredryck'},{a:1,u:'tsk',n:'kanel'},{a:100,u:'g',n:'blandade bär'},{a:1,u:'msk',n:'honung'}],
-      steps:'Koka havregryn med havredryck i 5 min. Toppa med bär och honung.' },
-    { name:'Linssoppa', emoji:'🥣', kcal:420, protein:22,
-      ingredients:[{a:200,u:'g',n:'röda linser'},{a:1,u:'st',n:'lök'},{a:2,u:'st',n:'vitlöksklyftor'},{a:400,u:'g',n:'krossade tomater'},{a:1,u:'tsk',n:'spiskummin'},{a:5,u:'dl',n:'grönsaksbuljong'}],
-      steps:'Fräs lök och vitlök. Tillsätt linser, tomater, buljong och kryddor. Koka 20 min.' },
-    { name:'Quinoasallad', emoji:'🥗', kcal:480, protein:18,
-      ingredients:[{a:150,u:'g',n:'quinoa'},{a:1,u:'st',n:'gurka'},{a:200,u:'g',n:'körsbärstomater'},{a:100,u:'g',n:'fetaost'},{a:2,u:'msk',n:'olivolja'},{a:1,u:'st',n:'citron'}],
-      steps:'Koka quinoa. Hacka grönsaker. Blanda allt och ringla över olivolja och citron.' },
-    { name:'Grönsakspasta', emoji:'🍝', kcal:520, protein:16,
-      ingredients:[{a:150,u:'g',n:'fullkornspasta'},{a:1,u:'st',n:'zucchini'},{a:1,u:'st',n:'paprika'},{a:200,u:'g',n:'körsbärstomater'},{a:2,u:'klyftor',n:'vitlök'},{a:50,u:'g',n:'parmesanost'}],
-      steps:'Koka pasta. Stek grönsaker i olivolja med vitlök. Blanda och toppa med parmesan.' },
-    { name:'Vegetarisk tacos', emoji:'🌮', kcal:580, protein:24,
-      ingredients:[{a:400,u:'g',n:'svarta bönor'},{a:1,u:'st',n:'paprika'},{a:1,u:'st',n:'avokado'},{a:8,u:'st',n:'majstortillas'},{a:100,u:'g',n:'cheddarost'},{a:1,u:'dl',n:'salsa'}],
-      steps:'Värm bönor med kryddor. Fyll tortillas med bönor, paprika, avokado och ost.' },
-    { name:'Röd linsgryta', emoji:'🍲', kcal:460, protein:26,
-      ingredients:[{a:250,u:'g',n:'röda linser'},{a:400,u:'ml',n:'kokosmjölk'},{a:1,u:'msk',n:'röd currypasta'},{a:200,u:'g',n:'spenat'},{a:1,u:'st',n:'lök'},{a:2,u:'klyftor',n:'vitlök'}],
-      steps:'Fräs lök, vitlök och currypasta. Tillsätt linser och kokosmjölk. Koka 20 min, rör ner spenat.' },
-    { name:'Smoothiebowl', emoji:'🫐', kcal:380, protein:14,
-      ingredients:[{a:200,u:'g',n:'frysta blåbär'},{a:1,u:'st',n:'banan'},{a:1,u:'dl',n:'havredryck'},{a:2,u:'msk',n:'hampafrön'},{a:50,u:'g',n:'granola'},{a:100,u:'g',n:'färska bär'}],
-      steps:'Mixa blåbär, banan och havredryck. Häll i skål, toppa med granola och bär.' },
-    { name:'Kikärtscurry', emoji:'🍛', kcal:510, protein:20,
-      ingredients:[{a:400,u:'g',n:'kikärtor'},{a:400,u:'ml',n:'kokosmjölk'},{a:2,u:'msk',n:'gul currypasta'},{a:1,u:'st',n:'lök'},{a:300,u:'g',n:'spenat'},{a:200,u:'g',n:'jasminris'}],
-      steps:'Fräs lök och curry. Tillsätt kikärtor och kokosmjölk. Koka 15 min, servera med ris.' },
-    { name:'Avocadotoast', emoji:'🥑', kcal:420, protein:14,
-      ingredients:[{a:2,u:'skivor',n:'surdegsbröd'},{a:1,u:'st',n:'avokado'},{a:2,u:'st',n:'ägg'},{a:0.5,u:'st',n:'citron'},{a:1,u:'nypa',n:'chiliflingor'},{a:1,u:'nypa',n:'flingsalt'}],
-      steps:'Rosta brödet. Mosa avokado med citron och salt. Pochera ägg. Lägg ihop.' },
-    { name:'Pannkakor', emoji:'🥞', kcal:440, protein:12,
-      ingredients:[{a:3,u:'dl',n:'havregrynsmjöl'},{a:4,u:'dl',n:'havredryck'},{a:2,u:'st',n:'ägg'},{a:1,u:'msk',n:'rapsolja'},{a:1,u:'krm',n:'salt'},{a:3,u:'msk',n:'jordgubbssylt'}],
-      steps:'Vispa ihop alla ingredienser. Stek tunna pannkakor på medelvärme. Servera med sylt.' }
+    { id:1, name:'Tacotallrik', cat:'Lunch', kcal:540, protein:44, ingredients:[{a:'180g',n:'tofu'},{a:'100g',n:'svarta bonor'},{a:'50g',n:'jalapenos'},{a:'35g',n:'gronkal'},{a:'50g',n:'tomat'},{a:'20g',n:'rodlok'},{a:'0.5 st',n:'avokado'}], steps:'Stek tofun i rapsolja tills gyllenbrun. Varm bonorna. Stek gronkalen latt. Lagg upp allt pa tallrik. Mosa avokadon med lite limejuice och salt. Toppa med jalapenos, hackad tomat och rodlok.' },
+    { id:2, name:'Tofu med broccolirora', cat:'Middag', kcal:480, protein:42, ingredients:[{a:'180g',n:'tofu'},{a:'100g',n:'broccoli'},{a:'60g',n:'champinjoner'},{a:'60g',n:'squash'},{a:'50g',n:'tomat'},{a:'30g',n:'fetaost'},{a:'efter smak',n:'jalapenos'}], steps:'Stek tofun gyllenbrun. Bryn broccoli, champinjoner, squash och tomat i samma panna. Tillsatt fetaosten sista minuten. Servera med tofun.' },
+    { id:3, name:'Paprikatofu med bonpasta', cat:'Lunch', kcal:530, protein:43, ingredients:[{a:'180g',n:'tofu'},{a:'40g',n:'bonpasta'},{a:'100g',n:'paprika'},{a:'40g',n:'tomat'},{a:'1 klyfta',n:'vitlok'},{a:'30g',n:'fetaost'}], steps:'Koka bonpastan. Stek tofun. Stek vitlok, paprika och tomat. Rör ner fetaosten. Servera med tofun.' },
+    { id:4, name:'Tofu med rotfrukter och gronkal', cat:'Middag', kcal:500, protein:40, ingredients:[{a:'180g',n:'tofu'},{a:'70g',n:'morot'},{a:'70g',n:'palsternacka'},{a:'150g',n:'gronkal'},{a:'30g',n:'fetaost'}], steps:'Skar rotfrukterna i 1 cm skivor. Woka tofu och rotfrukter tills mjuka. Tillsatt gronkalen sista 3 minuterna och fetaosten sista minuten.' },
+    { id:5, name:'Tofu och agg med quinoa', cat:'Lunch', kcal:560, protein:48, ingredients:[{a:'150g',n:'tofu'},{a:'2 st',n:'agg'},{a:'100g',n:'quinoa'},{a:'efter smak',n:'spenat'},{a:'efter smak',n:'sojasas'},{a:'efter smak',n:'sesamolja'}], steps:'Koka quinoan. Stek tofun. Stek aggen. Woka spenat snabbt. Ringla over sojasas och sesamolja.' },
+    { id:6, name:'Tempeh med kikartor och rotfrukter', cat:'Middag', kcal:540, protein:40, ingredients:[{a:'150g',n:'tempeh'},{a:'100g',n:'kikartor'},{a:'80g',n:'morot'},{a:'80g',n:'palsternacka'},{a:'efter smak',n:'tahini'}], steps:'Stek tempeh tills gyllenbrun. Woka rotfrukter och kikartor. Servera med tahini ringad over.' },
+    { id:7, name:'Kebabtallrik', cat:'Lunch', kcal:520, protein:40, ingredients:[{a:'180g',n:'tofu'},{a:'60g',n:'avokado'},{a:'60g',n:'tomat'},{a:'60g',n:'gurka'},{a:'20g',n:'bladspenat'},{a:'15g',n:'jalapenos'},{a:'100g',n:'silkestofu'},{a:'1 klyfta',n:'vitlok'}], steps:'Krydda tofun med paprika, spiskummin, koriander, salt. Stek gyllenbrun. Mixa silkestofu med vitlok, citron, salt till vitlokssas.' },
+    { id:8, name:'Tofu med brysselkal och halloumi', cat:'Middag', kcal:510, protein:42, ingredients:[{a:'150g',n:'tofu'},{a:'100g',n:'brysselkal'},{a:'100g',n:'gronkal'},{a:'50g',n:'squash'},{a:'40g',n:'halloumi'}], steps:'Stek tofun. Tillsatt brysselkal och squash. Lagg i gronkal och halloumi sista minuten.' },
+    { id:9, name:'Bonpasta med tofu och tomatsas', cat:'Lunch', kcal:520, protein:42, ingredients:[{a:'180g',n:'tofu'},{a:'40g',n:'bonpasta'},{a:'120g',n:'krossade tomater'},{a:'efter smak',n:'lok och vitlok'},{a:'10g',n:'ruccola'}], steps:'Stek lok och vitlok. Tillsatt krossade tomater, sjud 10 min. Stek tofun. Koka bonpastan. Blanda ihop.' },
+    { id:10, name:'Spenatsoppa med rokt tofu', cat:'Middag', kcal:480, protein:38, ingredients:[{a:'180g',n:'rokt tofu'},{a:'200g',n:'spenat'},{a:'1 dl',n:'kokosmjolk'},{a:'2 klyftor',n:'vitlok'},{a:'efter smak',n:'ingefara'}], steps:'Fras vitlok och ingefara. Tillsatt spenat och lat falla ihop. Hall i kokosmjolk och mixa slatt. Lagg i rokt tofu.' },
+    { id:11, name:'Aggomelett med tofu och sotpotatis', cat:'Frukost', kcal:580, protein:50, ingredients:[{a:'3 st',n:'agg'},{a:'120g',n:'tofu'},{a:'150g',n:'sotpotatis'},{a:'efter smak',n:'paprika och spenat'}], steps:'Koka sotpotatis. Stek tofu. Vispa agg och stek till omelett med paprika och spenat. Servera med sotpotatis och tofu.' },
+    { id:12, name:'Tempeh med svarta bonor och paprika', cat:'Middag', kcal:520, protein:42, ingredients:[{a:'150g',n:'tempeh'},{a:'150g',n:'svarta bonor'},{a:'100g',n:'paprika'},{a:'efter smak',n:'tomatsas och vitlok'},{a:'30g',n:'fetaost'}], steps:'Stek tempeh gyllenbrun. Stek vitlok och paprika. Tillsatt bonor och tomatsas. Ror ner fetaost.' },
+    { id:13, name:'Tofu med edamame och quinoa', cat:'Middag', kcal:550, protein:45, ingredients:[{a:'150g',n:'tofu'},{a:'150g',n:'edamame'},{a:'80g',n:'quinoa'},{a:'efter smak',n:'sojasas och sesamolja'}], steps:'Koka quinoan. Stek tofu. Varm edamame. Blanda med sojasas och sesamolja.' },
+    { id:14, name:'Proteinglass', cat:'Mellanmal', kcal:160, protein:25, ingredients:[{a:'30g',n:'proteinpulver'},{a:'3 dl',n:'mandelmjolk'}], steps:'Mixa ihop. Smaксatt valfritt. Hall i form. Frys 3-4 timmar.' }
   ];
-  var SHOPPING_CATEGORIES = {
-    'Frukt & Grönt': ['blandade bär','gurka','körsbärstomater','zucchini','paprika','avokado','spenat','citron','banan','blåbär'],
-    'Torrvaror': ['havregryn','quinoa','röda linser','fullkornspasta','majstortillas','kikärtor','jasminris','bulgur','granola'],
-    'Mejeri & Ägg': ['kvarg','fetaost','cheddarost','parmesanost','naturell yoghurt','ägg'],
-    'Konserver': ['krossade tomater','kokosmjölk','svarta bönor','salsa'],
-    'Övrigt': ['havredryck','olivolja','honung','jordnötssmör','hampafrön','rapsolja','grönsaksbuljong']
-  };
+  var SHOPPING = ["tofu","rokt tofu","tempeh","silkestofu","agg","halloumi","fetaost","proteinpulver","broccoli","gronkal","brysselkal","spenat","paprika","squash","tomat","gurka","rodlok","jalapenos","sotpotatis","morot","palsternacka","avokado","svarta bonor","kikartor","edamame","bonpasta","quinoa","kokosmjolk","krossade tomater","tahini","sojasas","sesamolja","mandelmjolk"];
 
-  // ─── RENDER: IDAG ─────────────────────────────────────────────────────────
   function renderIdag() {
-    var dayIdx = new Date().getDay();
-    dayIdx = dayIdx === 0 ? 6 : dayIdx - 1;
+    var dayIdx = new Date().getDay(); dayIdx = dayIdx===0?6:dayIdx-1;
     var todayMenu = WEEK_MENU_DEF[dayIdx];
-    var totalKcal = 0, totalProtein = 0;
-    MEAL_NAMES.forEach(function(m, i) {
-      var mealName = todayMenu.meals[i];
-      var rec = RECIPES_DEF.find(function(r){ return r.name === mealName; });
-      if (rec && checkedMeals[i]) { totalKcal += rec.kcal; totalProtein += rec.protein; }
+    var totalKcal=0, totalProtein=0;
+    MEAL_NAMES.forEach(function(m,i){
+      var rec = RECIPES_DEF.find(function(r){return r.name===todayMenu.meals[i];});
+      if(rec && checkedMeals[i]){totalKcal+=rec.kcal; totalProtein+=rec.protein;}
     });
-    return h('div', { className: 'space-y-4' },
-      h('div', { className: 'grid grid-cols-2 gap-4' },
-        h('div', { className: 'bg-white rounded-xl p-4 shadow-md text-center' },
-          h('div', { className: 'text-2xl mb-1' }, '🔥'),
-          h('p', { className: 'text-xs text-gray-500 uppercase tracking-wide' }, 'Kcal idag'),
-          h('p', { className: 'text-2xl font-bold text-gray-800' }, totalKcal),
-          h('p', { className: 'text-xs text-gray-400' }, 'av ca 2000')
+    return h('div', {className:'space-y-4'},
+      h('div', {className:'grid grid-cols-2 gap-4'},
+        h('div', {className:'bg-white rounded-xl p-4 shadow-md text-center'},
+          h('div',{className:'text-2xl mb-1'},'🔥'),
+          h('p',{className:'text-xs text-gray-500 uppercase tracking-wide'},'Kcal idag'),
+          h('p',{className:'text-2xl font-bold text-gray-800'},totalKcal),
+          h('p',{className:'text-xs text-gray-400'},'av ca 2000')
         ),
-        h('div', { className: 'bg-white rounded-xl p-4 shadow-md text-center' },
-          h('div', { className: 'text-2xl mb-1' }, '💪'),
-          h('p', { className: 'text-xs text-gray-500 uppercase tracking-wide' }, 'Protein idag'),
-          h('p', { className: 'text-2xl font-bold text-gray-800' }, totalProtein + ' g'),
-          h('p', { className: 'text-xs text-gray-400' }, 'av ca 120g')
+        h('div', {className:'bg-white rounded-xl p-4 shadow-md text-center'},
+          h('div',{className:'text-2xl mb-1'},'💪'),
+          h('p',{className:'text-xs text-gray-500 uppercase tracking-wide'},'Protein idag'),
+          h('p',{className:'text-2xl font-bold text-gray-800'},totalProtein+'g'),
+          h('p',{className:'text-xs text-gray-400'},'av ca 140g')
         )
       ),
-      h('div', { className: 'bg-white rounded-xl p-4 shadow-md' },
-        h('h2', { className: 'text-lg font-bold text-gray-800 mb-3' }, '🗓️ ' + todayMenu.day + 's måltider'),
-        h('div', { className: 'space-y-2' },
-          MEAL_NAMES.map(function(meal, i) {
-            var mealName = todayMenu.meals[i];
-            var rec = RECIPES_DEF.find(function(r){ return r.name === mealName; });
+      h('div', {className:'bg-white rounded-xl p-4 shadow-md'},
+        h('h2',{className:'text-lg font-bold text-gray-800 mb-3'},'Dagens maltider'),
+        h('div',{className:'space-y-2'},
+          MEAL_NAMES.map(function(meal,i){
+            var rec = RECIPES_DEF.find(function(r){return r.name===todayMenu.meals[i];});
             var checked = !!checkedMeals[i];
-            return h('div', { key:i,
-              className: 'flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ' + (checked ? 'bg-green-50 border border-green-200' : 'bg-gray-50 hover:bg-gray-100'),
-              onClick: function(){ setCheckedMeals(function(prev){ var n=Object.assign({},prev); n[i]=!n[i]; return n; }); }
+            return h('div',{key:i,
+              className:'flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors '+(checked?'bg-green-50 border border-green-200':'bg-gray-50 hover:bg-gray-100'),
+              onClick:function(){setCheckedMeals(function(prev){var n=Object.assign({},prev);n[i]=!n[i];return n;})}
             },
-              h('div', { className: 'text-2xl' }, MEAL_EMOJI[i]),
-              h('div', { className: 'flex-1' },
-                h('p', { className: 'text-xs font-semibold text-gray-500 uppercase' }, meal),
-                h('p', { className: 'font-medium text-gray-800' }, mealName),
-                rec ? h('p', { className: 'text-xs text-gray-400' }, rec.kcal + ' kcal · ' + rec.protein + 'g protein') : null
+              h('div',{className:'flex-1'},
+                h('p',{className:'text-xs font-semibold text-gray-500 uppercase'},meal),
+                h('p',{className:'font-medium text-gray-800'},todayMenu.meals[i]),
+                rec?h('p',{className:'text-xs text-gray-400'},rec.kcal+' kcal · '+rec.protein+'g protein'):null
               ),
-              h('div', { className: 'w-6 h-6 rounded-full border-2 flex items-center justify-center ' + (checked ? 'bg-green-500 border-green-500' : 'border-gray-300') },
-                checked ? h('span', { className: 'text-white text-xs' }, '✓') : null
+              h('div',{className:'w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 '+(checked?'bg-green-500 border-green-500':'border-gray-300')},
+                checked?h('span',{className:'text-white text-xs'},'✓'):null
               )
             );
           })
@@ -1341,20 +1583,20 @@ function WeightStepTracker() {
       )
     );
   }
-  // ─── RENDER: MENY ─────────────────────────────────────────────────────────
+
   function renderMeny() {
-    return h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
-      h('h2', { className: 'text-xl font-bold text-gray-800 mb-4' }, '📅 Veckans meny'),
-      h('div', { className: 'space-y-3' },
-        WEEK_MENU_DEF.map(function(day, di) {
-          var isToday = di === (new Date().getDay() === 0 ? 6 : new Date().getDay() - 1);
-          return h('div', { key:di, className: 'border rounded-xl overflow-hidden ' + (isToday ? 'border-indigo-400' : 'border-gray-100') },
-            h('div', { className: 'px-4 py-2 font-bold text-sm ' + (isToday ? 'bg-indigo-600 text-white' : 'bg-gray-50 text-gray-700') }, day.day + (isToday ? ' — Idag' : '')),
-            h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-0' },
-              day.meals.map(function(meal, mi) {
-                return h('div', { key:mi, className: 'p-3 border-r border-b border-gray-50' },
-                  h('p', { className: 'text-xs text-gray-400 uppercase' }, MEAL_EMOJI[mi] + ' ' + MEAL_NAMES[mi]),
-                  h('p', { className: 'text-sm font-medium text-gray-700 mt-0.5' }, meal)
+    return h('div', {className:'bg-white rounded-xl p-6 shadow-md'},
+      h('h2',{className:'text-xl font-bold text-gray-800 mb-4'},'Veckans meny'),
+      h('div',{className:'space-y-3'},
+        WEEK_MENU_DEF.map(function(day,di){
+          var isToday = di===(new Date().getDay()===0?6:new Date().getDay()-1);
+          return h('div',{key:di,className:'border rounded-xl overflow-hidden '+(isToday?'border-indigo-400':'border-gray-100')},
+            h('div',{className:'px-4 py-2 font-bold text-sm '+(isToday?'bg-indigo-600 text-white':'bg-gray-50 text-gray-700')},day.day+(isToday?' - Idag':'')),
+            h('div',{className:'grid grid-cols-2 md:grid-cols-4'},
+              day.meals.map(function(meal,mi){
+                return h('div',{key:mi,className:'p-3 border-r border-b border-gray-50'},
+                  h('p',{className:'text-xs text-gray-400 uppercase'},MEAL_NAMES[mi]),
+                  h('p',{className:'text-sm font-medium text-gray-700 mt-0.5'},meal)
                 );
               })
             )
@@ -1363,200 +1605,177 @@ function WeightStepTracker() {
       )
     );
   }
-  // ─── RENDER: RECEPT ───────────────────────────────────────────────────────
+
   function renderRecept() {
-    var filtered = RECIPES_DEF.filter(function(r){ return r.name.toLowerCase().includes(recipeSearch.toLowerCase()); });
-    return h('div', { className: 'space-y-4' },
-      h('div', { className: 'bg-white rounded-xl p-4 shadow-md' },
-        h('input', { type:'text', placeholder:'🔍 Sök recept…', value:recipeSearch,
+    var cats = ['alla','Frukost','Lunch','Middag','Mellanmal'];
+    var filtered = RECIPES_DEF.filter(function(r){
+      if(recipeFilter!=='alla' && r.cat!==recipeFilter) return false;
+      if(recipeSearch && !(r.name+r.ingredients.map(function(i){return i.n;}).join()).toLowerCase().includes(recipeSearch.toLowerCase())) return false;
+      return true;
+    });
+    return h('div',{className:'space-y-4'},
+      h('div',{className:'bg-white rounded-xl p-4 shadow-md'},
+        h('input',{type:'text',placeholder:'Sök recept…',value:recipeSearch,
           onChange:function(e){setRecipeSearch(e.target.value);},
-          className:'w-full px-4 py-3 border rounded-xl outline-none focus:border-indigo-400' })
+          className:'w-full px-4 py-3 border rounded-xl outline-none mb-3'}),
+        h('div',{className:'flex gap-2 flex-wrap'},
+          cats.map(function(cat){
+            return h('button',{key:cat,onClick:function(){setRecipeFilter(cat);},
+              className:'px-4 py-1.5 rounded-full text-sm font-medium border transition-colors '+(recipeFilter===cat?'bg-indigo-600 text-white border-indigo-600':'border-gray-200 text-gray-600 hover:border-indigo-300')
+            },cat==='alla'?'Alla':cat);
+          })
+        )
       ),
-      h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4' },
-        filtered.map(function(rec, ri) {
-          var isOpen = openRecipe === ri;
-          var savedAmts = recipeAmounts[ri] || {};
-          return h('div', { key:ri, className: 'bg-white rounded-xl shadow-md overflow-hidden' },
-            h('div', { className: 'p-4 cursor-pointer hover:bg-gray-50', onClick:function(){ setOpenRecipe(isOpen ? null : ri); } },
-              h('div', { className: 'flex items-center justify-between' },
-                h('div', { className: 'flex items-center gap-3' },
-                  h('span', { className: 'text-3xl' }, rec.emoji),
-                  h('div', null,
-                    h('h3', { className: 'font-bold text-gray-800' }, rec.name),
-                    h('p', { className: 'text-xs text-gray-400' }, rec.kcal + ' kcal · ' + rec.protein + 'g protein')
+      h('div',{className:'grid grid-cols-1 md:grid-cols-2 gap-4'},
+        filtered.map(function(rec){
+          var isOpen = openRecipe===rec.id;
+          var isFav = recipeFavs.includes(rec.id);
+          return h('div',{key:rec.id,className:'bg-white rounded-xl shadow-md overflow-hidden'},
+            h('div',{className:'p-4 cursor-pointer hover:bg-gray-50',onClick:function(){setOpenRecipe(isOpen?null:rec.id);}},
+              h('div',{className:'flex items-start justify-between gap-2'},
+                h('div',{className:'flex-1'},
+                  h('span',{className:'text-xs font-semibold px-2 py-0.5 rounded-full mr-2 bg-indigo-100 text-indigo-700'},rec.cat),
+                  h('span',{className:'font-bold text-gray-800'},rec.name),
+                  h('div',{className:'flex gap-4 mt-1'},
+                    h('span',{className:'text-xs text-gray-400'},'Kcal: '+rec.kcal),
+                    h('span',{className:'text-xs text-gray-400'},'Protein: '+rec.protein+'g')
                   )
                 ),
-                h('span', { className: 'text-gray-400' }, isOpen ? '▲' : '▼')
+                h('button',{onClick:function(e){e.stopPropagation();setRecipeFavs(function(prev){return prev.includes(rec.id)?prev.filter(function(x){return x!==rec.id;}):[].concat(prev,[rec.id]);});},
+                  className:'text-xl flex-shrink-0 '+(isFav?'text-yellow-400':'text-gray-300 hover:text-yellow-400')
+                },isFav?'*':'-')
               )
             ),
-            isOpen ? h('div', { className: 'border-t px-4 pb-4' },
-              h('p', { className: 'text-xs font-semibold text-gray-500 uppercase mt-3 mb-2' }, 'Ingredienser'),
-              h('div', { className: 'space-y-1' },
-                rec.ingredients.map(function(ing, ii) {
-                  var savedAmt = savedAmts[ii] !== undefined ? savedAmts[ii] : ing.a;
-                  return h('div', { key:ii, className: 'flex items-center gap-2' },
-                    h('input', { type:'number', value:savedAmt, step:'0.5',
-                      className:'w-16 px-2 py-1 border rounded text-center text-sm outline-none focus:border-indigo-400',
-                      onChange:function(e){
-                        var v=parseFloat(e.target.value)||0;
-                        setRecipeAmounts(function(prev){
-                          var n=Object.assign({},prev);
-                          n[ri]=Object.assign({},n[ri]||{});
-                          n[ri][ii]=v;
-                          return n;
-                        });
-                      }
-                    }),
-                    h('span', { className: 'text-sm text-gray-500 w-8' }, ing.u),
-                    h('span', { className: 'text-sm text-gray-700' }, ing.n)
+            isOpen?h('div',{className:'border-t px-4 pb-4'},
+              h('p',{className:'text-xs font-bold text-gray-400 uppercase tracking-wide mt-3 mb-2'},'Ingredienser'),
+              h('ul',{className:'space-y-1'},
+                rec.ingredients.map(function(ing,ii){
+                  return h('li',{key:ii,className:'flex gap-2 text-sm'},
+                    h('span',{className:'font-bold text-gray-700 w-24 text-right flex-shrink-0'},ing.a),
+                    h('span',{className:'text-gray-600'},ing.n)
                   );
                 })
               ),
-              h('p', { className: 'text-xs font-semibold text-gray-500 uppercase mt-3 mb-1' }, 'Tillagning'),
-              h('p', { className: 'text-sm text-gray-600' }, rec.steps),
-              h('button', { className: 'mt-3 text-xs text-gray-400 hover:text-gray-600',
-                onClick:function(){ setRecipeAmounts(function(prev){ var n=Object.assign({},prev); delete n[ri]; return n; }); }
-              }, 'Återställ mängder')
-            ) : null
+              h('p',{className:'text-xs font-bold text-gray-400 uppercase tracking-wide mt-3 mb-1'},'Tillagning'),
+              h('p',{className:'text-sm text-gray-600 leading-relaxed'},rec.steps)
+            ):null
           );
         })
       )
     );
   }
-  // ─── RENDER: HANDLA ───────────────────────────────────────────────────────
+
   function renderHandla() {
-    var allIngredients = [];
-    RECIPES_DEF.forEach(function(rec) {
-      rec.ingredients.forEach(function(ing) { allIngredients.push(ing.n.toLowerCase()); });
-    });
-    return h('div', { className: 'space-y-4' },
-      h('div', { className: 'flex items-center justify-between bg-white rounded-xl p-4 shadow-md' },
-        h('h2', { className: 'text-lg font-bold text-gray-800' }, '🛒 Handlingslista'),
-        h('button', { onClick:function(){ setBoughtItems({}); }, className:'text-xs text-gray-400 hover:text-red-500' }, 'Rensa ikryssade')
+    return h('div',{className:'space-y-4'},
+      h('div',{className:'flex items-center justify-between bg-white rounded-xl p-4 shadow-md'},
+        h('h2',{className:'text-lg font-bold text-gray-800'},'Handlingslista'),
+        h('button',{onClick:function(){setBoughtItems({});},className:'text-xs text-gray-400 hover:text-red-500'},'Rensa')
       ),
-      Object.entries(SHOPPING_CATEGORIES).map(function(kv) {
-        var cat = kv[0], items = kv[1];
-        var catItems = items.filter(function(item){ return allIngredients.includes(item); });
-        if (!catItems.length) return null;
-        return h('div', { key:cat, className: 'bg-white rounded-xl p-4 shadow-md' },
-          h('h3', { className: 'font-bold text-gray-700 mb-3 text-sm uppercase tracking-wide' }, cat),
-          h('div', { className: 'space-y-1' },
-            catItems.map(function(item) {
-              var bought = !!boughtItems[item];
-              return h('div', { key:item,
-                className: 'flex items-center gap-3 py-2 px-2 rounded-lg cursor-pointer hover:bg-gray-50',
-                onClick:function(){ setBoughtItems(function(prev){ var n=Object.assign({},prev); n[item]=!n[item]; return n; }); }
-              },
-                h('div', { className: 'w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ' + (bought ? 'bg-green-500 border-green-500' : 'border-gray-300') },
-                  bought ? h('span', { className: 'text-white text-xs leading-none' }, '✓') : null
-                ),
-                h('span', { className: 'text-sm ' + (bought ? 'line-through text-gray-400' : 'text-gray-700') }, item)
-              );
-            })
-          )
-        );
-      })
+      h('div',{className:'bg-white rounded-xl p-4 shadow-md'},
+        h('div',{className:'space-y-1'},
+          SHOPPING.map(function(item){
+            var bought=!!boughtItems[item];
+            return h('div',{key:item,
+              className:'flex items-center gap-3 py-2 px-2 rounded-lg cursor-pointer hover:bg-gray-50',
+              onClick:function(){setBoughtItems(function(prev){var n=Object.assign({},prev);n[item]=!n[item];return n;})}
+            },
+              h('div',{className:'w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 '+(bought?'bg-green-500 border-green-500':'border-gray-300')},
+                bought?h('span',{className:'text-white text-xs leading-none'},'v'):null
+              ),
+              h('span',{className:'text-sm '+(bought?'line-through text-gray-400':'text-gray-700')},item)
+            );
+          })
+        )
+      )
     );
   }
-  // ─── Main render ──────────────────────────────────────────────────────────
-  var allNavItems = [
-    { id:'overview',  label:'📊 Översikt',     group:'hälsa' },
-    { id:'add',       label:'➕ Lägg till vikt', group:'hälsa' },
-    { id:'workouts',  label:'💪 Träning',       group:'hälsa' },
-    { id:'history',   label:'📅 Historik',      group:'hälsa' },
-    { id:'weekly',    label:'📆 Veckor',        group:'hälsa' },
-    { id:'habits',    label:'🎯 Vanor',         group:'hälsa' },
-    { id:'settings',  label:'⚙️ Inställningar', group:'hälsa' },
-    { id:'idag',      label:'🍽️ Idag',          group:'kost' },
-    { id:'meny',      label:'📋 Veckans meny',  group:'kost' },
-    { id:'recept',    label:'📖 Recept',        group:'kost' },
-    { id:'handla',    label:'🛒 Handla',        group:'kost' },
+
+  // Main render
+  var allNav = [
+    { id:'overview', label:'Översikt', group:'h' },
+    { id:'add', label:'+ Lägg till vikt', group:'h' },
+    { id:'workouts', label:'Träning', group:'h' },
+    { id:'history', label:'Historik', group:'h' },
+    { id:'weekly', label:'Veckor', group:'h' },
+    { id:'habits', label:'Vanor', group:'h' },
+    { id:'settings', label:'Inställningar', group:'h' },
+    { id:'idag', label:'Idag', group:'k' },
+    { id:'meny', label:'Veckans meny', group:'k' },
+    { id:'recept', label:'Recept', group:'k' },
+    { id:'handla', label:'Handla', group:'k' },
   ];
   var backupPanel = showImport ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
     h('div', { className: 'flex items-center justify-between mb-5' },
       h('h2', { className: 'text-xl font-bold text-gray-800' }, 'Backup & Import'),
-      h('button', { onClick:function(){setShowImport(false);}, className:'text-gray-400 hover:text-gray-600 text-2xl leading-none' }, '×')
+      h('button', { onClick:function(){setShowImport(false);}, className:'text-gray-400 hover:text-gray-600 text-2xl leading-none' }, 'x')
     ),
     h('div', { className: 'space-y-6' },
       h('div', { className: 'flex gap-3 flex-wrap' },
-        h('button', { onClick:exportData, className:'bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 text-sm font-medium' }, '💾 Ladda ner backup'),
-        h('label', { className:'bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium cursor-pointer' },
-          '📂 Återställ från fil',
+        h('button', { onClick:exportData, className:'bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-medium' }, 'Ladda ner backup'),
+        h('label', { className:'bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium cursor-pointer' },
+          'Aterställ från fil',
           h('input', { type:'file', accept:'.json', onChange:importFromFile, className:'hidden' })
         )
       ),
       h('div', { className: 'border-t pt-5' },
-        h('h3', { className: 'font-medium mb-1 text-sm text-gray-700' }, '📋 Importera historisk viktdata'),
+        h('h3', { className: 'font-medium mb-1 text-sm text-gray-700' }, 'Importera historisk viktdata'),
         h('p', { className: 'text-xs text-gray-400 mb-3' }, 'Format per rad: 03-nov 91,1'),
-        h('textarea', { value:importText, onChange:function(e){setImportText(e.target.value);}, placeholder:'03-nov 91,1\n04-nov 90,8\n...', className:'w-full px-4 py-2 border rounded-lg font-mono text-sm mb-3 outline-none', rows:6 }),
-        h('button', { onClick:importHistoricalData, className:'bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 text-sm font-medium' }, 'Importera')
+        h('textarea', { value:importText, onChange:function(e){setImportText(e.target.value);}, placeholder:'03-nov 91,1', className:'w-full px-4 py-2 border rounded-lg font-mono text-sm mb-3 outline-none', rows:6 }),
+        h('button', { onClick:importHistoricalData, className:'bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium' }, 'Importera')
       )
     )
   ) : null;
   return h('div', { className: 'min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100' },
     h(Toast, { toast: toast, onClose: function(){ setToast(null); } }),
     h('div', { className: 'md:hidden bg-white shadow-sm px-4 pt-4 pb-2' },
-      h('h1', { className: 'text-xl font-bold text-gray-800 mb-2' }, '🏥 Hälsodagbok'),
+      h('h1', { className: 'text-xl font-bold text-gray-800 mb-2' }, 'Hälsodagbok'),
       h('div', { className: 'flex gap-2 overflow-x-auto pb-2' },
-        allNavItems.map(function(n) {
+        allNav.map(function(n) {
           return h('button', { key:n.id, onClick:function(){setView(n.id);},
-            className:'px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap flex-shrink-0 ' + (view===n.id ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700') }, n.label);
+            className:'px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap '+(view===n.id?'bg-indigo-600 text-white':'bg-gray-100 text-gray-700') }, n.label);
         }),
-        h('button', { onClick:function(){setShowImport(!showImport);}, className:'px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap flex-shrink-0 bg-gray-100 text-gray-700' }, '💾 Backup')
+        h('button', { onClick:function(){setShowImport(!showImport);}, className:'px-3 py-2 rounded-lg text-sm bg-gray-100 text-gray-700 whitespace-nowrap' }, 'Backup')
       )
     ),
     h('div', { className: 'flex' },
-      h('aside', { className: 'hidden md:flex flex-col fixed left-0 top-0 h-full w-60 bg-white shadow-xl z-10 overflow-y-auto' },
+      h('aside', { className: 'hidden md:flex flex-col fixed left-0 top-0 h-full w-56 bg-white shadow-xl z-10 overflow-y-auto' },
         h('div', { className: 'p-5' },
-          h('div', { className: 'mb-5 px-2' },
-            h('div', { className: 'text-3xl mb-1' }, '🏥'),
-            h('h1', { className: 'text-lg font-bold text-gray-800' }, 'Hälsodagbok'),
-            stats ? h('p', { className: 'text-xs text-gray-400 mt-0.5' }, 'Senast: ' + new Date(stats.latest.date).toLocaleDateString('sv-SE', { day:'numeric', month:'short' })) : null
+          h('div', { className: 'mb-6' },
+            h('h1', { className: 'text-lg font-bold text-gray-800' }, 'Hälsodagbok')
           ),
-          h('p', { className: 'text-xs font-bold text-gray-400 uppercase tracking-widest px-2 mb-1' }, 'Hälsa'),
+          h('p', { className: 'text-xs font-bold text-gray-400 uppercase tracking-widest mb-1' }, 'Hälsa'),
           h('nav', { className: 'flex flex-col gap-0.5 mb-4' },
-            allNavItems.filter(function(n){return n.group==='hälsa';}).map(function(n) {
+            allNav.filter(function(n){return n.group==='h';}).map(function(n){
               return h('button', { key:n.id, onClick:function(){setView(n.id);},
-                className:'text-left px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ' + (view===n.id ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-indigo-50') }, n.label);
+                className:'text-left px-3 py-2 rounded-lg font-medium text-sm '+(view===n.id?'bg-indigo-600 text-white':'text-gray-600 hover:bg-indigo-50') }, n.label);
             }),
             h('button', { onClick:function(){setShowImport(!showImport);},
-              className:'text-left px-4 py-2.5 rounded-xl font-medium text-sm ' + (showImport ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-indigo-50') }, '💾 Backup')
+              className:'text-left px-3 py-2 rounded-lg font-medium text-sm '+(showImport?'bg-indigo-100 text-indigo-700':'text-gray-600 hover:bg-indigo-50') }, 'Backup')
           ),
-          h('p', { className: 'text-xs font-bold text-gray-400 uppercase tracking-widest px-2 mb-1' }, 'Mat & Kost'),
+          h('p', { className: 'text-xs font-bold text-gray-400 uppercase tracking-widest mb-1' }, 'Mat & Kost'),
           h('nav', { className: 'flex flex-col gap-0.5' },
-            allNavItems.filter(function(n){return n.group==='kost';}).map(function(n) {
+            allNav.filter(function(n){return n.group==='k';}).map(function(n){
               return h('button', { key:n.id, onClick:function(){setView(n.id);},
-                className:'text-left px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ' + (view===n.id ? 'bg-green-600 text-white' : 'text-gray-600 hover:bg-green-50') }, n.label);
+                className:'text-left px-3 py-2 rounded-lg font-medium text-sm '+(view===n.id?'bg-green-600 text-white':'text-gray-600 hover:bg-green-50') }, n.label);
             })
           )
         )
       ),
-      h('main', { className: 'flex-1 md:ml-60 p-4 md:p-8 min-h-screen' },
+      h('main', { className: 'flex-1 md:ml-56 p-4 md:p-8 min-h-screen' },
         h('div', { className: 'max-w-5xl mx-auto' },
-          h('div', { className: 'hidden md:flex items-center justify-between bg-white rounded-2xl shadow-md px-8 py-5 mb-6' },
-            h('div', null,
-              h('h2', { className: 'text-2xl font-bold text-gray-800' },
-                (allNavItems.find(function(n){return n.id===view;})||{label:'📊 Översikt'}).label
-              )
-            ),
-            stats ? h('div', { className: 'text-right' },
-              h('p', { className: 'text-xs text-gray-400 uppercase tracking-wide' }, 'Senast loggat'),
-              h('p', { className: 'font-bold text-gray-700' }, new Date(stats.latest.date).toLocaleDateString('sv-SE', { day:'numeric', month:'short', year:'numeric' }))
-            ) : null
-          ),
           backupPanel,
-          view === 'overview'  ? renderOverview()  : null,
-          view === 'add'       ? renderAdd()       : null,
-          view === 'workouts'  ? renderWorkouts()  : null,
-          view === 'goals'     ? renderGoals()     : null,
-          view === 'history'   ? renderHistory()   : null,
-          view === 'weekly'    ? renderWeekly()    : null,
-          view === 'habits'    ? renderHabits()    : null,
-          view === 'settings'  ? renderSettings()  : null,
-          view === 'idag'      ? renderIdag()      : null,
-          view === 'meny'      ? renderMeny()      : null,
-          view === 'recept'    ? renderRecept()    : null,
-          view === 'handla'    ? renderHandla()    : null
+          view === 'overview' ? renderOverview()  : null,
+          view === 'add'      ? renderAdd()       : null,
+          view === 'workouts' ? renderWorkouts()  : null,
+          view === 'goals'    ? renderGoals()     : null,
+          view === 'history'  ? renderHistory()   : null,
+          view === 'weekly'   ? renderWeekly()    : null,
+          view === 'habits'   ? renderHabits()    : null,
+          view === 'settings' ? renderSettings()  : null,
+          view === 'idag'     ? renderIdag()      : null,
+          view === 'meny'     ? renderMeny()      : null,
+          view === 'recept'   ? renderRecept()    : null,
+          view === 'handla'   ? renderHandla()    : null
         )
       )
     )
@@ -1564,6 +1783,7 @@ function WeightStepTracker() {
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(h(WeightStepTracker, null));
+
 </script>
 </body>
 </html>
