@@ -448,33 +448,32 @@ function WeightStepTracker() {
     var r2 = ssTot > 0 ? Math.max(0, 1 - ssRes/ssTot) : 0;
     var kgPerWeek = parseFloat((slope*7).toFixed(2));
     if (slope >= 0) return { gaining: true, kgPerWeek: Math.abs(kgPerWeek), r2: parseFloat(r2.toFixed(2)) };
-    // Days to goal from last entry
-    var lastX = (new Date(recent[recent.length-1].date).getTime()-t0)/86400000;
-    var daysToGoal = (goalWeight - intercept)/slope - lastX;
-    // Confidence scenarios based on std dev of residuals
+    // Project forward from last actual weight (avoids negative daysToGoal from regression offset)
+    var currentWeight = recent[recent.length-1].weight;
+    var daysToGoal = (goalWeight - currentWeight) / slope;
+    // Confidence scenarios
     var residuals = recent.map(function(e) {
       var x=(new Date(e.date).getTime()-t0)/86400000;
       return e.weight - (slope*x+intercept);
     });
     var stdDev = Math.sqrt(residuals.reduce(function(s,r){return s+r*r;},0)/n);
     var slopeOpt = slope * 1.3, slopePes = slope * 0.5;
-    var daysOpt = (goalWeight - intercept - stdDev)/slope - lastX;
-    var daysPes = daysToGoal * 1.8;
-    // Projection data points (next ~120 days)
-    var projDays = Math.min(Math.max(Math.ceil(daysToGoal * 1.15), 30), 150);
+    var daysOpt = (goalWeight - currentWeight) / slopeOpt;
+    var daysPes = (goalWeight - currentWeight) / slopePes;
+    // Projection data points starting from current actual weight
+    var projDays = Math.min(Math.max(Math.ceil(daysToGoal * 1.2), 30), 180);
     var projPoints = [];
     for (var d = 7; d <= projDays; d += 7) {
       var projDate = new Date(recent[recent.length-1].date);
       projDate.setDate(projDate.getDate() + d);
-      var x = lastX + d;
       projPoints.push({
         datum: projDate.toLocaleDateString('sv-SE',{month:'short',day:'numeric'}),
-        prognos: parseFloat((slope*x+intercept).toFixed(2)),
-        prognosOpt: parseFloat(((slope*1.3)*x+intercept-stdDev*0.5).toFixed(2)),
-        prognosPes: parseFloat(((slope*0.5)*x+intercept+stdDev*0.5).toFixed(2)),
+        prognos:    parseFloat((currentWeight + slope    * d).toFixed(2)),
+        prognosOpt: parseFloat((currentWeight + slopeOpt * d).toFixed(2)),
+        prognosPes: parseFloat((currentWeight + slopePes * d).toFixed(2)),
       });
     }
-    if (daysToGoal < 0 || daysToGoal > 365*4) return { gaining: false, kgPerWeek: Math.abs(kgPerWeek), r2: parseFloat(r2.toFixed(2)), noGoal: true };
+    if (daysToGoal < 1 || daysToGoal > 365*4) return { gaining: false, kgPerWeek: Math.abs(kgPerWeek), r2: parseFloat(r2.toFixed(2)), noGoal: true };
     var goalDate = new Date(recent[recent.length-1].date);
     goalDate.setDate(goalDate.getDate() + Math.round(daysToGoal));
     var goalDateOpt = new Date(recent[recent.length-1].date);
