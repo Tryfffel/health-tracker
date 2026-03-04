@@ -144,6 +144,8 @@ function WeightStepTracker() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [newHabit, setNewHabit]     = useState({ name: '', type: 'good', emoji: '✅' });
   const [habitTab, setHabitTab]     = useState('week');
+  const [measurements, setMeasurements] = useState([]);
+  const [newMeasurement, setNewMeasurement] = useState({ date: todayStr(), midja:'', höft:'', bröst:'', lår:'', överarm:'' });
   useEffect(() => { loadData(); }, []);
   useEffect(() => { if (!loading) saveData(); }, [entries, workouts, habits, habitLogs, goalWeight, targetRate, yearlyGoal, height, loading]);
 
@@ -179,6 +181,7 @@ function WeightStepTracker() {
         window.storage.get('target-rate'),
         window.storage.get('habits'),
         window.storage.get('habit-logs'),
+        window.storage.get('measurements'),
       ]);
       if (results[0] && results[0].value) setEntries(JSON.parse(results[0].value));
       if (results[1] && results[1].value) setWorkouts(JSON.parse(results[1].value));
@@ -188,6 +191,7 @@ function WeightStepTracker() {
       if (results[5] && results[5].value) setTargetRate(parseFloat(results[5].value));
       if (results[6] && results[6].value) { var h=JSON.parse(results[6].value); setHabits(Array.isArray(h)?h:[]); }
       if (results[7] && results[7].value) { var hl=JSON.parse(results[7].value); setHabitLogs((hl&&typeof hl==='object'&&!Array.isArray(hl))?hl:{}); }
+      if (results[8] && results[8].value) { var ms=JSON.parse(results[8].value); setMeasurements(Array.isArray(ms)?ms:[]); }
     } catch (err) {
       console.log('Ingen sparad data', err);
     } finally {
@@ -205,6 +209,7 @@ function WeightStepTracker() {
         window.storage.set('target-rate',    targetRate.toString()),
         window.storage.set('habits',         JSON.stringify(habits)),
         window.storage.set('habit-logs',     JSON.stringify(habitLogs)),
+        window.storage.set('measurements',   JSON.stringify(measurements)),
       ]);
     } catch (err) { console.error(err); }
   };
@@ -656,6 +661,116 @@ function WeightStepTracker() {
     );
   }
   // ─── View rendering helpers ─────────────────────────────────────────────────
+  function renderMeasurements() {
+    var METRICS = [
+      { key:'midja',   label:'Midja',   color:'#4f46e5' },
+      { key:'höft',    label:'Höft',    color:'#ec4899' },
+      { key:'bröst',   label:'Bröst',   color:'#f59e0b' },
+      { key:'lår',     label:'Lår',     color:'#10b981' },
+      { key:'överarm', label:'Överarm', color:'#ef4444' },
+    ];
+    var addMeasurement = function() {
+      var hasVal = METRICS.some(function(m){ return newMeasurement[m.key]; });
+      if (!hasVal) return;
+      var entry = { date: newMeasurement.date, id: Date.now() };
+      METRICS.forEach(function(m){ if(newMeasurement[m.key]) entry[m.key]=parseFloat(newMeasurement[m.key]); });
+      setMeasurements(function(prev){
+        return prev.filter(function(e){return e.date!==entry.date;}).concat(entry)
+          .sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+      });
+      setNewMeasurement({ date: todayStr(), midja:'', höft:'', bröst:'', lår:'', överarm:'' });
+      showToast('📏 Mått sparat!');
+    };
+    var chrono = measurements.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+    var desc   = measurements.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+    var latest = chrono.length > 0 ? chrono[chrono.length-1] : null;
+    var prev   = chrono.length > 1 ? chrono[chrono.length-2] : null;
+    // Trendlines: linear regression per metric
+    var trends = {};
+    METRICS.forEach(function(m) {
+      var pts = chrono.map(function(e,i){ return e[m.key] ? {x:i,y:parseFloat(e[m.key])} : null; }).filter(Boolean);
+      if (pts.length < 2) { trends[m.key]=null; return; }
+      var n=pts.length,sx=0,sy=0,sxy=0,sx2=0;
+      pts.forEach(function(p){sx+=p.x;sy+=p.y;sxy+=p.x*p.y;sx2+=p.x*p.x;});
+      var den=n*sx2-sx*sx; if(!den){trends[m.key]=null;return;}
+      var slope=(n*sxy-sx*sy)/den, ic=(sy-slope*sx)/n;
+      trends[m.key]=function(i){return parseFloat((slope*i+ic).toFixed(1));};
+    });
+    var chartData = chrono.map(function(e,i){
+      var pt = { datum: new Date(e.date).toLocaleDateString('sv-SE',{month:'short',day:'numeric'}) };
+      METRICS.forEach(function(m){
+        if(e[m.key]) pt[m.key]=parseFloat(e[m.key]);
+        if(trends[m.key]) pt[m.key+'_t']=trends[m.key](i);
+      });
+      return pt;
+    });
+    var chartLines = [];
+    METRICS.forEach(function(m){
+      chartLines.push({key:m.key,   color:m.color, width:1.5, name:m.label});
+      if(trends[m.key]) chartLines.push({key:m.key+'_t', color:m.color, width:2.5, name:m.label+' trend', dashed:true});
+    });
+    return h('div', null,
+      h('div', { className:'bg-white rounded-xl p-6 shadow-md mb-6' },
+        h('h2', { className:'text-xl font-bold text-gray-800 mb-5' }, '📏 Lägg till mått'),
+        h('div', { className:'flex gap-2 mb-4' },
+          h('input', { type:'date', value:newMeasurement.date, onChange:function(e){setNewMeasurement(Object.assign({},newMeasurement,{date:e.target.value}));}, className:'flex-1 px-4 py-3 border rounded-lg outline-none' }),
+          h('button', { onClick:function(){setNewMeasurement(Object.assign({},newMeasurement,{date:todayStr()}));}, className:'px-4 py-3 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100' }, 'Idag')
+        ),
+        h('div', { className:'grid grid-cols-2 md:grid-cols-5 gap-3 mb-4' },
+          METRICS.map(function(m){
+            return h('div', { key:m.key },
+              h('label', { className:'text-xs text-gray-500 mb-1 block font-medium' }, m.label+' (cm)'),
+              h('input', { type:'number', step:'0.5', value:newMeasurement[m.key], onChange:function(e){var u=Object.assign({},newMeasurement);u[m.key]=e.target.value;setNewMeasurement(u);}, placeholder:'cm', className:'w-full px-3 py-2 border-2 rounded-lg outline-none text-sm', style:{borderColor:m.color+'66'} })
+            );
+          })
+        ),
+        h('button', { onClick:addMeasurement, className:'w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 font-medium' }, '+ Spara mått')
+      ),
+      latest ? h('div', { className:'grid grid-cols-2 md:grid-cols-5 gap-3 mb-6' },
+        METRICS.map(function(m){
+          var val=latest[m.key], pval=prev?prev[m.key]:null;
+          var diff=(val&&pval)?parseFloat((val-pval).toFixed(1)):null;
+          return h('div', { key:m.key, className:'bg-white rounded-xl p-4 shadow-md border-t-4', style:{borderTopColor:m.color} },
+            h('p', { className:'text-xs text-gray-400 uppercase tracking-wide font-medium mb-1' }, m.label),
+            h('p', { className:'text-2xl font-bold text-gray-800' }, val ? val+' cm' : '—'),
+            diff!==null ? h('p', { className:'text-xs mt-1 '+(diff<=0?'text-green-600':'text-red-500') }, (diff>0?'+':'')+diff+' cm') : null
+          );
+        })
+      ) : null,
+      chrono.length >= 2 ? h('div', { className:'bg-white rounded-xl p-6 shadow-md mb-6' },
+        h('h2', { className:'text-lg font-bold text-gray-800 mb-1' }, 'Måttens utveckling'),
+        h('p', { className:'text-xs text-gray-400 mb-4' }, 'Tunn linje = faktiska värden · Streckad = trendlinje (linjär regression)'),
+        h(SvgLineChart, { data:chartData, height:320, lines:chartLines })
+      ) : null,
+      desc.length > 0 ? h('div', { className:'bg-white rounded-xl p-6 shadow-md' },
+        h('h2', { className:'text-lg font-bold text-gray-800 mb-4' }, 'Historik'),
+        h('div', { className:'overflow-x-auto' },
+          h('table', { className:'w-full text-sm' },
+            h('thead', null,
+              h('tr', { className:'text-left text-xs text-gray-400 uppercase border-b' },
+                h('th', { className:'pb-2 pr-6' }, 'Datum'),
+                METRICS.map(function(m){ return h('th', { key:m.key, className:'pb-2 pr-4', style:{color:m.color} }, m.label); }),
+                h('th', null)
+              )
+            ),
+            h('tbody', null,
+              desc.map(function(e){
+                return h('tr', { key:e.id, className:'border-b border-gray-50 hover:bg-gray-50' },
+                  h('td', { className:'py-2 pr-6 text-gray-500 text-xs' }, new Date(e.date).toLocaleDateString('sv-SE',{day:'numeric',month:'short',year:'numeric'})),
+                  METRICS.map(function(m){ return h('td', { key:m.key, className:'py-2 pr-4 font-medium' }, e[m.key]?e[m.key]+' cm':'—'); }),
+                  h('td', { className:'py-2' }, h('button', { onClick:function(){setMeasurements(function(p){return p.filter(function(x){return x.id!==e.id;});});}, className:'text-gray-300 hover:text-red-400 text-xs' }, '✕'))
+                );
+              })
+            )
+          )
+        )
+      ) : h('div', { className:'bg-white rounded-xl p-10 text-center shadow-md' },
+        h('p', { className:'text-5xl mb-3' }, '📏'),
+        h('p', { className:'text-gray-500 text-lg mb-1' }, 'Inga mått loggade än'),
+        h('p', { className:'text-gray-400 text-sm' }, 'Mät en gång i veckan för att se din trendlinje')
+      )
+    );
+  }
   function renderOverview() {
     if (!stats) {
       return h('div', { className: 'bg-white rounded-xl p-12 text-center shadow-md' },
@@ -1697,6 +1812,7 @@ function WeightStepTracker() {
     { id:'history', label:'Historik', group:'h' },
     { id:'weekly', label:'Veckor', group:'h' },
     { id:'habits', label:'Vanor', group:'h' },
+    { id:'mått', label:'Mått', group:'h' },
     { id:'settings', label:'Inställningar', group:'h' },
     { id:'idag', label:'Idag', group:'k' },
     { id:'meny', label:'Veckans meny', group:'k' },
@@ -1769,8 +1885,9 @@ function WeightStepTracker() {
           view === 'goals'    ? renderGoals()     : null,
           view === 'history'  ? renderHistory()   : null,
           view === 'weekly'   ? renderWeekly()    : null,
-          view === 'habits'   ? renderHabits()    : null,
-          view === 'settings' ? renderSettings()  : null,
+          view === 'habits'   ? renderHabits()       : null,
+          view === 'mått'     ? renderMeasurements(): null,
+          view === 'settings' ? renderSettings()    : null,
           view === 'idag'     ? renderIdag()      : null,
           view === 'meny'     ? renderMeny()      : null,
           view === 'recept'   ? renderRecept()    : null,
