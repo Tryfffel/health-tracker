@@ -1360,7 +1360,7 @@ function WeightStepTracker() {
     var weekDays = [];
     for (var i = 0; i < 7; i++) {
       var d = new Date(monday); d.setDate(monday.getDate() + i);
-      weekDays.push(d.toISOString().split('T')[0]);
+      weekDays.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'));
     }
     var weekLabel = (weekOffset === 0) ? 'Denna vecka' : (weekOffset === -1 ? 'Förra veckan' : new Date(weekDays[0]).toLocaleDateString('sv-SE', { day:'numeric', month:'short' }) + ' – ' + new Date(weekDays[6]).toLocaleDateString('sv-SE', { day:'numeric', month:'short' }));
     function toggleHabitLog(hid, date) {
