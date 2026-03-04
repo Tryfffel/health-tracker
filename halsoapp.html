@@ -122,6 +122,7 @@ const IntensityDots = ({ level }) =>
 // ─── Main Component ───────────────────────────────────────────────────────────
 function WeightStepTracker() {
   const todayStr = () => { var d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  const localDS  = (d) => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   const [entries, setEntries]       = useState([]);
   const [workouts, setWorkouts]     = useState([]);
   const [goalWeight, setGoalWeight]       = useState(85);
@@ -150,7 +151,7 @@ function WeightStepTracker() {
   useEffect(() => { if (!loading) saveData(); }, [entries, workouts, habits, habitLogs, goalWeight, targetRate, yearlyGoal, height, loading]);
 
   // Diet state
-  var todayDietStr = new Date().toISOString().split('T')[0];
+  var todayDietStr = todayStr();
   var dietChecked = React.useState({}); var checkedMeals = dietChecked[0]; var setCheckedMeals = dietChecked[1];
   var dietBought = React.useState({}); var boughtItems = dietBought[0]; var setBoughtItems = dietBought[1];
   var dietSearch = React.useState(''); var recipeSearch = dietSearch[0]; var setRecipeSearch = dietSearch[1];
@@ -230,7 +231,7 @@ function WeightStepTracker() {
     });
     const next = new Date(newEntry.date);
     next.setDate(next.getDate() + 1);
-    setNewEntry({ date: next.toISOString().split('T')[0], weight: '', steps: '', mood: '', comment: '' });
+    setNewEntry({ date: localDS(next), weight: '', steps: '', mood: '', comment: '' });
     showToast('✓ Mätning sparad!');
   };
   const addWorkout = () => {
@@ -248,7 +249,7 @@ function WeightStepTracker() {
     });
     const next = new Date(newWorkout.date);
     next.setDate(next.getDate() + 1);
-    setNewWorkout({ date: next.toISOString().split('T')[0], type: '', duration: '', intensity: '3', comment: '' });
+    setNewWorkout({ date: localDS(next), type: '', duration: '', intensity: '3', comment: '' });
     showToast('💪 Träningspass sparat!');
   };
   const deleteEntry   = function(id) { setEntries(function(prev) { return prev.filter(function(e) { return e.id !== id; }); }); };
@@ -352,7 +353,7 @@ function WeightStepTracker() {
     const diff = d.getDate() - d.getDay() + (d.getDay() === 0 ? -6 : 1);
     const monday = new Date(d.setDate(diff));
     monday.setHours(0,0,0,0);
-    return monday.toISOString().split('T')[0];
+    return localDS(monday);
   };
   const getISOWeekNumber = function(date) {
     const d = new Date(date);
@@ -1374,7 +1375,7 @@ function WeightStepTracker() {
       var streak = 0;
       var d = new Date(today);
       while (true) {
-        var ds = d.toISOString().split('T')[0];
+        var ds = localDS(d);
         if (habitLogs[ds] && habitLogs[ds][hid]) { streak++; d.setDate(d.getDate()-1); }
         else break;
       }
@@ -1410,7 +1411,7 @@ function WeightStepTracker() {
         var done = 0;
         for (var i = 0; i < 7; i++) {
           var wd = new Date(wMonday); wd.setDate(wMonday.getDate() + i);
-          var ds = wd.toISOString().split('T')[0];
+          var ds = localDS(wd);
           if (ds > todayStr2) break;
           if (habitLogs[ds] && habitLogs[ds][hid]) done++;
         }
