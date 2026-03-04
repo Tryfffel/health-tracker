@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hälsodagbok</title>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100">
@@ -15,12 +15,7 @@
 window.addEventListener('error', function(e) {
   var el = document.getElementById('error-display');
   el.style.display = 'block';
-  el.textContent = 'FEL: ' + e.message + '\nRad: ' + e.lineno + '\nFil: ' + e.filename + '\nStack: ' + (e.error && e.error.stack ? e.error.stack : 'N/A');
-});
-window.addEventListener('unhandledrejection', function(e) {
-  var el = document.getElementById('error-display');
-  el.style.display = 'block';
-  el.textContent = 'Promise-fel: ' + (e.reason && e.reason.stack ? e.reason.stack : String(e.reason));
+  el.textContent = 'FEL: ' + e.message + '\nRad: ' + e.lineno + '\nFil: ' + e.filename;
 });
 </script>
 <script>
@@ -152,7 +147,7 @@ function WeightStepTracker() {
   const [habitTab, setHabitTab]     = useState('week');
   useEffect(() => { loadData(); }, []);
   useEffect(() => { if (!loading) saveData(); }, [entries, workouts, habits, habitLogs, goalWeight, targetRate, yearlyGoal, height, loading]);
-
+  // Read URL params injected by iOS Shortcut: ?steps=8500&date=2026-02-25
   const loadData = async () => {
     try {
       const results = await Promise.all([
@@ -183,13 +178,13 @@ function WeightStepTracker() {
     try {
       await Promise.all([
         window.storage.set('weight-entries', JSON.stringify(entries)),
-        window.storage.set('workouts',        JSON.stringify(workouts)),
-        window.storage.set('goal-weight',     goalWeight.toString()),
-        window.storage.set('yearly-goal',     JSON.stringify(yearlyGoal)),
-        window.storage.set('user-height',     height.toString()),
-        window.storage.set('target-rate',     targetRate.toString()),
-        window.storage.set('habits',          JSON.stringify(habits)),
-        window.storage.set('habit-logs',      JSON.stringify(habitLogs)),
+        window.storage.set('workouts',       JSON.stringify(workouts)),
+        window.storage.set('goal-weight',    goalWeight.toString()),
+        window.storage.set('yearly-goal',    JSON.stringify(yearlyGoal)),
+        window.storage.set('user-height',    height.toString()),
+        window.storage.set('target-rate',    targetRate.toString()),
+        window.storage.set('habits',         JSON.stringify(habits)),
+        window.storage.set('habit-logs',     JSON.stringify(habitLogs)),
       ]);
     } catch (err) { console.error(err); }
   };
@@ -598,10 +593,10 @@ function WeightStepTracker() {
         h('h2', { className: 'text-lg font-bold text-gray-800 mb-1' }, 'Viktutveckling'),
         h('p', { className: 'text-xs text-gray-400 mb-4' }, 'Daglig vikt + 7-dagars snitt + BMI'),
         h(SvgLineChart, { data: chartData, height: 300, lines: [
-            { key: 'vikt',    color: '#a5b4fc', width: 1.5, name: 'Vikt (kg)' },
-            { key: 'snitt7',  color: '#4f46e5', width: 2.5, name: '7-dagarssnitt' },
-            { key: 'målvikt', color: '#f97316', width: 1.5, dashed: true, name: 'Mål' }
-          ]})
+          { key: 'vikt',    color: '#a5b4fc', width: 1.5, name: 'Vikt (kg)' },
+          { key: 'snitt7',  color: '#4f46e5', width: 2.5, name: '7-dagars snitt' },
+          { key: 'målvikt', color: '#10b981', width: 1.5, name: 'Målvikt', dashed: true }
+        ]})
       ),
       // BMI chart
       chartData.some(function(d){ return d.bmi; }) ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
@@ -641,7 +636,7 @@ function WeightStepTracker() {
             bmiPreview ? h('span', { className: 'absolute right-3 top-3.5 text-xs text-gray-400' }, 'BMI: ' + bmiPreview) : null
           ),
           h('div', { className: 'flex gap-2' },
-            h('input', { type:'number', value: newEntry.steps, onChange: function(e){setNewEntry(Object.assign({},newEntry,{steps:e.target.value}));}, placeholder:'Steg (valfritt)', className:'flex-1 px-4 py-3 border rounded-lg outline-none' })
+            h('input', { type:'number', value: newEntry.steps, onChange: function(e){setNewEntry(Object.assign({},newEntry,{steps:e.target.value}));}, placeholder:'Steg (valfritt)', className:'flex-1 px-4 py-3 border rounded-lg outline-none' }),
           ),
           h('div', null,
             h('p', { className: 'text-sm text-gray-600 mb-2' }, 'Energi & humör (valfritt)'),
@@ -1177,6 +1172,7 @@ function WeightStepTracker() {
       ) : null
     );
   }
+
   function renderSettings() {
     return h('div', { className: 'max-w-lg mx-auto space-y-4' },
       h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
@@ -1203,7 +1199,7 @@ function WeightStepTracker() {
             h('input', { type:'number', value:height, onChange:function(e){setHeight(parseFloat(e.target.value)||0);}, className:'w-full px-4 py-3 border rounded-lg outline-none' })
           ),
           h('div', { className: 'border-t pt-5' },
-            h('p', { className: 'text-sm font-semibold text-gray-700 mb-3' }, 'Årsmål ' + new Date().getFullYear()),
+            h('p', { className: 'text-sm font-semibold text-gray-700 mb-3' }, 'Arsmål ' + new Date().getFullYear()),
             h('div', { className: 'grid grid-cols-2 gap-3' },
               h('div', null,
                 h('label', { className: 'text-xs text-gray-500' }, 'Träningspass'),
@@ -1219,84 +1215,19 @@ function WeightStepTracker() {
       )
     );
   }
-  // ─── Main render
-  // ─── DIET DATA ───────────────────────────────────────────────────────────
-  var MEAL_NAMES = ['Frukost','Lunch','Middag','Kvällsmat'];
-  var MEAL_EMOJI = ['🌅','🥗','🍽️','🌙'];
-  var WEEK_MENU_DEF = [
-    { day:'Måndag',    meals:['Äggomelett med tofu & sötpotatis','Tacotallrik','Tofu med broccoliröra','Proteinglass'] },
-    { day:'Tisdag',    meals:['Äggomelett med tofu & sötpotatis','Paprikatofu med bönpasta','Tofu med rotfrukter & grönkål','Proteinglass'] },
-    { day:'Onsdag',    meals:['Äggomelett med tofu & sötpotatis','Tofu & ägg med quinoa','Tempeh med kikärtor & rotfrukter','Proteinglass'] },
-    { day:'Torsdag',   meals:['Äggomelett med tofu & sötpotatis','Kebabtallrik','Tofu med brysselkål & halloumi','Proteinglass'] },
-    { day:'Fredag',    meals:['Äggomelett med tofu & sötpotatis','Bönpasta med tofu & tomatsås','Spenatsoppa med rökt tofu','Proteinglass'] },
-    { day:'Lördag',    meals:['Äggomelett med tofu & sötpotatis','Tacotallrik','Tempeh med svarta bönor & paprika','Proteinglass'] },
-    { day:'Söndag',    meals:['Äggomelett med tofu & sötpotatis','Tofu & ägg med quinoa','Tofu med edamame & quinoa','Proteinglass'] }
-  ];
-  var RECIPES_DEF = [
-    { id:1, name:'Tacotallrik', cat:'Lunch', kcal:540, protein:44,
-      ingredients:[{a:'180g',n:'tofu'},{a:'100g',n:'svarta bönor'},{a:'50g',n:'jalapeños'},{a:'35g',n:'grönkål'},{a:'50g',n:'tomat'},{a:'20g',n:'rödlök'},{a:'½ st',n:'avokado'}],
-      steps:'Stek tofun i rapsolja tills gyllenbrun. Värm bönorna. Stek grönkålen lätt. Lägg upp allt på tallrik. Mosa avokadon med lite limejuice och salt till guacamole. Toppa med jalapeños, hackad tomat och rödlök.' },
-    { id:2, name:'Tofu med broccoliröra', cat:'Middag', kcal:480, protein:42,
-      ingredients:[{a:'180g',n:'tofu'},{a:'100g',n:'broccoli'},{a:'60g',n:'champinjoner'},{a:'60g',n:'squash'},{a:'50g',n:'tomat'},{a:'30g',n:'fetaost'},{a:'efter smak',n:'jalapeños'}],
-      steps:'Stek tofun gyllenbrun. Bryn broccoli, champinjoner, squash och tomat i samma panna. Tillsätt fetaosten sista minuten – låt smälta, inte koka bort. Servera tillsammans med tofun. Toppa med jalapeños.' },
-    { id:3, name:'Paprikatofu med bönpasta', cat:'Lunch', kcal:530, protein:43,
-      ingredients:[{a:'180g',n:'tofu'},{a:'40g',n:'bönpasta'},{a:'100g',n:'paprika'},{a:'40g',n:'tomat'},{a:'1 klyfta',n:'vitlök'},{a:'30g',n:'fetaost'}],
-      steps:'Koka bönpastan. Stek tofun. Stek vitlök, paprika och tomat. Häll i färdigkokt pasta och rör ner fetaosten. Låt fetaosten smälta. Servera med tofun.' },
-    { id:4, name:'Tofu med rotfrukter & grönkål', cat:'Middag', kcal:500, protein:40,
-      ingredients:[{a:'180g',n:'tofu'},{a:'70g',n:'morot'},{a:'70g',n:'palsternacka'},{a:'150g',n:'grönkål'},{a:'30g',n:'fetaost'}],
-      steps:'Skär rotfrukterna i 1 cm skivor. Woka tofu och rotfrukter tills mjuka. Tillsätt grönkålen sista 3 minuterna och fetaosten sista minuten.' },
-    { id:5, name:'Tofu & ägg med quinoa', cat:'Lunch', kcal:560, protein:48,
-      ingredients:[{a:'150g',n:'tofu'},{a:'2 st',n:'ägg'},{a:'100g',n:'quinoa'},{a:'efter smak',n:'spenat'},{a:'efter smak',n:'sojasås'},{a:'efter smak',n:'sesamolja'}],
-      steps:'Koka quinoan. Stek tofun. Stek äggen (eller scramble). Woka spenat snabbt. Lägg upp och ringla över sojasås och sesamolja.' },
-    { id:6, name:'Tempeh med kikärtor & rotfrukter', cat:'Middag', kcal:540, protein:40,
-      ingredients:[{a:'150g',n:'tempeh'},{a:'100g',n:'kikärtor'},{a:'80g',n:'morot'},{a:'80g',n:'palsternacka'},{a:'efter smak',n:'tahini'}],
-      steps:'Stek tempeh tills gyllenbrun. Woka rotfrukter och kikärtor. Servera med tahini ringad över.' },
-    { id:7, name:'Kebabtallrik', cat:'Lunch', kcal:520, protein:40,
-      ingredients:[{a:'180g',n:'tofu'},{a:'60g',n:'avokado'},{a:'60g',n:'tomat'},{a:'60g',n:'gurka'},{a:'20g',n:'bladspenat'},{a:'15g',n:'jalapeños'},{a:'100g',n:'silkestofu (sås)'},{a:'1 klyfta',n:'vitlök (sås)'}],
-      steps:'Krydda tofun med paprika, spiskummin, koriander, salt. Stek gyllenbrun. Mixa silkestofu med vitlök, citron, salt och peppar till vitlökssås. Skär gurka i stavar, grovhacka tomat och avokado. Lägg upp med spenat och jalapeños. Servera med vitlökssåsen.' },
-    { id:8, name:'Tofu med brysselkål & halloumi', cat:'Middag', kcal:510, protein:42,
-      ingredients:[{a:'150g',n:'tofu'},{a:'100g',n:'brysselkål'},{a:'100g',n:'grönkål'},{a:'50g',n:'squash'},{a:'40g',n:'halloumi'}],
-      steps:'Stek tofun. Tillsätt brysselkål och squash. Lägg i grönkål och halloumi sista minuten.' },
-    { id:9, name:'Bönpasta med tofu & tomatsås', cat:'Lunch', kcal:520, protein:42,
-      ingredients:[{a:'180g',n:'tofu'},{a:'40g',n:'bönpasta'},{a:'120g',n:'krossade tomater'},{a:'efter smak',n:'lök och vitlök'},{a:'10g',n:'ruccola'}],
-      steps:'Stek lök och vitlök mjuka. Tillsätt krossade tomater och låt sjuda 10–15 min. Stek tofun separat. Koka bönpastan. Blanda ihop allt. Servera med ruccola på toppen.' },
-    { id:10, name:'Spenatsoppa med rökt tofu', cat:'Middag', kcal:480, protein:38,
-      ingredients:[{a:'180g',n:'rökt tofu'},{a:'200g',n:'spenat'},{a:'1 dl',n:'kokosmjölk'},{a:'2 klyftor',n:'vitlök'},{a:'efter smak',n:'ingefära och chili'}],
-      steps:'Fräs vitlök och ingefära. Tillsätt spenat och låt falla ihop. Häll i kokosmjölk och mixa slätt. Smaka av med chili och salt. Skär rökt tofu i kuber och lägg i soppan.' },
-    { id:11, name:'Äggomelett med tofu & sötpotatis', cat:'Lunch', kcal:580, protein:50,
-      ingredients:[{a:'3 st',n:'ägg'},{a:'120g',n:'tofu'},{a:'150g',n:'sötpotatis'},{a:'efter smak',n:'paprika och spenat'}],
-      steps:'Koka sötpotatis tills mjuk. Stek tofu. Vispa ägg och stek till omelett med paprika och spenat. Servera med sötpotatis och tofu.' },
-    { id:12, name:'Tempeh med svarta bönor & paprika', cat:'Middag', kcal:520, protein:42,
-      ingredients:[{a:'150g',n:'tempeh'},{a:'150g',n:'svarta bönor'},{a:'100g',n:'paprika'},{a:'efter smak',n:'tomatsås och vitlök'},{a:'30g',n:'fetaost'}],
-      steps:'Stek tempeh gyllenbrun. Stek vitlök och paprika. Tillsätt bönor och tomatsås, låt sjuda 5 min. Rör ner fetaost sista minuten. Servera med tempeh.' },
-    { id:13, name:'Tofu med edamame & quinoa', cat:'Middag', kcal:550, protein:45,
-      ingredients:[{a:'150g',n:'tofu'},{a:'150g',n:'edamame'},{a:'80g',n:'quinoa'},{a:'efter smak',n:'sojasås och sesamolja'},{a:'efter smak',n:'ingefära'}],
-      steps:'Koka quinoan. Stek tofu. Värm edamame. Riv ingefära och blanda med sojasås och sesamolja. Häll dressingen över allt.' },
-    { id:14, name:'Proteinglass', cat:'Mellanmål', kcal:160, protein:25,
-      ingredients:[{a:'30g',n:'proteinpulver'},{a:'3 dl',n:'osötad mandelmjölk'}],
-      steps:'Mixa ihop. Smaksätt valfritt (kakao, vanilj, jordgubb). Häll i ispinneform eller liten form. Frys 3–4 timmar.' }
-  ];
-  var SHOPPING_CATEGORIES = {
-    'Protein': ['tofu','rökt tofu','tempeh','silkestofu','ägg','halloumi','fetaost','proteinpulver'],
-    'Grönsaker': ['broccoli','grönkål','brysselkål','spenat','bladspenat','paprika','squash','tomat','gurka','rödlök','jalapeños','sötpotatis','morot','palsternacka','avokado'],
-    'Bönor & Linser': ['svarta bönor','kikärtor','edamame','bönpasta'],
-    'Spannmål': ['quinoa','bönpasta'],
-    'Övrigt': ['kokosmjölk','krossade tomater','tahini','sojasås','sesamolja','rapsolja','vitlök','ingefära','mandelmjölk']
-  };
+
   // Diet state
-  var todayDietStr = (function(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
-  var [checkedMeals, setCheckedMeals] = useState({});
-  var [recipeAmounts, setRecipeAmounts] = useState({});
-  var [boughtItems, setBoughtItems]   = useState({});
-  var [recipeSearch, setRecipeSearch] = useState('');
-  var [openRecipe, setOpenRecipe]     = useState(null);
-  var [recipeFavs, setRecipeFavs]     = useState([]);
-  var [recipeFilter, setRecipeFilter] = useState('alla');
-  // Load/save diet data
+  var todayDietStr = new Date().toISOString().split('T')[0];
+  var dietChecked = React.useState({}); var checkedMeals = dietChecked[0]; var setCheckedMeals = dietChecked[1];
+  var dietBought = React.useState({}); var boughtItems = dietBought[0]; var setBoughtItems = dietBought[1];
+  var dietSearch = React.useState(''); var recipeSearch = dietSearch[0]; var setRecipeSearch = dietSearch[1];
+  var dietOpen = React.useState(null); var openRecipe = dietOpen[0]; var setOpenRecipe = dietOpen[1];
+  var dietFavs = React.useState([]); var recipeFavs = dietFavs[0]; var setRecipeFavs = dietFavs[1];
+  var dietFilter = React.useState('alla'); var recipeFilter = dietFilter[0]; var setRecipeFilter = dietFilter[1];
   useEffect(function(){
-    var cm = localStorage.getItem('diet-checked-'+todayDietStr);
-    var rf = localStorage.getItem('diet-favs');
-    var bi = localStorage.getItem('diet-bought');
+    var cm=localStorage.getItem('diet-checked-'+todayDietStr);
+    var rf=localStorage.getItem('diet-favs');
+    var bi=localStorage.getItem('diet-bought');
     if(cm) setCheckedMeals(JSON.parse(cm));
     if(rf) setRecipeFavs(JSON.parse(rf));
     if(bi) setBoughtItems(JSON.parse(bi));
@@ -1305,7 +1236,37 @@ function WeightStepTracker() {
   useEffect(function(){ localStorage.setItem('diet-favs', JSON.stringify(recipeFavs)); }, [recipeFavs]);
   useEffect(function(){ localStorage.setItem('diet-bought', JSON.stringify(boughtItems)); }, [boughtItems]);
 
-  // ─── RENDER: IDAG ─────────────────────────────────────────────────────────
+  // Diet data
+  var MEAL_NAMES = ['Frukost','Lunch','Middag','Kvallsmat'];
+  var MEAL_EMOJI = ['sunrise','salad','plate','moon'];
+  var MEAL_ICON = { 'sunrise':'🌅', 'salad':'🥗', 'plate':'🍽', 'moon':'🌙' };
+  var WEEK_MENU_DEF = [
+    { day:'Mandag',    meals:['Aggomelett med tofu och sotpotatis','Tacotallrik','Tofu med broccolirora','Proteinglass'] },
+    { day:'Tisdag',    meals:['Aggomelett med tofu och sotpotatis','Paprikatofu med bonpasta','Tofu med rotfrukter och gronkal','Proteinglass'] },
+    { day:'Onsdag',    meals:['Aggomelett med tofu och sotpotatis','Tofu och agg med quinoa','Tempeh med kikartor och rotfrukter','Proteinglass'] },
+    { day:'Torsdag',   meals:['Aggomelett med tofu och sotpotatis','Kebabtallrik','Tofu med brysselkal och halloumi','Proteinglass'] },
+    { day:'Fredag',    meals:['Aggomelett med tofu och sotpotatis','Bonpasta med tofu och tomatsas','Spenatsoppa med rokt tofu','Proteinglass'] },
+    { day:'Lordag',    meals:['Aggomelett med tofu och sotpotatis','Tacotallrik','Tempeh med svarta bonor och paprika','Proteinglass'] },
+    { day:'Sondag',    meals:['Aggomelett med tofu och sotpotatis','Tofu och agg med quinoa','Tofu med edamame och quinoa','Proteinglass'] }
+  ];
+  var RECIPES_DEF = [
+    { id:1, name:'Tacotallrik', cat:'Lunch', kcal:540, protein:44, ingredients:[{a:'180g',n:'tofu'},{a:'100g',n:'svarta bonor'},{a:'50g',n:'jalapenos'},{a:'35g',n:'gronkal'},{a:'50g',n:'tomat'},{a:'20g',n:'rodlok'},{a:'0.5 st',n:'avokado'}], steps:'Stek tofun i rapsolja tills gyllenbrun. Varm bonorna. Stek gronkalen latt. Lagg upp allt pa tallrik. Mosa avokadon med lite limejuice och salt. Toppa med jalapenos, hackad tomat och rodlok.' },
+    { id:2, name:'Tofu med broccolirora', cat:'Middag', kcal:480, protein:42, ingredients:[{a:'180g',n:'tofu'},{a:'100g',n:'broccoli'},{a:'60g',n:'champinjoner'},{a:'60g',n:'squash'},{a:'50g',n:'tomat'},{a:'30g',n:'fetaost'},{a:'efter smak',n:'jalapenos'}], steps:'Stek tofun gyllenbrun. Bryn broccoli, champinjoner, squash och tomat i samma panna. Tillsatt fetaosten sista minuten. Servera med tofun.' },
+    { id:3, name:'Paprikatofu med bonpasta', cat:'Lunch', kcal:530, protein:43, ingredients:[{a:'180g',n:'tofu'},{a:'40g',n:'bonpasta'},{a:'100g',n:'paprika'},{a:'40g',n:'tomat'},{a:'1 klyfta',n:'vitlok'},{a:'30g',n:'fetaost'}], steps:'Koka bonpastan. Stek tofun. Stek vitlok, paprika och tomat. Rör ner fetaosten. Servera med tofun.' },
+    { id:4, name:'Tofu med rotfrukter och gronkal', cat:'Middag', kcal:500, protein:40, ingredients:[{a:'180g',n:'tofu'},{a:'70g',n:'morot'},{a:'70g',n:'palsternacka'},{a:'150g',n:'gronkal'},{a:'30g',n:'fetaost'}], steps:'Skar rotfrukterna i 1 cm skivor. Woka tofu och rotfrukter tills mjuka. Tillsatt gronkalen sista 3 minuterna och fetaosten sista minuten.' },
+    { id:5, name:'Tofu och agg med quinoa', cat:'Lunch', kcal:560, protein:48, ingredients:[{a:'150g',n:'tofu'},{a:'2 st',n:'agg'},{a:'100g',n:'quinoa'},{a:'efter smak',n:'spenat'},{a:'efter smak',n:'sojasas'},{a:'efter smak',n:'sesamolja'}], steps:'Koka quinoan. Stek tofun. Stek aggen. Woka spenat snabbt. Ringla over sojasas och sesamolja.' },
+    { id:6, name:'Tempeh med kikartor och rotfrukter', cat:'Middag', kcal:540, protein:40, ingredients:[{a:'150g',n:'tempeh'},{a:'100g',n:'kikartor'},{a:'80g',n:'morot'},{a:'80g',n:'palsternacka'},{a:'efter smak',n:'tahini'}], steps:'Stek tempeh tills gyllenbrun. Woka rotfrukter och kikartor. Servera med tahini ringad over.' },
+    { id:7, name:'Kebabtallrik', cat:'Lunch', kcal:520, protein:40, ingredients:[{a:'180g',n:'tofu'},{a:'60g',n:'avokado'},{a:'60g',n:'tomat'},{a:'60g',n:'gurka'},{a:'20g',n:'bladspenat'},{a:'15g',n:'jalapenos'},{a:'100g',n:'silkestofu'},{a:'1 klyfta',n:'vitlok'}], steps:'Krydda tofun med paprika, spiskummin, koriander, salt. Stek gyllenbrun. Mixa silkestofu med vitlok, citron, salt till vitlokssas.' },
+    { id:8, name:'Tofu med brysselkal och halloumi', cat:'Middag', kcal:510, protein:42, ingredients:[{a:'150g',n:'tofu'},{a:'100g',n:'brysselkal'},{a:'100g',n:'gronkal'},{a:'50g',n:'squash'},{a:'40g',n:'halloumi'}], steps:'Stek tofun. Tillsatt brysselkal och squash. Lagg i gronkal och halloumi sista minuten.' },
+    { id:9, name:'Bonpasta med tofu och tomatsas', cat:'Lunch', kcal:520, protein:42, ingredients:[{a:'180g',n:'tofu'},{a:'40g',n:'bonpasta'},{a:'120g',n:'krossade tomater'},{a:'efter smak',n:'lok och vitlok'},{a:'10g',n:'ruccola'}], steps:'Stek lok och vitlok. Tillsatt krossade tomater, sjud 10 min. Stek tofun. Koka bonpastan. Blanda ihop.' },
+    { id:10, name:'Spenatsoppa med rokt tofu', cat:'Middag', kcal:480, protein:38, ingredients:[{a:'180g',n:'rokt tofu'},{a:'200g',n:'spenat'},{a:'1 dl',n:'kokosmjolk'},{a:'2 klyftor',n:'vitlok'},{a:'efter smak',n:'ingefara'}], steps:'Fras vitlok och ingefara. Tillsatt spenat och lat falla ihop. Hall i kokosmjolk och mixa slatt. Lagg i rokt tofu.' },
+    { id:11, name:'Aggomelett med tofu och sotpotatis', cat:'Frukost', kcal:580, protein:50, ingredients:[{a:'3 st',n:'agg'},{a:'120g',n:'tofu'},{a:'150g',n:'sotpotatis'},{a:'efter smak',n:'paprika och spenat'}], steps:'Koka sotpotatis. Stek tofu. Vispa agg och stek till omelett med paprika och spenat. Servera med sotpotatis och tofu.' },
+    { id:12, name:'Tempeh med svarta bonor och paprika', cat:'Middag', kcal:520, protein:42, ingredients:[{a:'150g',n:'tempeh'},{a:'150g',n:'svarta bonor'},{a:'100g',n:'paprika'},{a:'efter smak',n:'tomatsas och vitlok'},{a:'30g',n:'fetaost'}], steps:'Stek tempeh gyllenbrun. Stek vitlok och paprika. Tillsatt bonor och tomatsas. Ror ner fetaost.' },
+    { id:13, name:'Tofu med edamame och quinoa', cat:'Middag', kcal:550, protein:45, ingredients:[{a:'150g',n:'tofu'},{a:'150g',n:'edamame'},{a:'80g',n:'quinoa'},{a:'efter smak',n:'sojasas och sesamolja'}], steps:'Koka quinoan. Stek tofu. Varm edamame. Blanda med sojasas och sesamolja.' },
+    { id:14, name:'Proteinglass', cat:'Mellanmal', kcal:160, protein:25, ingredients:[{a:'30g',n:'proteinpulver'},{a:'3 dl',n:'mandelmjolk'}], steps:'Mixa ihop. Smaксatt valfritt. Hall i form. Frys 3-4 timmar.' }
+  ];
+  var SHOPPING = ["tofu","rokt tofu","tempeh","silkestofu","agg","halloumi","fetaost","proteinpulver","broccoli","gronkal","brysselkal","spenat","paprika","squash","tomat","gurka","rodlok","jalapenos","sotpotatis","morot","palsternacka","avokado","svarta bonor","kikartor","edamame","bonpasta","quinoa","kokosmjolk","krossade tomater","tahini","sojasas","sesamolja","mandelmjolk"];
+
   function renderIdag() {
     var dayIdx = new Date().getDay(); dayIdx = dayIdx===0?6:dayIdx-1;
     var todayMenu = WEEK_MENU_DEF[dayIdx];
@@ -1330,16 +1291,15 @@ function WeightStepTracker() {
         )
       ),
       h('div', {className:'bg-white rounded-xl p-4 shadow-md'},
-        h('h2',{className:'text-lg font-bold text-gray-800 mb-3'},'🗓️ '+todayMenu.day+'s måltider'),
+        h('h2',{className:'text-lg font-bold text-gray-800 mb-3'},'Dagens maltider'),
         h('div',{className:'space-y-2'},
           MEAL_NAMES.map(function(meal,i){
             var rec = RECIPES_DEF.find(function(r){return r.name===todayMenu.meals[i];});
             var checked = !!checkedMeals[i];
             return h('div',{key:i,
               className:'flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors '+(checked?'bg-green-50 border border-green-200':'bg-gray-50 hover:bg-gray-100'),
-              onClick:function(){setCheckedMeals(function(prev){var n=Object.assign({},prev);n[i]=!n[i];return n;});}
+              onClick:function(){setCheckedMeals(function(prev){var n=Object.assign({},prev);n[i]=!n[i];return n;})}
             },
-              h('div',{className:'text-2xl'},MEAL_EMOJI[i]),
               h('div',{className:'flex-1'},
                 h('p',{className:'text-xs font-semibold text-gray-500 uppercase'},meal),
                 h('p',{className:'font-medium text-gray-800'},todayMenu.meals[i]),
@@ -1355,19 +1315,18 @@ function WeightStepTracker() {
     );
   }
 
-  // ─── RENDER: MENY ─────────────────────────────────────────────────────────
   function renderMeny() {
     return h('div', {className:'bg-white rounded-xl p-6 shadow-md'},
-      h('h2',{className:'text-xl font-bold text-gray-800 mb-4'},'📅 Veckans meny'),
+      h('h2',{className:'text-xl font-bold text-gray-800 mb-4'},'Veckans meny'),
       h('div',{className:'space-y-3'},
         WEEK_MENU_DEF.map(function(day,di){
           var isToday = di===(new Date().getDay()===0?6:new Date().getDay()-1);
           return h('div',{key:di,className:'border rounded-xl overflow-hidden '+(isToday?'border-indigo-400':'border-gray-100')},
-            h('div',{className:'px-4 py-2 font-bold text-sm '+(isToday?'bg-indigo-600 text-white':'bg-gray-50 text-gray-700')},day.day+(isToday?' — Idag':'')),
+            h('div',{className:'px-4 py-2 font-bold text-sm '+(isToday?'bg-indigo-600 text-white':'bg-gray-50 text-gray-700')},day.day+(isToday?' - Idag':'')),
             h('div',{className:'grid grid-cols-2 md:grid-cols-4'},
               day.meals.map(function(meal,mi){
-                return h('div',{key:mi,className:'p-3 border-r border-b border-gray-50 last:border-r-0'},
-                  h('p',{className:'text-xs text-gray-400 uppercase'},MEAL_EMOJI[mi]+' '+MEAL_NAMES[mi]),
+                return h('div',{key:mi,className:'p-3 border-r border-b border-gray-50'},
+                  h('p',{className:'text-xs text-gray-400 uppercase'},MEAL_NAMES[mi]),
                   h('p',{className:'text-sm font-medium text-gray-700 mt-0.5'},meal)
                 );
               })
@@ -1378,19 +1337,18 @@ function WeightStepTracker() {
     );
   }
 
-  // ─── RENDER: RECEPT ───────────────────────────────────────────────────────
   function renderRecept() {
-    var cats = ['alla','Lunch','Middag','Mellanmål'];
+    var cats = ['alla','Frukost','Lunch','Middag','Mellanmal'];
     var filtered = RECIPES_DEF.filter(function(r){
       if(recipeFilter!=='alla' && r.cat!==recipeFilter) return false;
-      if(recipeSearch && !(r.name+' '+r.ingredients.map(function(i){return i.n;}).join(' ')).toLowerCase().includes(recipeSearch.toLowerCase())) return false;
+      if(recipeSearch && !(r.name+r.ingredients.map(function(i){return i.n;}).join()).toLowerCase().includes(recipeSearch.toLowerCase())) return false;
       return true;
     });
     return h('div',{className:'space-y-4'},
       h('div',{className:'bg-white rounded-xl p-4 shadow-md'},
-        h('input',{type:'text',placeholder:'🔍 Sök recept eller ingrediens…',value:recipeSearch,
+        h('input',{type:'text',placeholder:'Sök recept…',value:recipeSearch,
           onChange:function(e){setRecipeSearch(e.target.value);},
-          className:'w-full px-4 py-3 border rounded-xl outline-none focus:border-indigo-400 mb-3'}),
+          className:'w-full px-4 py-3 border rounded-xl outline-none mb-3'}),
         h('div',{className:'flex gap-2 flex-wrap'},
           cats.map(function(cat){
             return h('button',{key:cat,onClick:function(){setRecipeFilter(cat);},
@@ -1403,29 +1361,28 @@ function WeightStepTracker() {
         filtered.map(function(rec){
           var isOpen = openRecipe===rec.id;
           var isFav = recipeFavs.includes(rec.id);
-          return h('div',{key:rec.id,className:'bg-white rounded-xl shadow-md overflow-hidden border '+(isOpen?'border-indigo-300':'border-transparent')},
+          return h('div',{key:rec.id,className:'bg-white rounded-xl shadow-md overflow-hidden'},
             h('div',{className:'p-4 cursor-pointer hover:bg-gray-50',onClick:function(){setOpenRecipe(isOpen?null:rec.id);}},
               h('div',{className:'flex items-start justify-between gap-2'},
                 h('div',{className:'flex-1'},
-                  h('span',{className:'text-xs font-semibold px-2 py-0.5 rounded-full mr-2 '+(rec.cat==='Lunch'?'bg-green-100 text-green-700':rec.cat==='Middag'?'bg-indigo-100 text-indigo-700':'bg-orange-100 text-orange-700')},rec.cat),
+                  h('span',{className:'text-xs font-semibold px-2 py-0.5 rounded-full mr-2 bg-indigo-100 text-indigo-700'},rec.cat),
                   h('span',{className:'font-bold text-gray-800'},rec.name),
                   h('div',{className:'flex gap-4 mt-1'},
-                    h('span',{className:'text-xs text-gray-400'},'🔥 '+rec.kcal+' kcal'),
-                    h('span',{className:'text-xs text-gray-400'},'💪 '+rec.protein+'g protein')
+                    h('span',{className:'text-xs text-gray-400'},'Kcal: '+rec.kcal),
+                    h('span',{className:'text-xs text-gray-400'},'Protein: '+rec.protein+'g')
                   )
                 ),
-                h('button',{onClick:function(e){e.stopPropagation();setRecipeFavs(function(prev){return prev.includes(rec.id)?prev.filter(function(x){return x!==rec.id;}):[...prev,rec.id];});},
+                h('button',{onClick:function(e){e.stopPropagation();setRecipeFavs(function(prev){return prev.includes(rec.id)?prev.filter(function(x){return x!==rec.id;}):[].concat(prev,[rec.id]);});},
                   className:'text-xl flex-shrink-0 '+(isFav?'text-yellow-400':'text-gray-300 hover:text-yellow-400')
-                },isFav?'⭐':'☆')
+                },isFav?'*':'-')
               )
             ),
             isOpen?h('div',{className:'border-t px-4 pb-4'},
               h('p',{className:'text-xs font-bold text-gray-400 uppercase tracking-wide mt-3 mb-2'},'Ingredienser'),
               h('ul',{className:'space-y-1'},
                 rec.ingredients.map(function(ing,ii){
-                  return h('li',{key:ii,className:'flex items-center gap-2 text-sm'},
+                  return h('li',{key:ii,className:'flex gap-2 text-sm'},
                     h('span',{className:'font-bold text-gray-700 w-24 text-right flex-shrink-0'},ing.a),
-                    h('span',{className:'w-1 h-1 rounded-full bg-gray-300 flex-shrink-0'}),
                     h('span',{className:'text-gray-600'},ing.n)
                   );
                 })
@@ -1439,141 +1396,122 @@ function WeightStepTracker() {
     );
   }
 
-  // ─── RENDER: HANDLA ───────────────────────────────────────────────────────
   function renderHandla() {
-    var allIngs = [];
-    RECIPES_DEF.forEach(function(r){r.ingredients.forEach(function(i){var n=i.n.split(' ')[0].toLowerCase();if(!allIngs.includes(n))allIngs.push(n);});});
     return h('div',{className:'space-y-4'},
       h('div',{className:'flex items-center justify-between bg-white rounded-xl p-4 shadow-md'},
-        h('h2',{className:'text-lg font-bold text-gray-800'},'🛒 Handlingslista'),
-        h('button',{onClick:function(){setBoughtItems({});},className:'text-xs text-gray-400 hover:text-red-500'},'Rensa ikryssade')
+        h('h2',{className:'text-lg font-bold text-gray-800'},'Handlingslista'),
+        h('button',{onClick:function(){setBoughtItems({});},className:'text-xs text-gray-400 hover:text-red-500'},'Rensa')
       ),
-      Object.entries(SHOPPING_CATEGORIES).map(function(kv){
-        var cat=kv[0], items=kv[1];
-        return h('div',{key:cat,className:'bg-white rounded-xl p-4 shadow-md'},
-          h('h3',{className:'font-bold text-gray-700 mb-3 text-sm uppercase tracking-wide'},cat),
-          h('div',{className:'space-y-1'},
-            items.map(function(item){
-              var bought=!!boughtItems[item];
-              return h('div',{key:item,
-                className:'flex items-center gap-3 py-2 px-2 rounded-lg cursor-pointer hover:bg-gray-50',
-                onClick:function(){setBoughtItems(function(prev){var n=Object.assign({},prev);n[item]=!n[item];return n;});}
-              },
-                h('div',{className:'w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 '+(bought?'bg-green-500 border-green-500':'border-gray-300')},
-                  bought?h('span',{className:'text-white text-xs leading-none'},'✓'):null
-                ),
-                h('span',{className:'text-sm '+(bought?'line-through text-gray-400':'text-gray-700')},item)
-              );
-            })
-          )
-        );
-      })
+      h('div',{className:'bg-white rounded-xl p-4 shadow-md'},
+        h('div',{className:'space-y-1'},
+          SHOPPING.map(function(item){
+            var bought=!!boughtItems[item];
+            return h('div',{key:item,
+              className:'flex items-center gap-3 py-2 px-2 rounded-lg cursor-pointer hover:bg-gray-50',
+              onClick:function(){setBoughtItems(function(prev){var n=Object.assign({},prev);n[item]=!n[item];return n;})}
+            },
+              h('div',{className:'w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 '+(bought?'bg-green-500 border-green-500':'border-gray-300')},
+                bought?h('span',{className:'text-white text-xs leading-none'},'v'):null
+              ),
+              h('span',{className:'text-sm '+(bought?'line-through text-gray-400':'text-gray-700')},item)
+            );
+          })
+        )
+      )
     );
   }
 
-  // ─── Main render ──────────────────────────────────────────────────────────
-  var allNavItems = [
-    { id:'overview', label:'📊 Översikt',      group:'halsa' },
-    { id:'add',      label:'➕ Lägg till vikt', group:'halsa' },
-    { id:'workouts', label:'💪 Träning',        group:'halsa' },
-    { id:'history',  label:'📅 Historik',       group:'halsa' },
-    { id:'weekly',   label:'📆 Veckor',         group:'halsa' },
-    { id:'habits',   label:'🎯 Vanor',          group:'halsa' },
-    { id:'settings', label:'⚙️ Inställningar',  group:'halsa' },
-    { id:'idag',     label:'🍽️ Idag',           group:'kost' },
-    { id:'meny',     label:'📋 Veckans meny',   group:'kost' },
-    { id:'recept',   label:'📖 Recept',         group:'kost' },
-    { id:'handla',   label:'🛒 Handla',         group:'kost' },
+  // Main render
+  var allNav = [
+    { id:'overview', label:'Översikt', group:'h' },
+    { id:'add', label:'+ Lägg till vikt', group:'h' },
+    { id:'workouts', label:'Träning', group:'h' },
+    { id:'history', label:'Historik', group:'h' },
+    { id:'weekly', label:'Veckor', group:'h' },
+    { id:'habits', label:'Vanor', group:'h' },
+    { id:'settings', label:'Inställningar', group:'h' },
+    { id:'idag', label:'Idag', group:'k' },
+    { id:'meny', label:'Veckans meny', group:'k' },
+    { id:'recept', label:'Recept', group:'k' },
+    { id:'handla', label:'Handla', group:'k' },
   ];
   var backupPanel = showImport ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
     h('div', { className: 'flex items-center justify-between mb-5' },
       h('h2', { className: 'text-xl font-bold text-gray-800' }, 'Backup & Import'),
-      h('button', { onClick:function(){setShowImport(false);}, className:'text-gray-400 hover:text-gray-600 text-2xl leading-none' }, '×')
+      h('button', { onClick:function(){setShowImport(false);}, className:'text-gray-400 hover:text-gray-600 text-2xl leading-none' }, 'x')
     ),
     h('div', { className: 'space-y-6' },
       h('div', { className: 'flex gap-3 flex-wrap' },
-        h('button', { onClick:exportData, className:'bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 text-sm font-medium' }, '💾 Ladda ner backup'),
-        h('label', { className:'bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium cursor-pointer' },
-          '📂 Återställ från fil',
+        h('button', { onClick:exportData, className:'bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-medium' }, 'Ladda ner backup'),
+        h('label', { className:'bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium cursor-pointer' },
+          'Aterställ från fil',
           h('input', { type:'file', accept:'.json', onChange:importFromFile, className:'hidden' })
         )
       ),
       h('div', { className: 'border-t pt-5' },
-        h('h3', { className: 'font-medium mb-1 text-sm text-gray-700' }, '📋 Importera historisk viktdata'),
+        h('h3', { className: 'font-medium mb-1 text-sm text-gray-700' }, 'Importera historisk viktdata'),
         h('p', { className: 'text-xs text-gray-400 mb-3' }, 'Format per rad: 03-nov 91,1'),
-        h('textarea', { value:importText, onChange:function(e){setImportText(e.target.value);}, placeholder:'03-nov 91,1\n04-nov 90,8\n...', className:'w-full px-4 py-2 border rounded-lg font-mono text-sm mb-3 outline-none', rows:6 }),
-        h('button', { onClick:importHistoricalData, className:'bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 text-sm font-medium' }, 'Importera')
+        h('textarea', { value:importText, onChange:function(e){setImportText(e.target.value);}, placeholder:'03-nov 91,1', className:'w-full px-4 py-2 border rounded-lg font-mono text-sm mb-3 outline-none', rows:6 }),
+        h('button', { onClick:importHistoricalData, className:'bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium' }, 'Importera')
       )
     )
   ) : null;
   return h('div', { className: 'min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100' },
     h(Toast, { toast: toast, onClose: function(){ setToast(null); } }),
     h('div', { className: 'md:hidden bg-white shadow-sm px-4 pt-4 pb-2' },
-      h('h1', { className: 'text-xl font-bold text-gray-800 mb-2' }, '🏥 Hälsodagbok'),
+      h('h1', { className: 'text-xl font-bold text-gray-800 mb-2' }, 'Hälsodagbok'),
       h('div', { className: 'flex gap-2 overflow-x-auto pb-2' },
-        allNavItems.map(function(n) {
+        allNav.map(function(n) {
           return h('button', { key:n.id, onClick:function(){setView(n.id);},
-            className:'px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap flex-shrink-0 '+(view===n.id?(n.group==='kost'?'bg-green-600 text-white':'bg-indigo-600 text-white'):'bg-gray-100 text-gray-700') }, n.label);
+            className:'px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap '+(view===n.id?'bg-indigo-600 text-white':'bg-gray-100 text-gray-700') }, n.label);
         }),
-        h('button', { onClick:function(){setShowImport(!showImport);}, className:'px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap flex-shrink-0 bg-gray-100 text-gray-700' }, '💾 Backup')
+        h('button', { onClick:function(){setShowImport(!showImport);}, className:'px-3 py-2 rounded-lg text-sm bg-gray-100 text-gray-700 whitespace-nowrap' }, 'Backup')
       )
     ),
     h('div', { className: 'flex' },
-      h('aside', { className: 'hidden md:flex flex-col fixed left-0 top-0 h-full w-60 bg-white shadow-xl z-10 overflow-y-auto' },
+      h('aside', { className: 'hidden md:flex flex-col fixed left-0 top-0 h-full w-56 bg-white shadow-xl z-10 overflow-y-auto' },
         h('div', { className: 'p-5' },
-          h('div', { className: 'mb-5 px-2' },
-            h('div', { className: 'text-3xl mb-1' }, '🏥'),
-            h('h1', { className: 'text-lg font-bold text-gray-800' }, 'Hälsodagbok'),
-            stats ? h('p', { className: 'text-xs text-gray-400 mt-0.5' }, 'Senast: ' + new Date(stats.latest.date).toLocaleDateString('sv-SE', { day:'numeric', month:'short' })) : null
+          h('div', { className: 'mb-6' },
+            h('h1', { className: 'text-lg font-bold text-gray-800' }, 'Hälsodagbok')
           ),
-          h('p', { className: 'text-xs font-bold text-gray-400 uppercase tracking-widest px-2 mb-1' }, 'Hälsa'),
+          h('p', { className: 'text-xs font-bold text-gray-400 uppercase tracking-widest mb-1' }, 'Hälsa'),
           h('nav', { className: 'flex flex-col gap-0.5 mb-4' },
-            allNavItems.filter(function(n){return n.group==='halsa';}).map(function(n){
+            allNav.filter(function(n){return n.group==='h';}).map(function(n){
               return h('button', { key:n.id, onClick:function(){setView(n.id);},
-                className:'text-left px-4 py-2.5 rounded-xl font-medium text-sm transition-colors '+(view===n.id?'bg-indigo-600 text-white':'text-gray-600 hover:bg-indigo-50') }, n.label);
+                className:'text-left px-3 py-2 rounded-lg font-medium text-sm '+(view===n.id?'bg-indigo-600 text-white':'text-gray-600 hover:bg-indigo-50') }, n.label);
             }),
             h('button', { onClick:function(){setShowImport(!showImport);},
-              className:'text-left px-4 py-2.5 rounded-xl font-medium text-sm '+(showImport?'bg-indigo-100 text-indigo-700':'text-gray-600 hover:bg-indigo-50') }, '💾 Backup')
+              className:'text-left px-3 py-2 rounded-lg font-medium text-sm '+(showImport?'bg-indigo-100 text-indigo-700':'text-gray-600 hover:bg-indigo-50') }, 'Backup')
           ),
-          h('p', { className: 'text-xs font-bold text-gray-400 uppercase tracking-widest px-2 mb-1' }, 'Mat & Kost'),
+          h('p', { className: 'text-xs font-bold text-gray-400 uppercase tracking-widest mb-1' }, 'Mat & Kost'),
           h('nav', { className: 'flex flex-col gap-0.5' },
-            allNavItems.filter(function(n){return n.group==='kost';}).map(function(n){
+            allNav.filter(function(n){return n.group==='k';}).map(function(n){
               return h('button', { key:n.id, onClick:function(){setView(n.id);},
-                className:'text-left px-4 py-2.5 rounded-xl font-medium text-sm transition-colors '+(view===n.id?'bg-green-600 text-white':'text-gray-600 hover:bg-green-50') }, n.label);
+                className:'text-left px-3 py-2 rounded-lg font-medium text-sm '+(view===n.id?'bg-green-600 text-white':'text-gray-600 hover:bg-green-50') }, n.label);
             })
           )
         )
       ),
-      h('main', { className: 'flex-1 md:ml-60 p-4 md:p-8 min-h-screen' },
+      h('main', { className: 'flex-1 md:ml-56 p-4 md:p-8 min-h-screen' },
         h('div', { className: 'max-w-5xl mx-auto' },
-          h('div', { className: 'hidden md:flex items-center justify-between bg-white rounded-2xl shadow-md px-8 py-5 mb-6' },
-            h('h2', { className: 'text-2xl font-bold text-gray-800' },
-              (allNavItems.find(function(n){return n.id===view;})||{label:'📊 Översikt'}).label
-            ),
-            stats ? h('div', { className: 'text-right' },
-              h('p', { className: 'text-xs text-gray-400 uppercase tracking-wide' }, 'Senast loggat'),
-              h('p', { className: 'font-bold text-gray-700' }, new Date(stats.latest.date).toLocaleDateString('sv-SE', { day:'numeric', month:'short', year:'numeric' }))
-            ) : null
-          ),
           backupPanel,
-          view === 'overview'  ? renderOverview()  : null,
-          view === 'add'       ? renderAdd()       : null,
-          view === 'workouts'  ? renderWorkouts()  : null,
-          view === 'goals'     ? renderGoals()     : null,
-          view === 'history'   ? renderHistory()   : null,
-          view === 'weekly'    ? renderWeekly()    : null,
-          view === 'habits'    ? renderHabits()    : null,
-          view === 'settings'  ? renderSettings()  : null,
-          view === 'idag'      ? renderIdag()      : null,
-          view === 'meny'      ? renderMeny()      : null,
-          view === 'recept'    ? renderRecept()    : null,
-          view === 'handla'    ? renderHandla()    : null
+          view === 'overview' ? renderOverview()  : null,
+          view === 'add'      ? renderAdd()       : null,
+          view === 'workouts' ? renderWorkouts()  : null,
+          view === 'goals'    ? renderGoals()     : null,
+          view === 'history'  ? renderHistory()   : null,
+          view === 'weekly'   ? renderWeekly()    : null,
+          view === 'habits'   ? renderHabits()    : null,
+          view === 'settings' ? renderSettings()  : null,
+          view === 'idag'     ? renderIdag()      : null,
+          view === 'meny'     ? renderMeny()      : null,
+          view === 'recept'   ? renderRecept()    : null,
+          view === 'handla'   ? renderHandla()    : null
         )
       )
     )
   );
 }
-
 ReactDOM.createRoot(document.getElementById('root')).render(h(WeightStepTracker, null));
 </script>
 </body>
