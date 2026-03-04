@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hälsodagbok</title>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin="anonymous"></script>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100">
@@ -1512,7 +1512,30 @@ function WeightStepTracker() {
     )
   );
 }
-ReactDOM.createRoot(document.getElementById('root')).render(h(WeightStepTracker, null));
+
+class ErrorBoundary extends React.Component {
+  constructor(p) { super(p); this.state = { err: null }; }
+  static getDerivedStateFromError(e) { return { err: e }; }
+  render() {
+    if (this.state.err) {
+      var el = document.getElementById('error-display');
+      el.style.display='block';
+      el.textContent = ['RENDER FEL:', this.state.err.message, this.state.err.stack].join(' | ');
+      return null;
+    }
+    return this.props.children;
+  }
+}
+try {
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    h(ErrorBoundary, null, h(WeightStepTracker, null))
+  );
+} catch(e) {
+  var el = document.getElementById('error-display');
+  el.style.display='block';
+  el.textContent = 'INIT FEL: ' + e.message + ' | ' + e.stack;
+}
+
 </script>
 </body>
 </html>
