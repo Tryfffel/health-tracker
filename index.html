@@ -199,10 +199,12 @@ function WeightStepTracker() {
       if (results[3] && results[3].value) setYearlyGoal(JSON.parse(results[3].value));
       if (results[4] && results[4].value) setHeight(parseFloat(results[4].value));
       if (results[5] && results[5].value) setTargetRate(parseFloat(results[5].value));
-      if (results[6] && results[6].value) setHabits(JSON.parse(results[6].value));
-      if (results[7] && results[7].value) setHabitLogs(JSON.parse(results[7].value));
+      if (results[6] && results[6].value) { var h=JSON.parse(results[6].value); setHabits(Array.isArray(h)?h:[]); }
+      if (results[7] && results[7].value) { var hl=JSON.parse(results[7].value); setHabitLogs((hl&&typeof hl==='object'&&!Array.isArray(hl))?hl:{}); }
     } catch (err) {
       console.log('Ingen sparad data', err);
+      localStorage.removeItem('habits');
+      localStorage.removeItem('habit-logs');
     } finally {
       setLoading(false);
     }
