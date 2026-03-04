@@ -1352,16 +1352,16 @@ function WeightStepTracker() {
   }
   function renderHabits() {
     var DAY_NAMES = ['M','T','O','T','F','L','S'];
-    var today = new Date(); today.setHours(0,0,0,0);
-    var todayStr2 = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
-    // Compute 7 days of the displayed week
-    var dow = today.getDay(); // 0=sun
-    var monday = new Date(today);
-    monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1) + weekOffset * 7);
+    var todayStr2 = todayStr();
+    // Use noon to avoid UTC/DST midnight edge cases in Sweden (UTC+1)
+    var _tp = todayStr2.split('-');
+    var today = new Date(parseInt(_tp[0]), parseInt(_tp[1])-1, parseInt(_tp[2]), 12, 0, 0);
+    var dow = today.getDay(); // 0=sun, guaranteed local
+    var monOffset = (dow === 0 ? -6 : 1 - dow) + weekOffset * 7;
     var weekDays = [];
     for (var i = 0; i < 7; i++) {
-      var d = new Date(monday); d.setDate(monday.getDate() + i);
-      weekDays.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'));
+      var d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + monOffset + i, 12, 0, 0);
+      weekDays.push(localDS(d));
     }
     var weekLabel = (weekOffset === 0) ? 'Denna vecka' : (weekOffset === -1 ? 'Förra veckan' : new Date(weekDays[0]).toLocaleDateString('sv-SE', { day:'numeric', month:'short' }) + ' – ' + new Date(weekDays[6]).toLocaleDateString('sv-SE', { day:'numeric', month:'short' }));
     function toggleHabitLog(hid, date) {
