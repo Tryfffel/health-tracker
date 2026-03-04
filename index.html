@@ -4,6 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hälsodagbok</title>
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Hälsodagbok">
+  <link rel="manifest" href="manifest.json">
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -482,6 +487,110 @@ function WeightStepTracker() {
   const yearProgress   = getYearlyProgress();
   const chartData      = getChartData();
   const prediction     = getPrediction();
+
+  const getWeeklyReport = function() {
+    if (entries.length < 2) return null;
+    var now = new Date(); now.setHours(0,0,0,0);
+    var dow = now.getDay();
+    var monday = new Date(now); monday.setDate(now.getDate() - (dow===0?6:dow-1));
+    var lastMon = new Date(monday); lastMon.setDate(monday.getDate()-7);
+    var lastSun = new Date(monday); lastSun.setDate(monday.getDate()-1);
+    var lastWeekEntries = entries.filter(function(e){
+      var d=new Date(e.date); return d>=lastMon && d<=lastSun;
+    });
+    if (lastWeekEntries.length < 2) return null;
+    var weights = lastWeekEntries.map(function(e){return e.weight;}).sort(function(a,b){return a-b;});
+    var avgW = (weights.reduce(function(s,v){return s+v;},0)/weights.length).toFixed(1);
+    var change = (lastWeekEntries[lastWeekEntries.length-1].weight - lastWeekEntries[0].weight).toFixed(1);
+    var lastWeekWorkouts = workouts.filter(function(w){
+      var d=new Date(w.date); return d>=lastMon && d<=lastSun;
+    });
+    var totalMin = lastWeekWorkouts.reduce(function(s,w){return s+w.duration;},0);
+    var steps = lastWeekEntries.filter(function(e){return e.steps;});
+    var avgSteps = steps.length ? Math.round(steps.reduce(function(s,e){return s+e.steps;},0)/steps.length) : 0;
+    return {
+      weekLabel: lastMon.toLocaleDateString('sv-SE',{month:'short',day:'numeric'}) + '–' + lastSun.toLocaleDateString('sv-SE',{month:'short',day:'numeric'}),
+      avgW: avgW, change: parseFloat(change),
+      workouts: lastWeekWorkouts.length, totalMin: totalMin,
+      avgSteps: avgSteps, logDays: lastWeekEntries.length
+    };
+  };
+
+  const getInsights = function() {
+    if (entries.length < 7) return [];
+    var insights = [];
+    var sorted = entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+
+    // Best day of week for weight loss
+    var dayDiffs = {};
+    for (var i = 1; i < sorted.length; i++) {
+      var prev = sorted[i-1], cur = sorted[i];
+      var diff = cur.weight - prev.weight;
+      var day = new Date(cur.date).getDay();
+      if (!dayDiffs[day]) dayDiffs[day] = [];
+      dayDiffs[day].push(diff);
+    }
+    var dayNames = ['söndag','måndag','tisdag','onsdag','torsdag','fredag','lördag'];
+    var bestDay = null, bestAvg = 0;
+    Object.keys(dayDiffs).forEach(function(d) {
+      var avg = dayDiffs[d].reduce(function(s,v){return s+v;},0)/dayDiffs[d].length;
+      if (bestDay === null || avg < bestAvg) { bestDay = parseInt(d); bestAvg = avg; }
+    });
+    if (bestDay !== null && bestAvg < -0.05) {
+      insights.push({ icon:'📅', text: 'Du tappar mest vikt på ' + dayNames[bestDay] + 'ar (snitt ' + bestAvg.toFixed(2) + ' kg)' });
+    }
+
+    // Steps vs weight correlation
+    var stepsEntries = sorted.filter(function(e){return e.steps && e.steps > 0;});
+    if (stepsEntries.length >= 5) {
+      var highSteps = stepsEntries.filter(function(e){return e.steps >= 8000;});
+      var lowSteps  = stepsEntries.filter(function(e){return e.steps < 8000;});
+      if (highSteps.length >= 3 && lowSteps.length >= 3) {
+        var avgHigh = highSteps.reduce(function(s,e){return s+e.weight;},0)/highSteps.length;
+        var avgLow  = lowSteps.reduce(function(s,e){return s+e.weight;},0)/lowSteps.length;
+        if (avgHigh < avgLow - 0.3) {
+          insights.push({ icon:'👟', text: 'Dagar med 8000+ steg: snitt ' + avgHigh.toFixed(1) + ' kg. Under 8000: ' + avgLow.toFixed(1) + ' kg' });
+        }
+      }
+    }
+
+    // Workout weeks vs non-workout weeks
+    if (workouts.length >= 4) {
+      var weekMap = {};
+      workouts.forEach(function(w){
+        var wk = w.date.slice(0,7) + '-W' + getWeekNumber(new Date(w.date));
+        weekMap[wk] = (weekMap[wk]||0) + 1;
+      });
+      var activeWeeks = Object.keys(weekMap).filter(function(w){return weekMap[w]>=3;});
+      if (activeWeeks.length >= 2) {
+        insights.push({ icon:'💪', text: 'Veckor med 3+ träningspass: bättre viktprogress. Ditt snitt: ' + (workouts.length / Math.max(1,Object.keys(weekMap).length)).toFixed(1) + ' pass/vecka' });
+      }
+    }
+
+    // Trend last 14 days
+    if (sorted.length >= 14) {
+      var last14 = sorted.slice(-14);
+      var first14w = last14[0].weight, last14w = last14[last14.length-1].weight;
+      var rate14 = (last14w - first14w) / 2;
+      if (Math.abs(rate14) > 0.05) {
+        var dir = rate14 < 0 ? '↓ minskar' : '↑ ökar';
+        insights.push({ icon:'📈', text: 'Senaste 2 veckorna: trend ' + dir + ' med ' + Math.abs(rate14).toFixed(2) + ' kg/vecka' });
+      }
+    }
+
+    // Best weight ever
+    var minW = Math.min.apply(null, sorted.map(function(e){return e.weight;}));
+    var minEntry = sorted.find(function(e){return e.weight===minW;});
+    var latest = sorted[sorted.length-1];
+    if (latest.weight - minW > 0.5) {
+      insights.push({ icon:'🏆', text: 'Lägsta vikt: ' + minW + ' kg (' + new Date(minEntry.date).toLocaleDateString('sv-SE',{month:'short',day:'numeric'}) + '). Nu ' + (latest.weight-minW).toFixed(1) + ' kg därifrån' });
+    }
+
+    return insights;
+  };
+
+  const weeklyReport = getWeeklyReport();
+  const insights = getInsights();
   const monthlySummary = getMonthlySummary();
   const NavButton = function(props) {
     return h('button', {
@@ -603,6 +712,51 @@ function WeightStepTracker() {
           )
         ) : null
       ),
+      // Weekly auto-report
+      weeklyReport ? h('div', { className: 'bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 rounded-xl p-5 shadow-sm mb-4' },
+        h('div', { className: 'flex items-center gap-2 mb-3' },
+          h('span', { className: 'text-xl' }, '📋'),
+          h('h2', { className: 'font-bold text-gray-800' }, 'Veckorapport ' + weeklyReport.weekLabel)
+        ),
+        h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-3' },
+          h('div', { className: 'bg-white rounded-lg p-3 text-center shadow-sm' },
+            h('p', { className: 'text-2xl font-bold ' + (weeklyReport.change <= 0 ? 'text-green-600' : 'text-red-500') },
+              (weeklyReport.change > 0 ? '+' : '') + weeklyReport.change + ' kg'),
+            h('p', { className: 'text-xs text-gray-500 mt-1' }, 'Viktförändring')
+          ),
+          h('div', { className: 'bg-white rounded-lg p-3 text-center shadow-sm' },
+            h('p', { className: 'text-2xl font-bold text-indigo-600' }, weeklyReport.avgW + ' kg'),
+            h('p', { className: 'text-xs text-gray-500 mt-1' }, 'Snittevikt')
+          ),
+          h('div', { className: 'bg-white rounded-lg p-3 text-center shadow-sm' },
+            h('p', { className: 'text-2xl font-bold text-orange-500' }, weeklyReport.workouts + ' 💪'),
+            h('p', { className: 'text-xs text-gray-500 mt-1' }, weeklyReport.totalMin + ' min träning')
+          ),
+          h('div', { className: 'bg-white rounded-lg p-3 text-center shadow-sm' },
+            h('p', { className: 'text-2xl font-bold text-blue-500' },
+              weeklyReport.avgSteps > 0 ? (weeklyReport.avgSteps >= 1000 ? Math.round(weeklyReport.avgSteps/1000*10)/10+'k' : weeklyReport.avgSteps) : '—'),
+            h('p', { className: 'text-xs text-gray-500 mt-1' }, 'Snitt steg/dag')
+          )
+        ),
+        h('p', { className: 'text-xs text-gray-400 mt-3 text-center' }, weeklyReport.logDays + ' loggade dagar · ' +
+          (weeklyReport.change <= -0.5 ? '🔥 Bra jobbat!' : weeklyReport.change <= 0 ? '👍 På rätt spår' : '💡 Justera kosten lite denna vecka'))
+      ) : null,
+      // Smart insights
+      insights.length > 0 ? h('div', { className: 'bg-gradient-to-br from-violet-50 to-indigo-50 border border-indigo-100 rounded-xl p-5 shadow-sm mb-6' },
+        h('div', { className: 'flex items-center gap-2 mb-3' },
+          h('span', { className: 'text-xl' }, '🧠'),
+          h('h2', { className: 'font-bold text-gray-800' }, 'Smarta insikter'),
+          h('span', { className: 'text-xs text-indigo-400 ml-auto' }, 'baserat på din data')
+        ),
+        h('div', { className: 'space-y-2' },
+          insights.map(function(ins, i) {
+            return h('div', { key: i, className: 'flex items-start gap-3 bg-white rounded-lg px-4 py-3 shadow-sm' },
+              h('span', { className: 'text-lg mt-0.5' }, ins.icon),
+              h('p', { className: 'text-sm text-gray-700 leading-snug' }, ins.text)
+            );
+          })
+        )
+      ) : null,
       // Weight chart (with BMI)
       h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
         h('h2', { className: 'text-lg font-bold text-gray-800 mb-1' }, 'Viktutveckling'),
