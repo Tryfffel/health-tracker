@@ -1364,7 +1364,7 @@ function WeightStepTracker() {
       var d = new Date(parseInt(_tp[0]), parseInt(_tp[1])-1, parseInt(_tp[2]) - dowMon + i + weekOffset * 7, 12, 0, 0);
       weekDays.push(localDS(d));
     }
-    var weekLabel = (weekOffset === 0) ? 'Denna vecka' : (weekOffset === -1 ? 'Förra veckan' : new Date(weekDays[0]).toLocaleDateString('sv-SE', { day:'numeric', month:'short' }) + ' – ' + new Date(weekDays[6]).toLocaleDateString('sv-SE', { day:'numeric', month:'short' }));
+    var weekLabel = 'V' + getISOWeekNumber(weekDays[3]) + (weekOffset === 0 ? ' · Denna vecka' : weekOffset === -1 ? ' · Förra veckan' : '');
     function toggleHabitLog(hid, date) {
       setHabitLogs(function(prev) {
         var day = Object.assign({}, prev[date] || {});
@@ -1466,9 +1466,7 @@ function WeightStepTracker() {
                 weekDays.map(function(date, i) {
                   var isToday = date === todayStr2;
                   return h('div', { key: date, className: 'bg-white py-2 text-center' },
-                    h('div', { className: 'text-xs text-gray-400' }, DAY_NAMES[i]),
-                    h('div', { className: 'text-xs font-bold ' + (isToday ? 'text-indigo-600' : 'text-gray-500') },
-                      parseInt(date.split('-')[2]))
+                    h('div', { className: 'text-xs font-bold ' + (isToday ? 'text-indigo-600' : 'text-gray-400') }, DAY_NAMES[i])
                   );
                 })
               ),
