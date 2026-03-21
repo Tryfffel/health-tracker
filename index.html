@@ -599,10 +599,12 @@ function WeightStepTracker() {
     }, props.label);
   };
   if (loading) {
-    return h('div', { className: 'min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center' },
+    return h('div', { className: 'min-h-screen bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center' },
       h('div', { className: 'text-center' },
-        h('div', { className: 'text-5xl mb-4' }, '🏃'),
-        h('p', { className: 'text-gray-500' }, 'Laddar…')
+        h('div', { style: { fontSize:'64px', animation:'pulse 1.2s ease-in-out infinite' } }, '🏥'),
+        h('p', { className: 'text-white text-xl font-bold mt-4 mb-1' }, 'Hälsodagbok'),
+        h('p', { className: 'text-blue-100 text-sm' }, 'Laddar din data…'),
+        h('style', null, '@keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.15)} }')
       )
     );
   }
@@ -761,71 +763,106 @@ function WeightStepTracker() {
           })
         )
       ) : null,
-      // Weight chart (with BMI)
-      h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
-        h('h2', { className: 'text-lg font-bold text-gray-800 mb-1' }, 'Viktutveckling'),
-        h('p', { className: 'text-xs text-gray-400 mb-4' }, 'Daglig vikt + 7-dagars snitt + BMI'),
-        h(SvgLineChart, { data: chartData, height: 300, lines: [
-          { key: 'vikt',    color: '#a5b4fc', width: 1.5, name: 'Vikt (kg)' },
-          { key: 'snitt7',  color: '#4f46e5', width: 2.5, name: '7-dagars snitt' },
-          { key: 'målvikt', color: '#10b981', width: 1.5, name: 'Målvikt', dashed: true }
-        ]})
+      // Weight chart
+      h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-indigo-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, 'Viktutveckling'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Daglig vikt + 7-dagars snitt')
+          )
+        ),
+        h('div', { className: 'px-4 py-4' },
+          h(SvgLineChart, { data: chartData, height: 280, lines: [
+            { key: 'vikt',    color: '#a5b4fc', width: 1.5, name: 'Vikt (kg)' },
+            { key: 'snitt7',  color: '#4f46e5', width: 2.5, name: '7-dagars snitt' },
+            { key: 'målvikt', color: '#10b981', width: 1.5, name: 'Målvikt', dashed: true }
+          ]})
+        )
       ),
       // BMI chart
-      chartData.some(function(d){ return d.bmi; }) ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
-        h('h2', { className: 'text-lg font-bold text-gray-800 mb-1' }, 'BMI-historik'),
-        h('p', { className: 'text-xs text-gray-400 mb-4' }, 'Normalvikt: 18.5–25'),
-        h(SvgLineChart, { data: chartData, height: 200, lines: [
-          { key: 'bmi', color: '#f59e0b', width: 2, name: 'BMI' }
-        ]})
+      chartData.some(function(d){ return d.bmi; }) ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-amber-400' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, 'BMI-historik'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Normalvikt: 18.5 – 25')
+          )
+        ),
+        h('div', { className: 'px-4 py-4' },
+          h(SvgLineChart, { data: chartData, height: 180, lines: [
+            { key: 'bmi', color: '#f59e0b', width: 2, name: 'BMI' }
+          ]})
+        )
       ) : null,
       // Mood chart
-      chartData.some(function(d){ return d.humör; }) ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
-        h('h2', { className: 'text-lg font-bold text-gray-800 mb-1' }, 'Energi & humör'),
-        h('p', { className: 'text-xs text-gray-400 mb-4' }, '1 = låg energi · 5 = toppen'),
-        h(SvgLineChart, { data: chartData, height: 180, lines: [
-          { key: 'humör', color: '#ec4899', width: 2, name: 'Humör (1–5)' }
-        ]})
+      chartData.some(function(d){ return d.humör; }) ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-pink-400' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, 'Energi & humör'),
+            h('p', { className: 'text-xs text-gray-400' }, '😴 1 = trött · 🤩 5 = toppen')
+          )
+        ),
+        h('div', { className: 'px-4 py-4' },
+          h(SvgLineChart, { data: chartData, height: 160, lines: [
+            { key: 'humör', color: '#ec4899', width: 2, name: 'Humör (1–5)' }
+          ]})
+        )
       ) : null,
       // Steps chart
-      h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
-        h('h2', { className: 'text-lg font-bold text-gray-800 mb-4' }, 'Steg per dag'),
-        h(SvgBarChart, { data: chartData, dataKey: 'steg', color: '#fb923c', height: 200 })
+      h('div', { className: 'bg-white rounded-2xl shadow-md overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-orange-400' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, 'Steg per dag'),
+            h('p', { className: 'text-xs text-gray-400' }, '👟 Dagliga steg')
+          )
+        ),
+        h('div', { className: 'px-4 py-4' },
+          h(SvgBarChart, { data: chartData, dataKey: 'steg', color: '#fb923c', height: 180 })
+        )
       )
     );
   }
   function renderAdd() {
     const bmiPreview = newEntry.weight && height > 0 ? getBMI(parseFloat(newEntry.weight)) : null;
+    const bmiCat = bmiPreview ? getBMICategory(bmiPreview) : null;
     return h('div', { className: 'max-w-lg mx-auto' },
-      h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
-        h('h2', { className: 'text-xl font-bold mb-5 text-gray-800' }, 'Lägg till mätning'),
-        h('div', { className: 'space-y-4' },
+      h('div', { className: 'bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl p-6 mb-4 text-white shadow-xl' },
+        h('p', { className: 'text-indigo-100 text-xs font-semibold uppercase tracking-widest mb-1' }, 'Ny mätning'),
+        h('p', { className: 'text-4xl font-black' }, newEntry.weight ? newEntry.weight + ' kg' : '— kg'),
+        bmiPreview ? h('p', { className: 'text-indigo-100 text-sm mt-1' }, 'BMI: ' + bmiPreview + (bmiCat ? ' · ' + bmiCat.label : '')) : h('p', { className: 'text-indigo-200 text-sm mt-1' }, 'Ange vikt nedan')
+      ),
+      h('div', { className: 'bg-white rounded-2xl shadow-md overflow-hidden' },
+        h('div', { className: 'p-6 space-y-4' },
           h('div', { className: 'flex gap-2' },
-            h('input', { type:'date', value: newEntry.date, onChange: function(e){setNewEntry(Object.assign({},newEntry,{date:e.target.value}));}, className:'flex-1 px-4 py-3 border rounded-lg outline-none' }),
-            h('button', { onClick: function(){setNewEntry(Object.assign({},newEntry,{date:todayStr()}));}, className:'px-4 py-3 bg-indigo-50 text-indigo-600 rounded-lg text-sm font-medium hover:bg-indigo-100' }, 'Idag')
+            h('input', { type:'date', value: newEntry.date, onChange: function(e){setNewEntry(Object.assign({},newEntry,{date:e.target.value}));}, className:'flex-1 px-4 py-3 border border-gray-200 rounded-xl outline-none focus:border-indigo-400 transition-colors' }),
+            h('button', { onClick: function(){setNewEntry(Object.assign({},newEntry,{date:todayStr()}));}, className:'px-4 py-3 bg-indigo-50 text-indigo-600 rounded-xl text-sm font-semibold hover:bg-indigo-100 transition-colors' }, 'Idag')
           ),
-          h('div', { className: 'relative' },
-            h('input', { type:'number', step:'0.1', value: newEntry.weight, onChange: function(e){setNewEntry(Object.assign({},newEntry,{weight:e.target.value}));}, placeholder:'Vikt (kg)', className:'w-full px-4 py-3 border rounded-lg outline-none' }),
-            bmiPreview ? h('span', { className: 'absolute right-3 top-3.5 text-xs text-gray-400' }, 'BMI: ' + bmiPreview) : null
-          ),
-          h('div', { className: 'flex gap-2' },
-            h('input', { type:'number', value: newEntry.steps, onChange: function(e){setNewEntry(Object.assign({},newEntry,{steps:e.target.value}));}, placeholder:'Steg (valfritt)', className:'flex-1 px-4 py-3 border rounded-lg outline-none' }),
-          ),
+          h('input', { type:'number', step:'0.1', value: newEntry.weight, onChange: function(e){setNewEntry(Object.assign({},newEntry,{weight:e.target.value}));}, placeholder:'⚖️  Vikt (kg)', className:'w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:border-indigo-400 transition-colors text-lg font-semibold' }),
+          h('input', { type:'number', value: newEntry.steps, onChange: function(e){setNewEntry(Object.assign({},newEntry,{steps:e.target.value}));}, placeholder:'👟  Steg (valfritt)', className:'w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:border-indigo-400 transition-colors' }),
           h('div', null,
-            h('p', { className: 'text-sm text-gray-600 mb-2' }, 'Energi & humör (valfritt)'),
-            h('div', { className: 'flex gap-2' },
+            h('p', { className: 'text-sm font-semibold text-gray-600 mb-2' }, 'Hur mår du idag?'),
+            h('div', { className: 'grid grid-cols-5 gap-2' },
               ['😴','😔','😐','😊','🤩'].map(function(emoji, i) {
                 var val = String(i+1);
+                var labels = ['Trött','Dålig','Ok','Bra','Toppen!'];
                 return h('button', {
                   key: val,
                   onClick: function(){ setNewEntry(Object.assign({},newEntry,{mood: newEntry.mood===val ? '' : val})); },
-                  className: 'flex-1 py-2 rounded-lg text-xl border-2 transition-colors ' + (newEntry.mood===val ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 bg-white hover:border-indigo-300')
-                }, emoji);
+                  className: 'flex flex-col items-center py-2 rounded-xl border-2 transition-all ' + (newEntry.mood===val ? 'border-indigo-500 bg-indigo-50 scale-105 shadow-md' : 'border-gray-100 bg-gray-50 hover:border-indigo-200')
+                },
+                  h('span', { className: 'text-2xl' }, emoji),
+                  h('span', { className: 'text-xs text-gray-400 mt-0.5' }, labels[i])
+                );
               })
             )
           ),
-          h('input', { type:'text', value: newEntry.comment, onChange: function(e){setNewEntry(Object.assign({},newEntry,{comment:e.target.value}));}, placeholder:'Kommentar (valfritt)', className:'w-full px-4 py-3 border rounded-lg outline-none' }),
-          h('button', { onClick: addEntry, disabled: !newEntry.weight, className:'w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 disabled:opacity-40 font-medium' }, '+ Spara mätning')
+          h('input', { type:'text', value: newEntry.comment, onChange: function(e){setNewEntry(Object.assign({},newEntry,{comment:e.target.value}));}, placeholder:'💬  Kommentar (valfritt)', className:'w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:border-indigo-400 transition-colors' })
+        ),
+        h('div', { className: 'px-6 pb-6' },
+          h('button', { onClick: addEntry, disabled: !newEntry.weight, className:'w-full bg-gradient-to-r from-indigo-500 to-blue-600 text-white py-4 rounded-xl hover:from-indigo-600 hover:to-blue-700 disabled:opacity-40 font-bold text-lg shadow-md transition-all' }, '✓ Spara mätning')
         )
       )
     );
@@ -1100,29 +1137,47 @@ function WeightStepTracker() {
     );
   }
   function renderWeekly() {
-    return h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
-      h('h2', { className: 'text-xl font-bold mb-4 text-gray-800' }, 'Veckoöversikt'),
+    return h('div', { className: 'bg-white rounded-2xl shadow-md overflow-hidden' },
+      h('div', { className: 'px-6 py-4 border-b border-gray-100 flex items-center justify-between' },
+        h('div', null,
+          h('h2', { className: 'text-xl font-bold text-gray-800' }, '📅 Veckoöversikt'),
+          h('p', { className: 'text-xs text-gray-400 mt-0.5' }, weeklyStats.length + ' veckor loggade')
+        )
+      ),
       h('div', { className: 'overflow-x-auto' },
         h('table', { className: 'w-full' },
           h('thead', null,
-            h('tr', { className: 'border-b-2 border-gray-100' },
-              h('th', { className: 'text-left py-3 text-xs uppercase tracking-wide text-gray-400' }, 'Vecka'),
-              h('th', { className: 'text-left py-3 text-xs uppercase tracking-wide text-gray-400' }, 'Snitt vikt'),
-              h('th', { className: 'text-left py-3 text-xs uppercase tracking-wide text-gray-400' }, 'Förändring'),
-              h('th', { className: 'text-left py-3 text-xs uppercase tracking-wide text-gray-400' }, 'Steg/dag'),
-              h('th', { className: 'text-left py-3 text-xs uppercase tracking-wide text-gray-400' }, 'Pass'),
-              h('th', { className: 'text-left py-3 text-xs uppercase tracking-wide text-gray-400' }, 'Min')
+            h('tr', { className: 'bg-gray-50' },
+              h('th', { className: 'text-left px-6 py-3 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Vecka'),
+              h('th', { className: 'text-left px-4 py-3 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Snitt vikt'),
+              h('th', { className: 'text-left px-4 py-3 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Förändring'),
+              h('th', { className: 'text-left px-4 py-3 text-xs font-bold uppercase tracking-wide text-gray-400' }, '👟 Steg/dag'),
+              h('th', { className: 'text-left px-4 py-3 text-xs font-bold uppercase tracking-wide text-gray-400' }, '💪 Pass'),
+              h('th', { className: 'text-left px-4 py-3 text-xs font-bold uppercase tracking-wide text-gray-400' }, '⏱ Min')
             )
           ),
           h('tbody', null,
             ...weeklyStats.map(function(week, idx) {
-              return h('tr', { key: week.weekStart, className: 'border-b border-gray-50 hover:bg-gray-50 ' + (idx === 0 ? 'bg-indigo-50' : '') },
-                h('td', { className: 'py-3 font-bold text-sm text-gray-800' }, week.weekNumber),
-                h('td', { className: 'py-3 font-semibold text-gray-800' }, week.avgWeight + ' kg'),
-                h('td', { className: 'py-3 font-medium text-sm ' + (week.change < 0 ? 'text-green-600' : week.change > 0 ? 'text-red-500' : 'text-gray-400') }, (week.change > 0 ? '+' : '') + week.change + ' kg'),
-                h('td', { className: 'py-3 text-sm text-gray-600' }, week.avgSteps.toLocaleString()),
-                h('td', { className: 'py-3 text-sm text-gray-600' }, week.workoutCount),
-                h('td', { className: 'py-3 text-sm text-gray-500' }, week.totalMinutes || '–')
+              var isCurrentWeek = idx === 0;
+              return h('tr', { key: week.weekStart, className: 'border-b border-gray-50 transition-colors ' + (isCurrentWeek ? 'bg-indigo-50 hover:bg-indigo-100' : (idx%2===0?'bg-white':'bg-gray-50/40') + ' hover:bg-blue-50') },
+                h('td', { className: 'px-6 py-3' },
+                  h('div', { className: 'flex items-center gap-2' },
+                    h('span', { className: 'font-bold text-gray-800' }, week.weekNumber),
+                    isCurrentWeek ? h('span', { className: 'text-xs bg-indigo-100 text-indigo-600 font-semibold px-2 py-0.5 rounded-full' }, 'Pågående') : null
+                  )
+                ),
+                h('td', { className: 'px-4 py-3 font-semibold text-gray-800' }, week.avgWeight + ' kg'),
+                h('td', { className: 'px-4 py-3' },
+                  week.change !== 0
+                    ? h('span', { className: 'px-2 py-0.5 rounded-full text-xs font-bold ' + (week.change < 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600') },
+                        (week.change > 0 ? '▲ +' : '▼ ') + week.change + ' kg')
+                    : h('span', { className: 'text-gray-400 text-xs' }, '–')
+                ),
+                h('td', { className: 'px-4 py-3 text-sm text-gray-600' }, week.avgSteps > 0 ? week.avgSteps.toLocaleString() : '–'),
+                h('td', { className: 'px-4 py-3' },
+                  h('span', { className: 'font-semibold ' + (week.workoutCount >= 3 ? 'text-green-600' : week.workoutCount > 0 ? 'text-blue-600' : 'text-gray-300') }, week.workoutCount || '–')
+                ),
+                h('td', { className: 'px-4 py-3 text-sm text-gray-500' }, week.totalMinutes || '–')
               );
             })
           )
