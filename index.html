@@ -689,10 +689,14 @@ function WeightStepTracker() {
               h('p', { className: 'text-sm text-gray-600 mb-1' }, 'tills du når ' + goalWeight + ' kg (ca ' + dateStr + ')'),
               h('p', { className: 'text-xs text-gray-400 mb-3' }, 'baserat på ' + targetRate + ' kg/vecka'),
               prediction && prediction.gaining
-                ? h('p', { className: 'text-xs text-red-500' }, '⚠️ Nuvarande trend: +' + prediction.kgPerWeek + ' kg/vecka — justera kosten för att nå målet')
-                : prediction
-                  ? h('p', { className: 'text-xs text-indigo-600' }, '📊 Nuvarande trend: −' + prediction.kgPerWeek + ' kg/vecka')
-                  : null
+                ? h('p', { className: 'text-xs text-red-500' }, '⚠️ Vikten ökar just nu (+' + prediction.kgPerWeek + ' kg/v) — se över kosten!')
+                : prediction && prediction.kgPerWeek >= targetRate * 0.8
+                  ? h('p', { className: 'text-xs text-green-600' }, '✓ Bra tempo! Trenden (' + prediction.kgPerWeek + ' kg/v) matchar ditt mål.')
+                  : prediction && prediction.kgPerWeek >= 0.1
+                    ? h('p', { className: 'text-xs text-orange-500' }, '⚡ Trenden är ' + prediction.kgPerWeek + ' kg/v — öka aktiviteten för att nå ' + targetRate + ' kg/v')
+                    : prediction
+                      ? h('p', { className: 'text-xs text-gray-400' }, '📊 Vikten är stabil just nu — håll koll på kosten!')
+                      : null
             );
           })() : h('p', { className: 'text-gray-400 text-sm' }, 'Lägg till mätningar för att se prognos')
         ),
