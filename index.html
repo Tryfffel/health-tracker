@@ -106,12 +106,13 @@ const Toast = ({ toast, onClose }) => {
     h('button', { onClick: onClose, className: 'hover:opacity-70 text-lg leading-none ml-2' }, '×')
   );
 };
-const StatCard = ({ emoji, label, value, sub, subColor, accent }) =>
-  h('div', { className: 'bg-white rounded-xl p-4 shadow-md border-l-4 ' + (accent || 'border-indigo-400') },
-    h('div', { className: 'text-2xl mb-1' }, emoji),
-    h('p', { className: 'text-xs text-gray-500 uppercase tracking-wide font-medium' }, label),
-    h('p', { className: 'text-2xl font-bold text-gray-800 mt-1' }, value),
-    sub ? h('p', { className: 'text-xs mt-1 ' + (subColor || 'text-gray-500') }, sub) : null
+const StatCard = ({ emoji, label, value, sub, subColor, accent, bg }) =>
+  h('div', { className: 'bg-white rounded-xl p-4 shadow-md border-l-4 overflow-hidden relative ' + (accent || 'border-indigo-400') },
+    h('div', { className: 'absolute -top-4 -right-4 w-20 h-20 rounded-full opacity-[0.08] ' + (bg || 'bg-indigo-500') }),
+    h('div', { className: 'relative text-2xl mb-1' }, emoji),
+    h('p', { className: 'relative text-xs text-gray-500 uppercase tracking-wide font-medium' }, label),
+    h('p', { className: 'relative text-2xl font-bold text-gray-800 mt-1' }, value),
+    sub ? h('p', { className: 'relative text-xs mt-1 ' + (subColor || 'text-gray-500') }, sub) : null
   );
 const IntensityDots = ({ level }) =>
   h('span', { className: 'inline-flex gap-0.5 items-center' },
@@ -695,6 +696,25 @@ function WeightStepTracker() {
       );
     }
     const diffNum = parseFloat(stats.diff);
+    // Progress calculations for hero card
+    var sortedE = entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+    var startWeight = sortedE.length ? sortedE[0].weight : stats.latest.weight;
+    var totalToLose = startWeight - goalWeight;
+    var lostSoFar = startWeight - stats.latest.weight;
+    var progressPct = totalToLose > 0 ? Math.max(0, Math.min(100, lostSoFar / totalToLose * 100)) : 0;
+    var progressRounded = Math.round(progressPct);
+    // SVG ring params
+    var ringR = 36, ringC = parseFloat((2 * Math.PI * ringR).toFixed(2));
+    var ringOffset = parseFloat((ringC * (1 - progressPct / 100)).toFixed(2));
+    // Day dots for this week
+    var todayD3 = new Date(); todayD3.setHours(0,0,0,0);
+    var dow3 = todayD3.getDay();
+    var monD3 = new Date(todayD3); monD3.setDate(todayD3.getDate() - (dow3===0?6:dow3-1));
+    var weekDayDots = ['M','T','O','T','F','L','S'].map(function(name, idx) {
+      var dd = new Date(monD3); dd.setDate(monD3.getDate()+idx);
+      var ds = dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0');
+      return { name: name, hasEntry: entries.some(function(e){return e.date===ds;}), hasWorkout: workouts.some(function(w){return w.date===ds;}), isToday: ds === (todayD3.getFullYear()+'-'+String(todayD3.getMonth()+1).padStart(2,'0')+'-'+String(todayD3.getDate()).padStart(2,'0')) };
+    });
     return h('div', null,
       // Plateau warning banner
       plateau ? h('div', { className: 'bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl p-5 mb-4 shadow-sm' },
@@ -716,20 +736,71 @@ function WeightStepTracker() {
           )
         )
       ) : null,
+      // ── HERO CARD ──────────────────────────────────────────────────────────────
+      h('div', { className: 'bg-gradient-to-br from-indigo-600 via-blue-600 to-blue-700 rounded-2xl shadow-xl mb-5 overflow-hidden' },
+        h('div', { className: 'flex items-stretch' },
+          // Left: weight info
+          h('div', { className: 'flex-1 p-6' },
+            h('p', { className: 'text-indigo-200 text-xs font-semibold uppercase tracking-widest mb-1' }, 'Aktuell vikt'),
+            h('div', { className: 'flex items-end gap-3 mb-2' },
+              h('p', { className: 'text-5xl font-black text-white leading-none' }, stats.latest.weight),
+              h('div', { className: 'mb-1' },
+                h('p', { className: 'text-indigo-200 text-sm font-semibold' }, 'kg'),
+                h('p', { className: 'text-sm font-bold ' + (diffNum <= 0 ? 'text-emerald-300' : 'text-red-300') },
+                  (diffNum > 0 ? '▲' : '▼') + ' ' + Math.abs(diffNum) + ' kg')
+              )
+            ),
+            h('p', { className: 'text-indigo-200 text-xs mb-4' }, new Date(stats.latest.date).toLocaleDateString('sv-SE', { weekday:'long', day:'numeric', month:'long' })),
+            h('div', { className: 'flex gap-3' },
+              h('div', { className: 'bg-white bg-opacity-15 rounded-xl px-3 py-2 text-center' },
+                h('p', { className: 'text-white text-lg font-black' }, Math.abs(stats.toGoal) + ' kg'),
+                h('p', { className: 'text-indigo-200 text-xs' }, 'kvar till mål')
+              ),
+              h('div', { className: 'bg-white bg-opacity-15 rounded-xl px-3 py-2 text-center' },
+                h('p', { className: 'text-white text-lg font-black' }, Math.abs(parseFloat(stats.totalLoss)) + ' kg'),
+                h('p', { className: 'text-indigo-200 text-xs' }, 'totalt tappad')
+              )
+            )
+          ),
+          // Right: SVG progress ring
+          h('div', { className: 'flex flex-col items-center justify-center p-6 pr-7' },
+            h('svg', { viewBox:'0 0 100 100', style:{ width:'110px', height:'110px' } },
+              h('circle', { cx:50, cy:50, r:ringR, fill:'none', stroke:'rgba(255,255,255,0.15)', strokeWidth:8 }),
+              h('circle', { cx:50, cy:50, r:ringR, fill:'none', stroke:'white', strokeWidth:8,
+                strokeDasharray: ringC, strokeDashoffset: ringOffset,
+                strokeLinecap:'round', transform:'rotate(-90 50 50)' }),
+              h('text', { x:50, y:44, textAnchor:'middle', fontSize:20, fontWeight:'900', fill:'white' }, progressRounded + '%'),
+              h('text', { x:50, y:60, textAnchor:'middle', fontSize:9, fill:'rgba(255,255,255,0.7)' }, 'av resan klar')
+            ),
+            h('p', { className: 'text-indigo-200 text-xs mt-1 text-center' }, 'Mål: ' + goalWeight + ' kg')
+          )
+        ),
+        // Progress bar at bottom
+        h('div', { className: 'px-6 pb-5' },
+          h('div', { className: 'relative h-2.5 bg-white bg-opacity-20 rounded-full overflow-hidden' },
+            h('div', { className: 'absolute h-full bg-gradient-to-r from-emerald-300 to-teal-200 rounded-full transition-all', style:{ width: progressPct + '%' } })
+          ),
+          h('div', { className: 'flex justify-between text-indigo-200 text-xs mt-1.5' },
+            h('span', null, 'Start ' + startWeight + ' kg'),
+            h('span', null, 'Mål ' + goalWeight + ' kg')
+          )
+        )
+      ),
       // Row 1 stats
       h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-4' },
-        h(StatCard, { emoji:'📉', label:'Senaste vikt', value: stats.latest.weight + ' kg', sub: (diffNum > 0 ? '+' : '') + stats.diff + ' kg från förra', subColor: diffNum <= 0 ? 'text-green-600' : 'text-red-500', accent: 'border-blue-400' }),
-        h(StatCard, { emoji:'🎯', label:'Till målet', value: Math.abs(stats.toGoal) + ' kg', sub: 'Mål: ' + goalWeight + ' kg', accent: 'border-green-400' }),
-        h(StatCard, { emoji:'🔥', label:'Total nedgång', value: stats.totalLoss + ' kg', sub: entries.length + ' mätningar', accent: 'border-orange-400' }),
+        h(StatCard, { emoji:'📉', label:'Senaste vikt', value: stats.latest.weight + ' kg', sub: (diffNum > 0 ? '+' : '') + stats.diff + ' kg från förra', subColor: diffNum <= 0 ? 'text-green-600' : 'text-red-500', accent: 'border-blue-400', bg: 'bg-blue-500' }),
+        h(StatCard, { emoji:'🎯', label:'Till målet', value: Math.abs(stats.toGoal) + ' kg', sub: 'Mål: ' + goalWeight + ' kg', accent: 'border-green-400', bg: 'bg-green-500' }),
+        h(StatCard, { emoji:'🔥', label:'Total nedgång', value: stats.totalLoss + ' kg', sub: entries.length + ' mätningar', accent: 'border-orange-400', bg: 'bg-orange-400' }),
         stats.bmi
-          ? h(StatCard, { emoji:'⚖️', label:'BMI', value: stats.bmi, sub: stats.bmiCat ? stats.bmiCat.label : '', subColor: stats.bmiCat ? stats.bmiCat.color : '', accent: 'border-purple-400' })
-          : h(StatCard, { emoji:'👟', label:'Snitt steg (7d)', value: stats.avgSteps.toLocaleString(), sub: 'senaste 7 dagarna', accent: 'border-teal-400' })
+          ? h(StatCard, { emoji:'⚖️', label:'BMI', value: stats.bmi, sub: stats.bmiCat ? stats.bmiCat.label : '', subColor: stats.bmiCat ? stats.bmiCat.color : '', accent: 'border-purple-400', bg: 'bg-purple-500' })
+          : h(StatCard, { emoji:'👟', label:'Snitt steg (7d)', value: stats.avgSteps.toLocaleString(), sub: 'senaste 7 dagarna', accent: 'border-teal-400', bg: 'bg-teal-500' })
       ),
       // Row 2 stats
       h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-6' },
-        h(StatCard, { emoji:'🏆', label:'Inloggningssvit', value: stats.streak + ' 🔥', sub: stats.streak > 0 ? 'dagar i rad' : 'Logga idag!', accent: 'border-amber-400' }),
-        h(StatCard, { emoji:'👟', label:'Snitt steg (7d)', value: stats.avgSteps.toLocaleString(), sub: 'senaste veckan', accent: 'border-teal-400' }),
-        h('div', { className: 'bg-white rounded-xl p-4 shadow-md col-span-2' },
+        h(StatCard, { emoji:'🏆', label:'Inloggningssvit', value: stats.streak + ' 🔥', sub: stats.streak > 0 ? 'dagar i rad' : 'Logga idag!', accent: 'border-amber-400', bg: 'bg-amber-400' }),
+        h(StatCard, { emoji:'👟', label:'Snitt steg (7d)', value: stats.avgSteps.toLocaleString(), sub: 'senaste veckan', accent: 'border-teal-400', bg: 'bg-teal-500' }),
+        h('div', { className: 'bg-white rounded-xl p-4 shadow-md col-span-2 border-l-4 border-indigo-300 overflow-hidden relative' },
+          h('div', { className: 'absolute -top-4 -right-4 w-20 h-20 rounded-full opacity-[0.06] bg-indigo-500' }),
           h('p', { className: 'text-xs text-gray-500 uppercase tracking-wide font-medium mb-2' }, '💪 Veckoträning'),
           currentWeek
             ? h('div', { className: 'flex gap-8' },
@@ -748,7 +819,21 @@ function WeightStepTracker() {
       // This/last week
       currentWeek ? h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-6' },
         h('div', { className: 'bg-gradient-to-r from-indigo-50 to-blue-50 border-2 border-indigo-200 rounded-xl p-5' },
-          h('h3', { className: 'text-xs font-bold text-indigo-600 mb-3 uppercase tracking-wide' }, '📅 Denna vecka (' + currentWeek.thisWeek.weekNumber + ')'),
+          h('div', { className: 'flex items-center justify-between mb-3' },
+            h('h3', { className: 'text-xs font-bold text-indigo-600 uppercase tracking-wide' }, '📅 Denna vecka (' + currentWeek.thisWeek.weekNumber + ')'),
+            h('div', { className: 'flex gap-1' },
+              weekDayDots.map(function(d, i) {
+                return h('div', { key: i, className: 'flex flex-col items-center gap-0.5' },
+                  h('div', { className: 'w-6 h-6 rounded-full flex items-center justify-center text-center ' + (d.hasWorkout ? 'bg-indigo-500' : d.hasEntry ? 'bg-indigo-200' : d.isToday ? 'bg-indigo-100 border-2 border-indigo-300' : 'bg-white border border-gray-200') },
+                    d.hasWorkout ? h('span', { className: 'text-white text-xs leading-none' }, '💪')
+                      : d.hasEntry ? h('span', { className: 'text-indigo-600 text-xs font-bold' }, '✓')
+                      : null
+                  ),
+                  h('span', { className: 'text-gray-400 text-xs leading-none' }, d.name)
+                );
+              })
+            )
+          ),
           h('div', { className: 'grid grid-cols-2 gap-3' },
             h('div', null, h('p', {className:'text-xs text-gray-500'}, 'Snitt vikt'), h('p', {className:'text-xl font-bold text-indigo-700'}, currentWeek.thisWeek.avgWeight + ' kg')),
             h('div', null, h('p', {className:'text-xs text-gray-500'}, 'Förändring'), h('p', {className:'text-xl font-bold ' + (currentWeek.thisWeek.change <= 0 ? 'text-green-600' : 'text-red-500')}, (currentWeek.thisWeek.change > 0 ? '+' : '') + currentWeek.thisWeek.change + ' kg')),
@@ -783,6 +868,16 @@ function WeightStepTracker() {
               h('p', { className: 'text-3xl font-bold text-green-700 mb-1' }, weeksTarget + ' veckor'),
               h('p', { className: 'text-sm text-gray-600 mb-1' }, 'tills du når ' + goalWeight + ' kg (ca ' + dateStr + ')'),
               h('p', { className: 'text-xs text-gray-400 mb-3' }, 'baserat på ' + targetRate + ' kg/vecka'),
+              h('div', { className: 'mb-3' },
+                h('div', { className: 'relative h-2 bg-gray-100 rounded-full overflow-hidden' },
+                  h('div', { className: 'absolute h-full bg-gradient-to-r from-indigo-400 to-green-400 rounded-full', style:{ width: progressPct + '%' } })
+                ),
+                h('div', { className: 'flex justify-between text-xs text-gray-400 mt-1' },
+                  h('span', null, startWeight + ' kg'),
+                  h('span', { className: 'text-green-600 font-semibold' }, progressRounded + '% klar'),
+                  h('span', null, goalWeight + ' kg')
+                )
+              ),
               prediction && prediction.gaining
                 ? h('p', { className: 'text-xs text-red-500' }, '⚠️ Vikten ökar just nu (+' + prediction.kgPerWeek + ' kg/v) — se över kosten!')
                 : prediction && prediction.kgPerWeek >= targetRate * 0.8
