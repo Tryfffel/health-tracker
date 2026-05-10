@@ -222,6 +222,37 @@ function WeightStepTracker() {
   useEffect(() => { loadData(); }, []);
   useEffect(() => { if (!loading) saveData(); }, [entries, workouts, goalWeight, targetRate, yearlyGoal, height, loading]);
 
+  // ─── WEGOVY STATE ────────────────────────────────────────────────────────
+  const WEGOVY_DEFAULT_PROTOCOL = {
+    start_date: '2026-04-28', current_dose: 0.25, weeks_per_step: 6,
+    titration_plan: [
+      { weeks: '1-6',  dose: 0.25 }, { weeks: '7-12', dose: 0.5  },
+      { weeks: '13-18',dose: 1.0  }, { weeks: '19-24',dose: 1.7  },
+      { weeks: '25+',  dose: 2.4  }
+    ]
+  };
+  const WEGOVY_DEFAULT_DOSES = [
+    { id: 1745798400000, date: '2026-04-28', dose: 0.25, side_effects: '', notes: '', weight_at_dose: null },
+    { id: 1746403200000, date: '2026-05-05', dose: 0.25, side_effects: '', notes: '', weight_at_dose: null }
+  ];
+  const [wegovyDoses, setWegovyDoses] = useState(null);
+  const [wegovyProtocol, setWegovyProtocol] = useState(null);
+  const [wgovLoading, setWgovLoading] = useState(true);
+  const [showDoseForm, setShowDoseForm] = useState(false);
+  const [editProtocol, setEditProtocol] = useState(false);
+  const [doseForm, setDoseForm] = useState({});
+
+  useEffect(function() {
+    Promise.all([
+      window.storage.get('wegovy-doses'),
+      window.storage.get('wegovy-protocol')
+    ]).then(function(r) {
+      setWegovyDoses((r[0] && r[0].value) ? JSON.parse(r[0].value) : WEGOVY_DEFAULT_DOSES);
+      setWegovyProtocol((r[1] && r[1].value) ? JSON.parse(r[1].value) : WEGOVY_DEFAULT_PROTOCOL);
+      setWgovLoading(false);
+    });
+  }, []);
+
 
   // Read URL params injected by iOS Shortcut: ?steps=8500&date=2026-02-25
   const loadData = async () => {
@@ -1627,43 +1658,6 @@ function WeightStepTracker() {
   }
 
   function renderWegovy() {
-    var wState = React.useState(null); var wegovyDoses = wState[0]; var setWegovyDoses = wState[1];
-    var wProto = React.useState(null); var wegovyProtocol = wProto[0]; var setWegovyProtocol = wProto[1];
-    var wLoading = React.useState(true); var wgovLoading = wLoading[0]; var setWgovLoading = wLoading[1];
-    var wForm = React.useState(false); var showDoseForm = wForm[0]; var setShowDoseForm = wForm[1];
-    var wEdit = React.useState(false); var editProtocol = wEdit[0]; var setEditProtocol = wEdit[1];
-    var wFormData = React.useState({}); var doseForm = wFormData[0]; var setDoseForm = wFormData[1];
-
-    var DEFAULT_PROTOCOL = {
-      start_date: '2026-04-28',
-      current_dose: 0.25,
-      weeks_per_step: 6,
-      titration_plan: [
-        { weeks: '1-6',  dose: 0.25 },
-        { weeks: '7-12', dose: 0.5  },
-        { weeks: '13-18',dose: 1.0  },
-        { weeks: '19-24',dose: 1.7  },
-        { weeks: '25+',  dose: 2.4  }
-      ]
-    };
-    var DEFAULT_DOSES = [
-      { id: 1745798400000, date: '2026-04-28', dose: 0.25, side_effects: '', notes: '', weight_at_dose: null },
-      { id: 1746403200000, date: '2026-05-05', dose: 0.25, side_effects: '', notes: '', weight_at_dose: null }
-    ];
-
-    React.useEffect(function() {
-      Promise.all([
-        window.storage.get('wegovy-doses'),
-        window.storage.get('wegovy-protocol')
-      ]).then(function(r) {
-        var doses = (r[0] && r[0].value) ? JSON.parse(r[0].value) : DEFAULT_DOSES;
-        var proto = (r[1] && r[1].value) ? JSON.parse(r[1].value) : DEFAULT_PROTOCOL;
-        setWegovyDoses(doses);
-        setWegovyProtocol(proto);
-        setWgovLoading(false);
-      });
-    }, []);
-
     function saveDoses(doses) {
       setWegovyDoses(doses);
       window.storage.set('wegovy-doses', JSON.stringify(doses));
