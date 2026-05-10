@@ -685,7 +685,12 @@ function WeightStepTracker() {
       });
       var activeWeeks = Object.keys(weekMap).filter(function(w){return weekMap[w]>=3;});
       if (activeWeeks.length >= 2) {
-        insights.push({ icon:'💪', text: 'Veckor med 3+ träningspass: bättre viktprogress. Ditt snitt: ' + (workouts.length / Math.max(1,Object.keys(weekMap).length)).toFixed(1) + ' pass/vecka' });
+        var eightWeeksAgo = new Date(); eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 56);
+        var recentWos = workouts.filter(function(w){return new Date(w.date) >= eightWeeksAgo;});
+        var recentWkMap = {};
+        recentWos.forEach(function(w){ var wk = w.date.slice(0,7)+'-W'+getWeekNumber(new Date(w.date)); recentWkMap[wk]=(recentWkMap[wk]||0)+1; });
+        var recentAvg = (recentWos.length / Math.max(1, Object.keys(recentWkMap).length)).toFixed(1);
+        insights.push({ icon:'💪', text: 'Veckor med 3+ träningspass: bättre viktprogress. Ditt snitt: ' + recentAvg + ' pass/vecka (senaste 8v)' });
       }
     }
 
@@ -835,8 +840,9 @@ function WeightStepTracker() {
                 h('p', { className: 'text-indigo-200 text-xs' }, 'kvar till mål')
               ),
               h('div', { className: 'bg-white bg-opacity-15 rounded-xl px-3 py-2 text-center' },
-                h('p', { className: 'text-white text-lg font-black' }, Math.abs(parseFloat(stats.totalLoss)) + ' kg'),
-                h('p', { className: 'text-indigo-200 text-xs' }, 'totalt tappad')
+                h('p', { className: 'text-lg font-black ' + (lostSoFar >= 0 ? 'text-white' : 'text-red-300') },
+                  (lostSoFar < 0 ? '+' : '-') + Math.abs(parseFloat(stats.totalLoss)) + ' kg'),
+                h('p', { className: 'text-indigo-200 text-xs' }, lostSoFar >= 0 ? 'totalt tappad' : 'gått upp')
               )
             )
           ),
@@ -848,7 +854,7 @@ function WeightStepTracker() {
                 strokeDasharray: ringC, strokeDashoffset: ringOffset,
                 strokeLinecap:'round', transform:'rotate(-90 50 50)' }),
               h('text', { x:50, y:44, textAnchor:'middle', fontSize:20, fontWeight:'900', fill:'white' }, progressRounded + '%'),
-              h('text', { x:50, y:60, textAnchor:'middle', fontSize:9, fill:'rgba(255,255,255,0.7)' }, 'av resan klar')
+              h('text', { x:50, y:60, textAnchor:'middle', fontSize:9, fill:'rgba(255,255,255,0.7)' }, lostSoFar >= 0 ? 'av resan klar' : 'från start')
             ),
             h('p', { className: 'text-indigo-200 text-xs mt-1 text-center' }, 'Mål: ' + goalWeight + ' kg')
           )
@@ -864,35 +870,14 @@ function WeightStepTracker() {
           )
         )
       ),
-      // Row 1 stats
-      h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-4' },
-        h(StatCard, { emoji:'📉', label:'Senaste vikt', value: stats.latest.weight + ' kg', sub: (diffNum > 0 ? '+' : '') + stats.diff + ' kg från förra', subColor: diffNum <= 0 ? 'text-green-600' : 'text-red-500', accent: 'border-blue-400', bg: 'bg-blue-500' }),
-        h(StatCard, { emoji:'🎯', label:'Till målet', value: Math.abs(stats.toGoal) + ' kg', sub: 'Mål: ' + goalWeight + ' kg', accent: 'border-green-400', bg: 'bg-green-500' }),
-        h(StatCard, { emoji:'🔥', label:'Total nedgång', value: stats.totalLoss + ' kg', sub: entries.length + ' mätningar', accent: 'border-orange-400', bg: 'bg-orange-400' }),
+      // Stats row (merged)
+      h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-6' },
+        h(StatCard, { emoji:'🔥', label:'Total förändring', value: (lostSoFar >= 0 ? '-' : '+') + Math.abs(parseFloat(stats.totalLoss)) + ' kg', sub: entries.length + ' mätningar', subColor: lostSoFar >= 0 ? 'text-green-600' : 'text-red-500', accent: lostSoFar >= 0 ? 'border-orange-400' : 'border-red-400', bg: lostSoFar >= 0 ? 'bg-orange-400' : 'bg-red-400' }),
         stats.bmi
           ? h(StatCard, { emoji:'⚖️', label:'BMI', value: stats.bmi, sub: stats.bmiCat ? stats.bmiCat.label : '', subColor: stats.bmiCat ? stats.bmiCat.color : '', accent: 'border-purple-400', bg: 'bg-purple-500' })
-          : h(StatCard, { emoji:'👟', label:'Snitt steg (7d)', value: stats.avgSteps.toLocaleString(), sub: 'senaste 7 dagarna', accent: 'border-teal-400', bg: 'bg-teal-500' })
-      ),
-      // Row 2 stats
-      h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-6' },
+          : null,
         h(StatCard, { emoji:'🏆', label:'Inloggningssvit', value: stats.streak + ' 🔥', sub: stats.streak > 0 ? 'dagar i rad' : 'Logga idag!', accent: 'border-amber-400', bg: 'bg-amber-400' }),
-        h(StatCard, { emoji:'👟', label:'Snitt steg (7d)', value: stats.avgSteps.toLocaleString(), sub: 'senaste veckan', accent: 'border-teal-400', bg: 'bg-teal-500' }),
-        h('div', { className: 'bg-white rounded-xl p-4 shadow-md col-span-2 border-l-4 border-indigo-300 overflow-hidden relative' },
-          h('div', { className: 'absolute -top-4 -right-4 w-20 h-20 rounded-full opacity-[0.06] bg-indigo-500' }),
-          h('p', { className: 'text-xs text-gray-500 uppercase tracking-wide font-medium mb-2' }, '💪 Veckoträning'),
-          currentWeek
-            ? h('div', { className: 'flex gap-8' },
-                h('div', null,
-                  h('p', { className: 'text-xl font-bold text-gray-800' }, currentWeek.thisWeek.workoutCount + ' pass'),
-                  h('p', { className: 'text-xs text-gray-500' }, currentWeek.thisWeek.totalMinutes + ' min · denna vecka')
-                ),
-                currentWeek.lastWeek ? h('div', { className: 'text-gray-400' },
-                  h('p', { className: 'text-xl font-bold' }, currentWeek.lastWeek.workoutCount + ' pass'),
-                  h('p', { className: 'text-xs' }, currentWeek.lastWeek.totalMinutes + ' min · förra veckan')
-                ) : null
-              )
-            : h('p', { className: 'text-gray-400 text-sm' }, 'Ingen träning loggad')
-        )
+        h(StatCard, { emoji:'👟', label:'Snitt steg (7d)', value: stats.avgSteps.toLocaleString(), sub: 'senaste veckan', accent: 'border-teal-400', bg: 'bg-teal-500' })
       ),
       // This/last week
       currentWeek ? h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-6' },
