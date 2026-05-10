@@ -145,6 +145,84 @@ function WeightStepTracker() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [newHabit, setNewHabit]     = useState({ name: '', type: 'good', emoji: '✅' });
   const [habitTab, setHabitTab]     = useState('week');
+
+// ─── OURA INTEGRATION ──────────────────────────────────────────────────────
+  const OURA_API = 'https://tryf-api.duckdns.org';
+  const [ouraData, setOuraData] = useState([]);
+  const [ouraLastSync, setOuraLastSync] = useState(null);
+  const [ouraConnected, setOuraConnected] = useState(false);
+  const [ouraSyncing, setOuraSyncing] = useState(false);
+
+  useEffect(function() {
+    // Load cached Oura data
+    Promise.all([
+      window.storage.get('oura-data'),
+      window.storage.get('oura-last-sync'),
+      window.storage.get('oura-connected')
+    ]).then(function(r) {
+      if (r[0] && r[0].value) setOuraData(JSON.parse(r[0].value));
+      if (r[1] && r[1].value) setOuraLastSync(r[1].value);
+      if (r[2] && r[2].value === 'true') setOuraConnected(true);
+    });
+  }, []);
+
+  const fetchOuraData = function(silent) {
+    return fetch(OURA_API + '/oura/data?days=90')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!Array.isArray(data)) throw new Error('Bad response');
+        setOuraData(data);
+        var now = new Date().toISOString();
+        setOuraLastSync(now);
+        setOuraConnected(true);
+        window.storage.set('oura-data', JSON.stringify(data));
+        window.storage.set('oura-last-sync', now);
+        window.storage.set('oura-connected', 'true');
+        if (!silent) showToast('💍 Oura synkad — ' + data.length + ' dagar');
+        return data;
+      })
+      .catch(function(err) {
+        console.error('Oura fetch failed', err);
+        if (!silent) showToast('Kunde inte synka Oura', 'error');
+      });
+  };
+
+  const triggerOuraSync = function() {
+    setOuraSyncing(true);
+    fetch(OURA_API + '/oura/data/sync', { method: 'POST' })
+      .then(function() { return fetchOuraData(false); })
+      .catch(function() { showToast('Sync misslyckades', 'error'); })
+      .finally(function() { setOuraSyncing(false); });
+  };
+
+  // Auto-fetch on load if data is stale (>2h)
+  useEffect(function() {
+    if (loading) return;
+    var lastSync = ouraLastSync ? new Date(ouraLastSync).getTime() : 0;
+    var twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
+    if (ouraConnected && lastSync < twoHoursAgo) {
+      fetchOuraData(true);
+    }
+  }, [loading, ouraConnected]);
+
+  // Helpers
+  const ouraLatest = ouraData.length > 0 ? ouraData[0] : null;
+  const ouraStats = (function() {
+    if (ouraData.length < 7) return null;
+    var recent = ouraData.slice(0, 7);
+    var avg = function(key) {
+      var vals = recent.map(function(d){return d[key];}).filter(function(v){return v!=null;});
+      return vals.length ? vals.reduce(function(a,b){return a+b;},0) / vals.length : null;
+    };
+    return {
+      avgSleepScore: avg('sleep_score'),
+      avgReadiness: avg('readiness_score'),
+      avgHrv: avg('hrv_avg'),
+      avgRestingHr: avg('resting_hr'),
+      avgSleepMin: avg('total_sleep_min')
+    };
+  })();
+
   useEffect(() => { loadData(); }, []);
   useEffect(() => { if (!loading) saveData(); }, [entries, workouts, habits, habitLogs, goalWeight, targetRate, yearlyGoal, height, loading]);
 
@@ -1722,6 +1800,150 @@ function WeightStepTracker() {
     );
   }
 
+  function renderOura() {
+    if (!ouraConnected && ouraData.length === 0) {
+      return h('div', { className: 'max-w-lg mx-auto bg-white rounded-2xl p-8 shadow-md text-center' },
+        h('div', { className: 'text-5xl mb-4' }, '💍'),
+        h('h2', { className: 'text-2xl font-bold text-gray-800 mb-2' }, 'Anslut din Oura-ring'),
+        h('p', { className: 'text-gray-500 mb-6' }, 'Synka sömn, HRV, readiness och vilo-HR automatiskt varje natt.'),
+        h('a', { href: OURA_API + '/oura/connect', target: '_blank', rel: 'noopener',
+          className: 'inline-block bg-gradient-to-r from-indigo-500 to-blue-600 text-white px-6 py-3 rounded-xl font-bold shadow-md hover:from-indigo-600 hover:to-blue-700' },
+          'Anslut Oura'),
+        h('p', { className: 'text-xs text-gray-400 mt-4' }, 'När du loggat in, kom tillbaka hit och tryck "Synka nu".'),
+        h('button', { onClick: function(){ fetchOuraData(false); },
+          className: 'mt-6 text-sm text-indigo-600 underline' }, 'Jag har anslutit — synka nu')
+      );
+    }
+    if (!ouraLatest) {
+      return h('div', { className: 'text-center py-12' },
+        h('p', { className: 'text-gray-400' }, 'Ingen Oura-data ännu. Synkar...'),
+        h('button', { onClick: function(){ fetchOuraData(false); }, className: 'mt-4 bg-indigo-600 text-white px-4 py-2 rounded-lg' }, 'Synka nu')
+      );
+    }
+    var sleepHours = Math.floor(ouraLatest.total_sleep_min / 60) + 'h ' + (ouraLatest.total_sleep_min % 60) + 'm';
+    var deepPct = Math.round(ouraLatest.deep_sleep_min / ouraLatest.total_sleep_min * 100);
+    var remPct = Math.round(ouraLatest.rem_sleep_min / ouraLatest.total_sleep_min * 100);
+    // Format chart data (oldest first for charts)
+    var chartData = ouraData.slice().reverse().map(function(d) {
+      return {
+        datum: new Date(d.date).toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' }),
+        sömn: d.sleep_score,
+        readiness: d.readiness_score,
+        hrv: d.hrv_avg,
+        vilohjärtfrekvens: d.resting_hr,
+        sömntimmar: d.total_sleep_min ? parseFloat((d.total_sleep_min/60).toFixed(1)) : null
+      };
+    });
+    return h('div', null,
+      // Hero
+      h('div', { className: 'bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700 rounded-2xl shadow-xl mb-5 p-6 text-white' },
+        h('div', { className: 'flex items-start justify-between mb-4' },
+          h('div', null,
+            h('p', { className: 'text-purple-200 text-xs font-semibold uppercase tracking-widest mb-1' }, '💍 Senaste natt'),
+            h('p', { className: 'text-xs text-purple-200' }, new Date(ouraLatest.date).toLocaleDateString('sv-SE', { weekday:'long', day:'numeric', month:'long' }))
+          ),
+          h('button', { onClick: triggerOuraSync, disabled: ouraSyncing,
+            className: 'bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1.5 rounded-lg disabled:opacity-50' },
+            ouraSyncing ? 'Synkar...' : '↻ Synka')
+        ),
+        h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-3' },
+          h('div', { className: 'bg-white/15 rounded-xl p-3' },
+            h('p', { className: 'text-purple-200 text-xs' }, 'Sömnpoäng'),
+            h('p', { className: 'text-3xl font-black' }, ouraLatest.sleep_score),
+            h('p', { className: 'text-xs text-purple-200' }, sleepHours)
+          ),
+          h('div', { className: 'bg-white/15 rounded-xl p-3' },
+            h('p', { className: 'text-purple-200 text-xs' }, 'Readiness'),
+            h('p', { className: 'text-3xl font-black' }, ouraLatest.readiness_score),
+            h('p', { className: 'text-xs text-purple-200' }, ouraLatest.readiness_score >= 70 ? 'Bra' : ouraLatest.readiness_score >= 60 ? 'Ok' : 'Lågt')
+          ),
+          h('div', { className: 'bg-white/15 rounded-xl p-3' },
+            h('p', { className: 'text-purple-200 text-xs' }, 'HRV (ms)'),
+            h('p', { className: 'text-3xl font-black' }, ouraLatest.hrv_avg),
+            ouraStats ? h('p', { className: 'text-xs text-purple-200' }, '7d snitt: ' + ouraStats.avgHrv.toFixed(0)) : null
+          ),
+          h('div', { className: 'bg-white/15 rounded-xl p-3' },
+            h('p', { className: 'text-purple-200 text-xs' }, 'Vilo-HR'),
+            h('p', { className: 'text-3xl font-black' }, ouraLatest.resting_hr),
+            ouraStats ? h('p', { className: 'text-xs text-purple-200' }, '7d snitt: ' + ouraStats.avgRestingHr.toFixed(0)) : null
+          )
+        ),
+        // Sleep stages
+        h('div', { className: 'mt-4 bg-white/10 rounded-xl p-3' },
+          h('div', { className: 'flex justify-between text-xs text-purple-200 mb-1.5' },
+            h('span', null, 'Sömnstadier'),
+            h('span', null, 'Djup ' + deepPct + '% · REM ' + remPct + '%')
+          ),
+          h('div', { className: 'flex h-3 rounded-full overflow-hidden' },
+            h('div', { className: 'bg-indigo-300', style: { width: deepPct + '%' } }),
+            h('div', { className: 'bg-purple-300', style: { width: remPct + '%' } }),
+            h('div', { className: 'bg-blue-200', style: { width: (100-deepPct-remPct) + '%' } })
+          )
+        )
+      ),
+      // Charts
+      h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-purple-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, 'Sömnpoäng & Readiness'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Senaste ' + ouraData.length + ' dagar')
+          )
+        ),
+        h('div', { className: 'px-4 py-4' },
+          h(SvgLineChart, { data: chartData, height: 220, lines: [
+            { key: 'sömn', color: '#7c3aed', width: 2, name: 'Sömnpoäng' },
+            { key: 'readiness', color: '#10b981', width: 2, name: 'Readiness' }
+          ]})
+        )
+      ),
+      h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-pink-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, 'HRV (Hjärtfrekvensvariabilitet)'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Högre = bättre återhämtning')
+          )
+        ),
+        h('div', { className: 'px-4 py-4' },
+          h(SvgLineChart, { data: chartData, height: 200, lines: [
+            { key: 'hrv', color: '#ec4899', width: 2, name: 'HRV (ms)' }
+          ]})
+        )
+      ),
+      h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-red-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, 'Vilopuls'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Lägre = bättre kondition')
+          )
+        ),
+        h('div', { className: 'px-4 py-4' },
+          h(SvgLineChart, { data: chartData, height: 180, lines: [
+            { key: 'vilohjärtfrekvens', color: '#ef4444', width: 2, name: 'Vilopuls (slag/min)' }
+          ]})
+        )
+      ),
+      h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-blue-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, 'Sömntid per natt'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Mål: 7-9 timmar')
+          )
+        ),
+        h('div', { className: 'px-4 py-4' },
+          h(SvgBarChart, { data: chartData, dataKey: 'sömntimmar', color: '#3b82f6', height: 180 })
+        )
+      ),
+      // Sync info footer
+      h('div', { className: 'text-center text-xs text-gray-400 mt-4' },
+        ouraLastSync ? 'Senast synkad: ' + new Date(ouraLastSync).toLocaleString('sv-SE') : 'Aldrig synkad',
+        ' · Auto-sync varje natt 07:00'
+      )
+    );
+  }
 
   // Diet data
   var MEAL_NAMES = ['Frukost','Lunch','Middag','Kvallsmat'];
@@ -1916,6 +2138,7 @@ function WeightStepTracker() {
     { id:'history', label:'📋 Historik', group:'h' },
     { id:'weekly', label:'📅 Veckor', group:'h' },
     { id:'habits', label:'🎯 Vanor', group:'h' },
+    { id:'oura', label:'💍 Oura', group:'h' },
     { id:'settings', label:'⚙️ Inställningar', group:'h' },
     { id:'idag', label:'🍽️ Idag', group:'k' },
     { id:'meny', label:'📆 Veckans meny', group:'k' },
@@ -2004,6 +2227,7 @@ function WeightStepTracker() {
           view === 'weekly'   ? renderWeekly()    : null,
           view === 'habits'   ? renderHabits()    : null,
           view === 'settings' ? renderSettings()  : null,
+          view === 'oura'     ? renderOura()      : null,
           view === 'idag'     ? renderIdag()      : null,
           view === 'meny'     ? renderMeny()      : null,
           view === 'recept'   ? renderRecept()    : null,
