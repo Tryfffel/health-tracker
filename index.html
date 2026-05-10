@@ -140,11 +140,7 @@ function WeightStepTracker() {
     setToast({ msg, type: type || 'success' });
     setTimeout(() => setToast(null), 3000);
   };
-  const [habits, setHabits]         = useState([]);
-  const [habitLogs, setHabitLogs]   = useState({});
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [newHabit, setNewHabit]     = useState({ name: '', type: 'good', emoji: '✅' });
-  const [habitTab, setHabitTab]     = useState('week');
+
 
 // ─── OURA INTEGRATION ──────────────────────────────────────────────────────
   const OURA_API = 'https://tryf-api.duckdns.org';
@@ -224,27 +220,8 @@ function WeightStepTracker() {
   })();
 
   useEffect(() => { loadData(); }, []);
-  useEffect(() => { if (!loading) saveData(); }, [entries, workouts, habits, habitLogs, goalWeight, targetRate, yearlyGoal, height, loading]);
+  useEffect(() => { if (!loading) saveData(); }, [entries, workouts, goalWeight, targetRate, yearlyGoal, height, loading]);
 
-  // Diet state
-  var todayDietStr = new Date().toISOString().split('T')[0];
-  var dietChecked = React.useState({}); var checkedMeals = dietChecked[0]; var setCheckedMeals = dietChecked[1];
-  var dietBought = React.useState({}); var boughtItems = dietBought[0]; var setBoughtItems = dietBought[1];
-  var dietSearch = React.useState(''); var recipeSearch = dietSearch[0]; var setRecipeSearch = dietSearch[1];
-  var dietOpen = React.useState(null); var openRecipe = dietOpen[0]; var setOpenRecipe = dietOpen[1];
-  var dietFavs = React.useState([]); var recipeFavs = dietFavs[0]; var setRecipeFavs = dietFavs[1];
-  var dietFilter = React.useState('alla'); var recipeFilter = dietFilter[0]; var setRecipeFilter = dietFilter[1];
-  useEffect(function(){
-    var cm=localStorage.getItem('diet-checked-'+todayDietStr);
-    var rf=localStorage.getItem('diet-favs');
-    var bi=localStorage.getItem('diet-bought');
-    if(cm) setCheckedMeals(JSON.parse(cm));
-    if(rf) setRecipeFavs(JSON.parse(rf));
-    if(bi) setBoughtItems(JSON.parse(bi));
-  }, []);
-  useEffect(function(){ localStorage.setItem('diet-checked-'+todayDietStr, JSON.stringify(checkedMeals)); }, [checkedMeals]);
-  useEffect(function(){ localStorage.setItem('diet-favs', JSON.stringify(recipeFavs)); }, [recipeFavs]);
-  useEffect(function(){ localStorage.setItem('diet-bought', JSON.stringify(boughtItems)); }, [boughtItems]);
 
   // Read URL params injected by iOS Shortcut: ?steps=8500&date=2026-02-25
   const loadData = async () => {
@@ -256,8 +233,6 @@ function WeightStepTracker() {
         window.storage.get('yearly-goal'),
         window.storage.get('user-height'),
         window.storage.get('target-rate'),
-        window.storage.get('habits'),
-        window.storage.get('habit-logs'),
       ]);
       if (results[0] && results[0].value) setEntries(JSON.parse(results[0].value));
       if (results[1] && results[1].value) setWorkouts(JSON.parse(results[1].value));
@@ -265,8 +240,6 @@ function WeightStepTracker() {
       if (results[3] && results[3].value) setYearlyGoal(JSON.parse(results[3].value));
       if (results[4] && results[4].value) setHeight(parseFloat(results[4].value));
       if (results[5] && results[5].value) setTargetRate(parseFloat(results[5].value));
-      if (results[6] && results[6].value) { var h=JSON.parse(results[6].value); setHabits(Array.isArray(h)?h:[]); }
-      if (results[7] && results[7].value) { var hl=JSON.parse(results[7].value); setHabitLogs((hl&&typeof hl==='object'&&!Array.isArray(hl))?hl:{}); }
     } catch (err) {
       console.log('Ingen sparad data', err);
     } finally {
@@ -282,8 +255,6 @@ function WeightStepTracker() {
         window.storage.set('yearly-goal',    JSON.stringify(yearlyGoal)),
         window.storage.set('user-height',    height.toString()),
         window.storage.set('target-rate',    targetRate.toString()),
-        window.storage.set('habits',         JSON.stringify(habits)),
-        window.storage.set('habit-logs',     JSON.stringify(habitLogs)),
       ]);
     } catch (err) { console.error(err); }
   };
@@ -1467,281 +1438,6 @@ function WeightStepTracker() {
       )
     );
   }
-  function renderWeekly() {
-    return h('div', { className: 'bg-white rounded-2xl shadow-md overflow-hidden' },
-      h('div', { className: 'px-6 py-4 border-b border-gray-100 flex items-center justify-between' },
-        h('div', null,
-          h('h2', { className: 'text-xl font-bold text-gray-800' }, '📅 Veckoöversikt'),
-          h('p', { className: 'text-xs text-gray-400 mt-0.5' }, weeklyStats.length + ' veckor loggade')
-        )
-      ),
-      h('div', { className: 'overflow-x-auto' },
-        h('table', { className: 'w-full' },
-          h('thead', null,
-            h('tr', { className: 'bg-gray-50' },
-              h('th', { className: 'text-left px-6 py-3 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Vecka'),
-              h('th', { className: 'text-left px-4 py-3 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Snitt vikt'),
-              h('th', { className: 'text-left px-4 py-3 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Förändring'),
-              h('th', { className: 'text-left px-4 py-3 text-xs font-bold uppercase tracking-wide text-gray-400' }, '👟 Steg/dag'),
-              h('th', { className: 'text-left px-4 py-3 text-xs font-bold uppercase tracking-wide text-gray-400' }, '💪 Pass'),
-              h('th', { className: 'text-left px-4 py-3 text-xs font-bold uppercase tracking-wide text-gray-400' }, '⏱ Min')
-            )
-          ),
-          h('tbody', null,
-            ...weeklyStats.map(function(week, idx) {
-              var isCurrentWeek = idx === 0;
-              return h('tr', { key: week.weekStart, className: 'border-b border-gray-50 transition-colors ' + (isCurrentWeek ? 'bg-indigo-50 hover:bg-indigo-100' : (idx%2===0?'bg-white':'bg-gray-50/40') + ' hover:bg-blue-50') },
-                h('td', { className: 'px-6 py-3' },
-                  h('div', { className: 'flex items-center gap-2' },
-                    h('span', { className: 'font-bold text-gray-800' }, week.weekNumber),
-                    isCurrentWeek ? h('span', { className: 'text-xs bg-indigo-100 text-indigo-600 font-semibold px-2 py-0.5 rounded-full' }, 'Pågående') : null
-                  )
-                ),
-                h('td', { className: 'px-4 py-3 font-semibold text-gray-800' }, week.avgWeight + ' kg'),
-                h('td', { className: 'px-4 py-3' },
-                  week.change !== 0
-                    ? h('span', { className: 'px-2 py-0.5 rounded-full text-xs font-bold ' + (week.change < 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600') },
-                        (week.change > 0 ? '▲ +' : '▼ ') + week.change + ' kg')
-                    : h('span', { className: 'text-gray-400 text-xs' }, '–')
-                ),
-                h('td', { className: 'px-4 py-3 text-sm text-gray-600' }, week.avgSteps > 0 ? week.avgSteps.toLocaleString() : '–'),
-                h('td', { className: 'px-4 py-3' },
-                  h('span', { className: 'font-semibold ' + (week.workoutCount >= 3 ? 'text-green-600' : week.workoutCount > 0 ? 'text-blue-600' : 'text-gray-300') }, week.workoutCount || '–')
-                ),
-                h('td', { className: 'px-4 py-3 text-sm text-gray-500' }, week.totalMinutes || '–')
-              );
-            })
-          )
-        )
-      )
-    );
-  }
-  function renderHabits() {
-    var DAY_NAMES = ['M','T','O','T','F','L','S'];
-    var today = new Date(); today.setHours(0,0,0,0);
-    var todayStr2 = today.getFullYear()+'-'+String(today.getMonth()+1).padStart(2,'0')+'-'+String(today.getDate()).padStart(2,'0');
-    // Compute 7 days of the displayed week
-    var dow = today.getDay(); // 0=sun
-    var monday = new Date(today);
-    monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1) + weekOffset * 7);
-    var weekDays = [];
-    for (var i = 0; i < 7; i++) {
-      var d = new Date(monday); d.setDate(monday.getDate() + i);
-      weekDays.push(d.toISOString().split('T')[0]);
-    }
-    var weekLabel = (weekOffset === 0) ? 'Denna vecka' : (weekOffset === -1 ? 'Förra veckan' : new Date(weekDays[0]).toLocaleDateString('sv-SE', { day:'numeric', month:'short' }) + ' – ' + new Date(weekDays[6]).toLocaleDateString('sv-SE', { day:'numeric', month:'short' }));
-    function toggleHabitLog(hid, date) {
-      setHabitLogs(function(prev) {
-        var day = Object.assign({}, prev[date] || {});
-        day[hid] = !day[hid];
-        return Object.assign({}, prev, { [date]: day });
-      });
-    }
-    function getStreak(hid) {
-      var streak = 0;
-      var d = new Date(today);
-      while (true) {
-        var ds = d.toISOString().split('T')[0];
-        if (habitLogs[ds] && habitLogs[ds][hid]) { streak++; d.setDate(d.getDate()-1); }
-        else break;
-      }
-      return streak;
-    }
-    function getBestStreak(hid) {
-      var best = 0, cur = 0;
-      var allDates = Object.keys(habitLogs).sort();
-      allDates.forEach(function(ds) {
-        if (habitLogs[ds] && habitLogs[ds][hid]) { cur++; best = Math.max(best, cur); }
-        else cur = 0;
-      });
-      return best;
-    }
-    function getMonthRate(hid) {
-      var now = new Date();
-      var month = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
-      var daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
-      var daysElapsed = Math.min(now.getDate(), daysInMonth);
-      var done = 0;
-      for (var i = 1; i <= daysElapsed; i++) {
-        var ds = month + '-' + String(i).padStart(2,'0');
-        if (habitLogs[ds] && habitLogs[ds][hid]) done++;
-      }
-      return daysElapsed > 0 ? Math.round(done / daysElapsed * 100) : 0;
-    }
-    function getWeeklyRates(hid) {
-      var rates = [];
-      for (var w = -7; w <= 0; w++) {
-        var wMonday = new Date(today);
-        var wDow = today.getDay();
-        wMonday.setDate(today.getDate() - (wDow === 0 ? 6 : wDow - 1) + w * 7);
-        var done = 0;
-        for (var i = 0; i < 7; i++) {
-          var wd = new Date(wMonday); wd.setDate(wMonday.getDate() + i);
-          var ds = wd.toISOString().split('T')[0];
-          if (ds > todayStr2) break;
-          if (habitLogs[ds] && habitLogs[ds][hid]) done++;
-        }
-        var wLabel = new Date(wMonday).toLocaleDateString('sv-SE', { day:'numeric', month:'short' });
-        rates.push({ datum: wLabel, rate: done });
-      }
-      return rates;
-    }
-    var addHabit = function() {
-      if (!newHabit.name.trim()) return;
-      var h2 = { id: Date.now(), name: newHabit.name.trim(), type: newHabit.type, emoji: newHabit.emoji };
-      setHabits(function(prev) { return prev.concat(h2); });
-      setNewHabit({ name: '', type: 'good', emoji: '✅' });
-      setHabitTab('week');
-      showToast('✅ Vana tillagd!');
-    };
-    var removeHabit = function(hid) {
-      setHabits(function(prev) { return prev.filter(function(h2){ return h2.id !== hid; }); });
-      showToast('Vana borttagen');
-    };
-    var emojiOptions = ['✅','🏃','💪','🥗','💧','📖','🧘','😴','🚫','🍰','🍞','📝','🎯','🚶','🧹','💊','🌿','☕'];
-    return h('div', { className: 'max-w-2xl mx-auto' },
-      // Sub-tabs
-      h('div', { className: 'flex gap-2 mb-5' },
-        ['week','stats','add'].map(function(t) {
-          var labels = { week: '📅 Vecka', stats: '📊 Analys', add: '+ Ny vana' };
-          return h('button', { key: t, onClick: function(){ setHabitTab(t); },
-            className: 'px-4 py-2 rounded-lg text-sm font-medium ' + (habitTab === t ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 hover:bg-indigo-50')
-          }, labels[t]);
-        })
-      ),
-      // WEEK VIEW
-      habitTab === 'week' ? h('div', null,
-        // Week navigation
-        h('div', { className: 'flex items-center justify-between mb-4 bg-white rounded-xl p-3 shadow-sm' },
-          h('button', { onClick: function(){ setWeekOffset(function(o){ return o-1; }); }, className: 'px-3 py-1 rounded-lg hover:bg-gray-100 text-lg' }, '‹'),
-          h('span', { className: 'font-semibold text-gray-700' }, weekLabel),
-          h('button', { onClick: function(){ setWeekOffset(function(o){ return Math.min(o+1, 0); }); }, disabled: weekOffset === 0, className: 'px-3 py-1 rounded-lg hover:bg-gray-100 text-lg disabled:opacity-30' }, '›')
-        ),
-        habits.length === 0
-          ? h('div', { className: 'bg-white rounded-xl p-12 text-center shadow-md' },
-              h('div', { className: 'text-4xl mb-3' }, '🎯'),
-              h('p', { className: 'text-gray-500 mb-4' }, 'Inga vanor ännu'),
-              h('button', { onClick: function(){ setHabitTab('add'); }, className: 'bg-indigo-600 text-white px-6 py-2 rounded-lg' }, '+ Lägg till vana')
-            )
-          : h('div', { className: 'bg-white rounded-xl shadow-md overflow-hidden' },
-              // Header row
-              h('div', { className: 'grid gap-px bg-gray-100', style: { gridTemplateColumns: '1fr repeat(7, 36px)' } },
-                h('div', { className: 'bg-white px-4 py-2 text-xs text-gray-400 font-medium' }, 'Vana'),
-                weekDays.map(function(date, i) {
-                  var isToday = date === todayStr2;
-                  return h('div', { key: date, className: 'bg-white py-2 text-center' },
-                    h('div', { className: 'text-xs text-gray-400' }, DAY_NAMES[i]),
-                    h('div', { className: 'text-xs font-bold ' + (isToday ? 'text-indigo-600' : 'text-gray-500') },
-                      new Date(date).getDate())
-                  );
-                })
-              ),
-              // Habit rows
-              habits.map(function(habit) {
-                var streak = getStreak(habit.id);
-                return h('div', { key: habit.id, className: 'grid gap-px bg-gray-100', style: { gridTemplateColumns: '1fr repeat(7, 36px)' } },
-                  h('div', { className: 'bg-white px-4 py-3 flex items-center gap-2' },
-                    h('span', { className: 'text-lg' }, habit.emoji),
-                    h('div', null,
-                      h('p', { className: 'text-sm font-medium text-gray-800 leading-tight' }, habit.name),
-                      streak > 0 ? h('p', { className: 'text-xs text-orange-500' }, '🔥 ' + streak) : null
-                    )
-                  ),
-                  weekDays.map(function(date) {
-                    var done = habitLogs[date] && habitLogs[date][habit.id];
-                    var isFuture = date > todayStr2;
-                    var isGood = habit.type === 'good' ? done : !done && !isFuture && date <= todayStr2;
-                    var color = isFuture ? 'bg-gray-50'
-                      : done && habit.type === 'good' ? 'bg-green-400'
-                      : done && habit.type === 'bad'  ? 'bg-red-400'
-                      : !done && habit.type === 'bad' && date <= todayStr2 ? 'bg-green-100'
-                      : 'bg-red-100';
-                    return h('div', { key: date, className: 'bg-white py-1 px-1' },
-                      h('button', {
-                        onClick: function(){ if (!isFuture) toggleHabitLog(habit.id, date); },
-                        disabled: isFuture,
-                        className: 'w-full h-8 rounded-md ' + color + ' transition-colors ' + (isFuture ? '' : 'hover:opacity-80')
-                      }, done ? (habit.type==='good'?'✓':'✗') : '')
-                    );
-                  })
-                );
-              })
-            )
-      ) : null,
-      // STATS VIEW
-      habitTab === 'stats' ? h('div', { className: 'space-y-4' },
-        habits.length === 0
-          ? h('p', { className: 'text-gray-400 text-center py-12' }, 'Inga vanor att analysera ännu')
-          : habits.map(function(habit) {
-              var streak = getStreak(habit.id);
-              var best = getBestStreak(habit.id);
-              var rate = getMonthRate(habit.id);
-              var weekRates = getWeeklyRates(habit.id);
-              return h('div', { key: habit.id, className: 'bg-white rounded-xl p-5 shadow-md' },
-                h('div', { className: 'flex items-center justify-between mb-4' },
-                  h('div', { className: 'flex items-center gap-2' },
-                    h('span', { className: 'text-2xl' }, habit.emoji),
-                    h('div', null,
-                      h('p', { className: 'font-bold text-gray-800' }, habit.name),
-                      h('p', { className: 'text-xs text-gray-400' }, habit.type === 'good' ? 'Bra vana' : 'Vana att undvika')
-                    )
-                  ),
-                  h('button', { onClick: function(){ removeHabit(habit.id); }, className: 'text-red-400 hover:text-red-600 text-sm' }, '🗑 Ta bort')
-                ),
-                h('div', { className: 'grid grid-cols-3 gap-3 mb-4' },
-                  h('div', { className: 'bg-orange-50 rounded-lg p-3 text-center' },
-                    h('p', { className: 'text-2xl font-bold text-orange-500' }, streak + '🔥'),
-                    h('p', { className: 'text-xs text-gray-500' }, 'Nuvarande svit')
-                  ),
-                  h('div', { className: 'bg-indigo-50 rounded-lg p-3 text-center' },
-                    h('p', { className: 'text-2xl font-bold text-indigo-600' }, best),
-                    h('p', { className: 'text-xs text-gray-500' }, 'Bästa svit')
-                  ),
-                  h('div', { className: 'bg-green-50 rounded-lg p-3 text-center' },
-                    h('p', { className: 'text-2xl font-bold text-green-600' }, rate + '%'),
-                    h('p', { className: 'text-xs text-gray-500' }, 'Denna månad')
-                  )
-                ),
-                h('p', { className: 'text-xs text-gray-400 mb-2' }, 'Fullföljda dagar per vecka (senaste 8 veckorna)'),
-                h(SvgBarChart, { data: weekRates, dataKey: 'rate', color: habit.type === 'good' ? '#4f46e5' : '#ef4444', height: 100 })
-              );
-            })
-      ) : null,
-      // ADD HABIT VIEW
-      habitTab === 'add' ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
-        h('h2', { className: 'text-lg font-bold text-gray-800 mb-5' }, 'Ny vana'),
-        h('div', { className: 'space-y-4' },
-          h('input', { type:'text', value: newHabit.name, onChange: function(e){ setNewHabit(Object.assign({},newHabit,{name:e.target.value})); },
-            placeholder: 'Namn, t.ex. "30 min promenad"', className: 'w-full px-4 py-3 border rounded-lg outline-none' }),
-          h('div', null,
-            h('p', { className: 'text-sm font-medium text-gray-700 mb-2' }, 'Typ'),
-            h('div', { className: 'flex gap-3' },
-              h('button', { onClick: function(){ setNewHabit(Object.assign({},newHabit,{type:'good'})); },
-                className: 'flex-1 py-3 rounded-lg border-2 font-medium ' + (newHabit.type==='good' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-500')
-              }, '✅ Bra vana'),
-              h('button', { onClick: function(){ setNewHabit(Object.assign({},newHabit,{type:'bad'})); },
-                className: 'flex-1 py-3 rounded-lg border-2 font-medium ' + (newHabit.type==='bad' ? 'border-red-400 bg-red-50 text-red-700' : 'border-gray-200 text-gray-500')
-              }, '🚫 Undvika')
-            )
-          ),
-          h('div', null,
-            h('p', { className: 'text-sm font-medium text-gray-700 mb-2' }, 'Emoji'),
-            h('div', { className: 'flex flex-wrap gap-2' },
-              emojiOptions.map(function(em) {
-                return h('button', { key: em, onClick: function(){ setNewHabit(Object.assign({},newHabit,{emoji:em})); },
-                  className: 'w-10 h-10 rounded-lg text-xl ' + (newHabit.emoji===em ? 'bg-indigo-100 border-2 border-indigo-400' : 'bg-gray-50 hover:bg-gray-100')
-                }, em);
-              })
-            )
-          ),
-          h('button', { onClick: addHabit, disabled: !newHabit.name.trim(),
-            className: 'w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 disabled:opacity-40 font-medium'
-          }, '+ Lägg till vana')
-        )
-      ) : null
-    );
-  }
-
   function renderSettings() {
     return h('div', { className: 'max-w-lg mx-auto space-y-4' },
       h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
@@ -1930,187 +1626,294 @@ function WeightStepTracker() {
     );
   }
 
-  // Diet data
-  var MEAL_NAMES = ['Frukost','Lunch','Middag','Kvallsmat'];
-  var MEAL_EMOJI = ['sunrise','salad','plate','moon'];
-  var MEAL_ICON = { 'sunrise':'🌅', 'salad':'🥗', 'plate':'🍽', 'moon':'🌙' };
-  var WEEK_MENU_DEF = [
-    { day:'Mandag',    meals:['Aggomelett med tofu och sotpotatis','Tacotallrik','Tofu med broccolirora','Proteinglass'] },
-    { day:'Tisdag',    meals:['Aggomelett med tofu och sotpotatis','Paprikatofu med bonpasta','Tofu med rotfrukter och gronkal','Proteinglass'] },
-    { day:'Onsdag',    meals:['Aggomelett med tofu och sotpotatis','Tofu och agg med quinoa','Tempeh med kikartor och rotfrukter','Proteinglass'] },
-    { day:'Torsdag',   meals:['Aggomelett med tofu och sotpotatis','Kebabtallrik','Tofu med brysselkal och halloumi','Proteinglass'] },
-    { day:'Fredag',    meals:['Aggomelett med tofu och sotpotatis','Bonpasta med tofu och tomatsas','Spenatsoppa med rokt tofu','Proteinglass'] },
-    { day:'Lordag',    meals:['Aggomelett med tofu och sotpotatis','Tacotallrik','Tempeh med svarta bonor och paprika','Proteinglass'] },
-    { day:'Sondag',    meals:['Aggomelett med tofu och sotpotatis','Tofu och agg med quinoa','Tofu med edamame och quinoa','Proteinglass'] }
-  ];
-  var RECIPES_DEF = [
-    { id:1, name:'Tacotallrik', cat:'Lunch', kcal:540, protein:44, ingredients:[{a:'180g',n:'tofu'},{a:'100g',n:'svarta bonor'},{a:'50g',n:'jalapenos'},{a:'35g',n:'gronkal'},{a:'50g',n:'tomat'},{a:'20g',n:'rodlok'},{a:'0.5 st',n:'avokado'}], steps:'Stek tofun i rapsolja tills gyllenbrun. Varm bonorna. Stek gronkalen latt. Lagg upp allt pa tallrik. Mosa avokadon med lite limejuice och salt. Toppa med jalapenos, hackad tomat och rodlok.' },
-    { id:2, name:'Tofu med broccolirora', cat:'Middag', kcal:480, protein:42, ingredients:[{a:'180g',n:'tofu'},{a:'100g',n:'broccoli'},{a:'60g',n:'champinjoner'},{a:'60g',n:'squash'},{a:'50g',n:'tomat'},{a:'30g',n:'fetaost'},{a:'efter smak',n:'jalapenos'}], steps:'Stek tofun gyllenbrun. Bryn broccoli, champinjoner, squash och tomat i samma panna. Tillsatt fetaosten sista minuten. Servera med tofun.' },
-    { id:3, name:'Paprikatofu med bonpasta', cat:'Lunch', kcal:530, protein:43, ingredients:[{a:'180g',n:'tofu'},{a:'40g',n:'bonpasta'},{a:'100g',n:'paprika'},{a:'40g',n:'tomat'},{a:'1 klyfta',n:'vitlok'},{a:'30g',n:'fetaost'}], steps:'Koka bonpastan. Stek tofun. Stek vitlok, paprika och tomat. Rör ner fetaosten. Servera med tofun.' },
-    { id:4, name:'Tofu med rotfrukter och gronkal', cat:'Middag', kcal:500, protein:40, ingredients:[{a:'180g',n:'tofu'},{a:'70g',n:'morot'},{a:'70g',n:'palsternacka'},{a:'150g',n:'gronkal'},{a:'30g',n:'fetaost'}], steps:'Skar rotfrukterna i 1 cm skivor. Woka tofu och rotfrukter tills mjuka. Tillsatt gronkalen sista 3 minuterna och fetaosten sista minuten.' },
-    { id:5, name:'Tofu och agg med quinoa', cat:'Lunch', kcal:560, protein:48, ingredients:[{a:'150g',n:'tofu'},{a:'2 st',n:'agg'},{a:'100g',n:'quinoa'},{a:'efter smak',n:'spenat'},{a:'efter smak',n:'sojasas'},{a:'efter smak',n:'sesamolja'}], steps:'Koka quinoan. Stek tofun. Stek aggen. Woka spenat snabbt. Ringla over sojasas och sesamolja.' },
-    { id:6, name:'Tempeh med kikartor och rotfrukter', cat:'Middag', kcal:540, protein:40, ingredients:[{a:'150g',n:'tempeh'},{a:'100g',n:'kikartor'},{a:'80g',n:'morot'},{a:'80g',n:'palsternacka'},{a:'efter smak',n:'tahini'}], steps:'Stek tempeh tills gyllenbrun. Woka rotfrukter och kikartor. Servera med tahini ringad over.' },
-    { id:7, name:'Kebabtallrik', cat:'Lunch', kcal:520, protein:40, ingredients:[{a:'180g',n:'tofu'},{a:'60g',n:'avokado'},{a:'60g',n:'tomat'},{a:'60g',n:'gurka'},{a:'20g',n:'bladspenat'},{a:'15g',n:'jalapenos'},{a:'100g',n:'silkestofu'},{a:'1 klyfta',n:'vitlok'}], steps:'Krydda tofun med paprika, spiskummin, koriander, salt. Stek gyllenbrun. Mixa silkestofu med vitlok, citron, salt till vitlokssas.' },
-    { id:8, name:'Tofu med brysselkal och halloumi', cat:'Middag', kcal:510, protein:42, ingredients:[{a:'150g',n:'tofu'},{a:'100g',n:'brysselkal'},{a:'100g',n:'gronkal'},{a:'50g',n:'squash'},{a:'40g',n:'halloumi'}], steps:'Stek tofun. Tillsatt brysselkal och squash. Lagg i gronkal och halloumi sista minuten.' },
-    { id:9, name:'Bonpasta med tofu och tomatsas', cat:'Lunch', kcal:520, protein:42, ingredients:[{a:'180g',n:'tofu'},{a:'40g',n:'bonpasta'},{a:'120g',n:'krossade tomater'},{a:'efter smak',n:'lok och vitlok'},{a:'10g',n:'ruccola'}], steps:'Stek lok och vitlok. Tillsatt krossade tomater, sjud 10 min. Stek tofun. Koka bonpastan. Blanda ihop.' },
-    { id:10, name:'Spenatsoppa med rokt tofu', cat:'Middag', kcal:480, protein:38, ingredients:[{a:'180g',n:'rokt tofu'},{a:'200g',n:'spenat'},{a:'1 dl',n:'kokosmjolk'},{a:'2 klyftor',n:'vitlok'},{a:'efter smak',n:'ingefara'}], steps:'Fras vitlok och ingefara. Tillsatt spenat och lat falla ihop. Hall i kokosmjolk och mixa slatt. Lagg i rokt tofu.' },
-    { id:11, name:'Aggomelett med tofu och sotpotatis', cat:'Frukost', kcal:580, protein:50, ingredients:[{a:'3 st',n:'agg'},{a:'120g',n:'tofu'},{a:'150g',n:'sotpotatis'},{a:'efter smak',n:'paprika och spenat'}], steps:'Koka sotpotatis. Stek tofu. Vispa agg och stek till omelett med paprika och spenat. Servera med sotpotatis och tofu.' },
-    { id:12, name:'Tempeh med svarta bonor och paprika', cat:'Middag', kcal:520, protein:42, ingredients:[{a:'150g',n:'tempeh'},{a:'150g',n:'svarta bonor'},{a:'100g',n:'paprika'},{a:'efter smak',n:'tomatsas och vitlok'},{a:'30g',n:'fetaost'}], steps:'Stek tempeh gyllenbrun. Stek vitlok och paprika. Tillsatt bonor och tomatsas. Ror ner fetaost.' },
-    { id:13, name:'Tofu med edamame och quinoa', cat:'Middag', kcal:550, protein:45, ingredients:[{a:'150g',n:'tofu'},{a:'150g',n:'edamame'},{a:'80g',n:'quinoa'},{a:'efter smak',n:'sojasas och sesamolja'}], steps:'Koka quinoan. Stek tofu. Varm edamame. Blanda med sojasas och sesamolja.' },
-    { id:14, name:'Proteinglass', cat:'Mellanmal', kcal:160, protein:25, ingredients:[{a:'30g',n:'proteinpulver'},{a:'3 dl',n:'mandelmjolk'}], steps:'Mixa ihop. Smaксatt valfritt. Hall i form. Frys 3-4 timmar.' }
-  ];
-  var SHOPPING = ["tofu","rokt tofu","tempeh","silkestofu","agg","halloumi","fetaost","proteinpulver","broccoli","gronkal","brysselkal","spenat","paprika","squash","tomat","gurka","rodlok","jalapenos","sotpotatis","morot","palsternacka","avokado","svarta bonor","kikartor","edamame","bonpasta","quinoa","kokosmjolk","krossade tomater","tahini","sojasas","sesamolja","mandelmjolk"];
+  function renderWegovy() {
+    var wState = React.useState(null); var wegovyDoses = wState[0]; var setWegovyDoses = wState[1];
+    var wProto = React.useState(null); var wegovyProtocol = wProto[0]; var setWegovyProtocol = wProto[1];
+    var wLoading = React.useState(true); var wgovLoading = wLoading[0]; var setWgovLoading = wLoading[1];
+    var wForm = React.useState(false); var showDoseForm = wForm[0]; var setShowDoseForm = wForm[1];
+    var wEdit = React.useState(false); var editProtocol = wEdit[0]; var setEditProtocol = wEdit[1];
+    var wFormData = React.useState({}); var doseForm = wFormData[0]; var setDoseForm = wFormData[1];
 
-  function renderIdag() {
-    var dayIdx = new Date().getDay(); dayIdx = dayIdx===0?6:dayIdx-1;
-    var todayMenu = WEEK_MENU_DEF[dayIdx];
-    var totalKcal=0, totalProtein=0;
-    MEAL_NAMES.forEach(function(m,i){
-      var rec = RECIPES_DEF.find(function(r){return r.name===todayMenu.meals[i];});
-      if(rec && checkedMeals[i]){totalKcal+=rec.kcal; totalProtein+=rec.protein;}
-    });
-    return h('div', {className:'space-y-4'},
-      h('div', {className:'grid grid-cols-2 gap-4'},
-        h('div', {className:'bg-white rounded-xl p-4 shadow-md text-center'},
-          h('div',{className:'text-2xl mb-1'},'🔥'),
-          h('p',{className:'text-xs text-gray-500 uppercase tracking-wide'},'Kcal idag'),
-          h('p',{className:'text-2xl font-bold text-gray-800'},totalKcal),
-          h('p',{className:'text-xs text-gray-400'},'av ca 2000')
+    var DEFAULT_PROTOCOL = {
+      start_date: '2026-04-28',
+      current_dose: 0.25,
+      weeks_per_step: 6,
+      titration_plan: [
+        { weeks: '1-6',  dose: 0.25 },
+        { weeks: '7-12', dose: 0.5  },
+        { weeks: '13-18',dose: 1.0  },
+        { weeks: '19-24',dose: 1.7  },
+        { weeks: '25+',  dose: 2.4  }
+      ]
+    };
+    var DEFAULT_DOSES = [
+      { id: 1745798400000, date: '2026-04-28', dose: 0.25, side_effects: '', notes: '', weight_at_dose: null },
+      { id: 1746403200000, date: '2026-05-05', dose: 0.25, side_effects: '', notes: '', weight_at_dose: null }
+    ];
+
+    React.useEffect(function() {
+      Promise.all([
+        window.storage.get('wegovy-doses'),
+        window.storage.get('wegovy-protocol')
+      ]).then(function(r) {
+        var doses = (r[0] && r[0].value) ? JSON.parse(r[0].value) : DEFAULT_DOSES;
+        var proto = (r[1] && r[1].value) ? JSON.parse(r[1].value) : DEFAULT_PROTOCOL;
+        setWegovyDoses(doses);
+        setWegovyProtocol(proto);
+        setWgovLoading(false);
+      });
+    }, []);
+
+    function saveDoses(doses) {
+      setWegovyDoses(doses);
+      window.storage.set('wegovy-doses', JSON.stringify(doses));
+    }
+    function saveProtocol(proto) {
+      setWegovyProtocol(proto);
+      window.storage.set('wegovy-protocol', JSON.stringify(proto));
+    }
+    function toDateStr(d) {
+      return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    }
+    function getNextTuesdayStr(fromDate) {
+      var d = new Date(fromDate || Date.now());
+      var day = d.getDay();
+      var diff = (day <= 2) ? (2 - day) : (9 - day);
+      if (diff === 0) diff = 7;
+      d.setDate(d.getDate() + diff);
+      return toDateStr(d);
+    }
+    function getWeeksOn(proto) {
+      if (!proto) return 0;
+      var ms = new Date() - new Date(proto.start_date);
+      return Math.ceil(ms / (7*24*60*60*1000));
+    }
+    function getCurrentStepIdx(proto, weeks) {
+      if (!proto) return 0;
+      var plan = proto.titration_plan;
+      for (var i = 0; i < plan.length; i++) {
+        var r = plan[i].weeks;
+        if (r.endsWith('+')) { if (weeks >= parseInt(r)) return i; }
+        else { var p = r.split('-'); if (weeks >= parseInt(p[0]) && weeks <= parseInt(p[1])) return i; }
+      }
+      return plan.length - 1;
+    }
+    function getDoseStreak(doses) {
+      if (!doses || !doses.length) return 0;
+      var streak = 0;
+      var d = new Date(); d.setHours(0,0,0,0);
+      var dow = d.getDay();
+      d.setDate(d.getDate() - ((dow >= 2) ? dow - 2 : dow + 5));
+      for (var i = 0; i < 52; i++) {
+        var ds = toDateStr(d);
+        if (doses.find(function(x){ return x.date === ds; })) { streak++; d.setDate(d.getDate()-7); }
+        else break;
+      }
+      return streak;
+    }
+
+    if (wgovLoading || !wegovyDoses || !wegovyProtocol) {
+      return h('div', { className: 'text-center py-12 text-gray-400' }, 'Laddar...');
+    }
+
+    var sortedDoses = wegovyDoses.slice().sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
+    var latestDose = sortedDoses[0] || null;
+    var weeksOn = getWeeksOn(wegovyProtocol);
+    var stepIdx = getCurrentStepIdx(wegovyProtocol, weeksOn);
+    var currentStep = wegovyProtocol.titration_plan[stepIdx] || wegovyProtocol.titration_plan[0];
+    var nextStep = wegovyProtocol.titration_plan[stepIdx + 1] || null;
+    var streak = getDoseStreak(wegovyDoses);
+    var today = new Date(); today.setHours(0,0,0,0);
+    var todayStr = toDateStr(today);
+
+    var nextTue = getNextTuesdayStr(today);
+    while (wegovyDoses.find(function(d){ return d.date === nextTue; })) {
+      var nt = new Date(nextTue); nt.setDate(nt.getDate()+7); nextTue = toDateStr(nt);
+    }
+    var daysToNext = Math.round((new Date(nextTue) - today) / (24*60*60*1000));
+    var daysSinceLast = latestDose ? Math.round((today - new Date(latestDose.date)) / (24*60*60*1000)) : null;
+
+    var firstDoseSorted = wegovyDoses.slice().sort(function(a,b){ return new Date(a.date)-new Date(b.date); });
+    var weightAtStart = (firstDoseSorted[0] && firstDoseSorted[0].weight_at_dose) ? firstDoseSorted[0].weight_at_dose : null;
+    var latestWeight = stats ? stats.latest.weight : null;
+    var weightChange = (weightAtStart && latestWeight) ? (latestWeight - weightAtStart).toFixed(1) : null;
+    var totalMg = wegovyDoses.reduce(function(s,d){ return s+(d.dose||0); }, 0).toFixed(2);
+
+    var nextStepDate = null;
+    if (nextStep) {
+      var endWeek = parseInt(currentStep.weeks.endsWith('+') ? '999' : currentStep.weeks.split('-')[1]);
+      if (!currentStep.weeks.endsWith('+')) {
+        var ns = new Date(wegovyProtocol.start_date);
+        ns.setDate(ns.getDate() + endWeek * 7);
+        nextStepDate = ns;
+      }
+    }
+
+    function openDoseForm() {
+      setDoseForm({ date: nextTue, dose: wegovyProtocol.current_dose, side_effects: '', notes: '', weight_at_dose: stats ? stats.latest.weight : '' });
+      setShowDoseForm(true);
+    }
+    function submitDose() {
+      if (!doseForm.date || !doseForm.dose) return;
+      saveDoses(wegovyDoses.concat([{ id: Date.now(), date: doseForm.date, dose: parseFloat(doseForm.dose), side_effects: doseForm.side_effects||'', notes: doseForm.notes||'', weight_at_dose: doseForm.weight_at_dose ? parseFloat(doseForm.weight_at_dose) : null }]));
+      setShowDoseForm(false);
+      showToast('💉 Dos loggad!');
+    }
+
+    return h('div', null,
+      h('div', { className: 'bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600 rounded-2xl shadow-xl mb-5 p-6 text-white' },
+        h('div', { className: 'flex items-start justify-between mb-4' },
+          h('div', null,
+            h('p', { className: 'text-pink-200 text-xs font-semibold uppercase tracking-widest mb-1' }, '💉 Wegovy-protokollet'),
+            h('p', { className: 'text-3xl font-black' }, 'Vecka ' + weeksOn + ' på ' + currentStep.dose + ' mg'),
+            h('p', { className: 'text-pink-200 text-sm mt-1' }, 'Start: ' + wegovyProtocol.start_date)
+          ),
+          h('button', { onClick: openDoseForm, className: 'bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl text-sm' }, '+ Logga dos')
         ),
-        h('div', {className:'bg-white rounded-xl p-4 shadow-md text-center'},
-          h('div',{className:'text-2xl mb-1'},'💪'),
-          h('p',{className:'text-xs text-gray-500 uppercase tracking-wide'},'Protein idag'),
-          h('p',{className:'text-2xl font-bold text-gray-800'},totalProtein+'g'),
-          h('p',{className:'text-xs text-gray-400'},'av ca 140g')
+        h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-3' },
+          h('div', { className: 'bg-white/15 rounded-xl p-3' },
+            h('p', { className: 'text-pink-200 text-xs' }, 'Senaste dos'),
+            h('p', { className: 'text-xl font-black' }, latestDose ? new Date(latestDose.date).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}) : '–'),
+            h('p', { className: 'text-xs text-pink-200' }, daysSinceLast !== null ? daysSinceLast + ' dagar sen' : '–')
+          ),
+          h('div', { className: 'bg-white/15 rounded-xl p-3' },
+            h('p', { className: 'text-pink-200 text-xs' }, 'Nästa dos'),
+            h('p', { className: 'text-xl font-black' }, new Date(nextTue).toLocaleDateString('sv-SE',{day:'numeric',month:'short'})),
+            h('p', { className: 'text-xs text-pink-200' }, daysToNext === 0 ? 'Idag!' : 'om ' + daysToNext + ' dagar')
+          ),
+          h('div', { className: 'bg-white/15 rounded-xl p-3' },
+            h('p', { className: 'text-pink-200 text-xs' }, 'Streak'),
+            h('p', { className: 'text-xl font-black' }, streak + ' 💉'),
+            h('p', { className: 'text-xs text-pink-200' }, streak === 1 ? 'tisdag i rad' : 'tisdagar i rad')
+          ),
+          h('div', { className: 'bg-white/15 rounded-xl p-3' },
+            h('p', { className: 'text-pink-200 text-xs' }, 'Viktändring'),
+            h('p', { className: 'text-xl font-black ' + (weightChange !== null && parseFloat(weightChange) < 0 ? 'text-green-300' : 'text-red-300') },
+              weightChange !== null ? (parseFloat(weightChange) > 0 ? '+' : '') + weightChange + ' kg' : '–'),
+            h('p', { className: 'text-xs text-pink-200' }, weightAtStart ? 'från ' + weightAtStart + ' kg' : 'logga vikt vid dos')
+          )
         )
       ),
-      h('div', {className:'bg-white rounded-xl p-4 shadow-md'},
-        h('h2',{className:'text-lg font-bold text-gray-800 mb-3'},'Dagens maltider'),
-        h('div',{className:'space-y-2'},
-          MEAL_NAMES.map(function(meal,i){
-            var rec = RECIPES_DEF.find(function(r){return r.name===todayMenu.meals[i];});
-            var checked = !!checkedMeals[i];
-            return h('div',{key:i,
-              className:'flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors '+(checked?'bg-green-50 border border-green-200':'bg-gray-50 hover:bg-gray-100'),
-              onClick:function(){setCheckedMeals(function(prev){var n=Object.assign({},prev);n[i]=!n[i];return n;})}
-            },
-              h('div',{className:'flex-1'},
-                h('p',{className:'text-xs font-semibold text-gray-500 uppercase'},meal),
-                h('p',{className:'font-medium text-gray-800'},todayMenu.meals[i]),
-                rec?h('p',{className:'text-xs text-gray-400'},rec.kcal+' kcal · '+rec.protein+'g protein'):null
-              ),
-              h('div',{className:'w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 '+(checked?'bg-green-500 border-green-500':'border-gray-300')},
-                checked?h('span',{className:'text-white text-xs'},'✓'):null
-              )
-            );
-          })
+      showDoseForm ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 p-6' },
+        h('div', { className: 'flex items-center justify-between mb-4' },
+          h('h2', { className: 'font-bold text-gray-800 text-lg' }, '💉 Logga dos'),
+          h('button', { onClick: function(){ setShowDoseForm(false); }, className: 'text-gray-400 hover:text-gray-600 text-2xl leading-none' }, '×')
+        ),
+        h('div', { className: 'grid grid-cols-2 gap-4 mb-4' },
+          h('div', null,
+            h('label', { className: 'text-xs font-medium text-gray-500 block mb-1' }, 'Datum'),
+            h('input', { type:'date', value: doseForm.date||'', onChange: function(e){ setDoseForm(Object.assign({},doseForm,{date:e.target.value})); }, className: 'w-full px-3 py-2 border rounded-lg text-sm outline-none' })
+          ),
+          h('div', null,
+            h('label', { className: 'text-xs font-medium text-gray-500 block mb-1' }, 'Dos (mg)'),
+            h('select', { value: doseForm.dose||'', onChange: function(e){ setDoseForm(Object.assign({},doseForm,{dose:e.target.value})); }, className: 'w-full px-3 py-2 border rounded-lg text-sm outline-none' },
+              [0.25, 0.5, 1.0, 1.7, 2.4].map(function(d){ return h('option',{key:d,value:d}, d+' mg'); })
+            )
+          ),
+          h('div', null,
+            h('label', { className: 'text-xs font-medium text-gray-500 block mb-1' }, 'Vikt vid dos (kg)'),
+            h('input', { type:'number', step:'0.1', value: doseForm.weight_at_dose||'', onChange: function(e){ setDoseForm(Object.assign({},doseForm,{weight_at_dose:e.target.value})); }, className: 'w-full px-3 py-2 border rounded-lg text-sm outline-none' })
+          ),
+          h('div', null,
+            h('label', { className: 'text-xs font-medium text-gray-500 block mb-1' }, 'Biverkningar'),
+            h('input', { type:'text', value: doseForm.side_effects||'', placeholder:'t.ex. illamående', onChange: function(e){ setDoseForm(Object.assign({},doseForm,{side_effects:e.target.value})); }, className: 'w-full px-3 py-2 border rounded-lg text-sm outline-none' })
+          )
+        ),
+        h('div', { className: 'mb-4' },
+          h('label', { className: 'text-xs font-medium text-gray-500 block mb-1' }, 'Anteckningar'),
+          h('input', { type:'text', value: doseForm.notes||'', placeholder:'Valfritt...', onChange: function(e){ setDoseForm(Object.assign({},doseForm,{notes:e.target.value})); }, className: 'w-full px-3 py-2 border rounded-lg text-sm outline-none' })
+        ),
+        h('button', { onClick: submitDose, className: 'w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold py-3 rounded-xl' }, 'Spara dos')
+      ) : null,
+      h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center justify-between px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'flex items-center gap-3' },
+            h('div', { className: 'w-1 h-8 rounded-full bg-purple-500' }),
+            h('div', null,
+              h('h2', { className: 'font-bold text-gray-800' }, 'Titreringsplan'),
+              nextStepDate ? h('p', { className: 'text-xs text-gray-400' }, 'Nästa upptrappning: ' + nextStepDate.toLocaleDateString('sv-SE',{day:'numeric',month:'long',year:'numeric'}) + ' → ' + nextStep.dose + ' mg') : null
+            )
+          ),
+          h('button', { onClick: function(){ setEditProtocol(!editProtocol); }, className: 'text-xs text-indigo-600 hover:underline' }, editProtocol ? 'Stäng' : 'Redigera')
+        ),
+        editProtocol ? h('div', { className: 'px-6 py-4 border-b border-gray-50' },
+          h('label', { className: 'text-xs font-medium text-gray-600 block mb-2' }, 'Veckor per steg (David kör 6v pga defekt penna)'),
+          h('div', { className: 'flex gap-2' },
+            [4,5,6,8].map(function(w) {
+              return h('button', { key:w, onClick: function(){
+                var plan = wegovyProtocol.titration_plan.map(function(step, i) {
+                  var doses = [0.25,0.5,1.0,1.7,2.4];
+                  if (i === wegovyProtocol.titration_plan.length-1) return { weeks: (w*i+1)+'+', dose: doses[i]||step.dose };
+                  return { weeks: (w*i+1)+'-'+(w*(i+1)), dose: doses[i]||step.dose };
+                });
+                saveProtocol(Object.assign({},wegovyProtocol,{weeks_per_step:w,titration_plan:plan}));
+              }, className: 'px-4 py-2 rounded-lg text-sm border-2 font-medium '+(wegovyProtocol.weeks_per_step===w?'bg-purple-600 text-white border-purple-600':'border-gray-200 text-gray-600') }, w+'v');
+            })
+          )
+        ) : null,
+        h('div', { className: 'px-6 py-5' },
+          h('div', { className: 'flex gap-2 overflow-x-auto pb-2' },
+            wegovyProtocol.titration_plan.map(function(step, i) {
+              var isCurrent = i === stepIdx;
+              var isPast = i < stepIdx;
+              return h('div', { key:i, className: 'flex-shrink-0 rounded-xl px-4 py-3 text-center border-2 min-w-[90px] '+(isCurrent?'bg-purple-600 border-purple-600 text-white':isPast?'bg-gray-50 border-gray-200 text-gray-400':'bg-white border-gray-200 text-gray-600') },
+                h('p', { className: 'text-lg font-black' }, step.dose+' mg'),
+                h('p', { className: 'text-xs mt-0.5 '+(isCurrent?'text-purple-200':'') }, 'v'+step.weeks),
+                isCurrent ? h('p', { className: 'text-xs text-purple-200 mt-1' }, '← Nu') : null
+              );
+            })
+          )
         )
-      )
-    );
-  }
-
-  function renderMeny() {
-    return h('div', {className:'bg-white rounded-xl p-6 shadow-md'},
-      h('h2',{className:'text-xl font-bold text-gray-800 mb-4'},'Veckans meny'),
-      h('div',{className:'space-y-3'},
-        WEEK_MENU_DEF.map(function(day,di){
-          var isToday = di===(new Date().getDay()===0?6:new Date().getDay()-1);
-          return h('div',{key:di,className:'border rounded-xl overflow-hidden '+(isToday?'border-indigo-400':'border-gray-100')},
-            h('div',{className:'px-4 py-2 font-bold text-sm '+(isToday?'bg-indigo-600 text-white':'bg-gray-50 text-gray-700')},day.day+(isToday?' - Idag':'')),
-            h('div',{className:'grid grid-cols-2 md:grid-cols-4'},
-              day.meals.map(function(meal,mi){
-                return h('div',{key:mi,className:'p-3 border-r border-b border-gray-50'},
-                  h('p',{className:'text-xs text-gray-400 uppercase'},MEAL_NAMES[mi]),
-                  h('p',{className:'text-sm font-medium text-gray-700 mt-0.5'},meal)
+      ),
+      h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-4' },
+        h('div', { className: 'bg-white rounded-xl p-4 shadow-md border-l-4 border-pink-400' },
+          h('p', { className: 'text-xs text-gray-500 uppercase tracking-wide font-medium' }, 'Antal doser'),
+          h('p', { className: 'text-2xl font-black text-gray-800 mt-1' }, wegovyDoses.length),
+          h('p', { className: 'text-xs text-gray-400 mt-0.5' }, 'loggade')
+        ),
+        h('div', { className: 'bg-white rounded-xl p-4 shadow-md border-l-4 border-purple-400' },
+          h('p', { className: 'text-xs text-gray-500 uppercase tracking-wide font-medium' }, 'Totalt mg'),
+          h('p', { className: 'text-2xl font-black text-gray-800 mt-1' }, totalMg),
+          h('p', { className: 'text-xs text-gray-400 mt-0.5' }, 'mg administrerat')
+        ),
+        h('div', { className: 'bg-white rounded-xl p-4 shadow-md border-l-4 border-indigo-400' },
+          h('p', { className: 'text-xs text-gray-500 uppercase tracking-wide font-medium' }, 'Veckor'),
+          h('p', { className: 'text-2xl font-black text-gray-800 mt-1' }, weeksOn),
+          h('p', { className: 'text-xs text-gray-400 mt-0.5' }, 'på protokollet')
+        ),
+        h('div', { className: 'bg-white rounded-xl p-4 shadow-md border-l-4 border-green-400' },
+          h('p', { className: 'text-xs text-gray-500 uppercase tracking-wide font-medium' }, 'Snitt/vecka'),
+          h('p', { className: 'text-2xl font-black mt-1 '+(weightChange!==null && parseFloat(weightChange)/Math.max(1,weeksOn)<0?'text-green-600':'text-red-500') },
+            (weightChange!==null && weeksOn>0) ? (parseFloat(weightChange)/weeksOn).toFixed(2)+' kg' : '–'),
+          h('p', { className: 'text-xs text-gray-400 mt-0.5' }, 'viktändring/vecka')
+        )
+      ),
+      h('div', { className: 'bg-white rounded-2xl shadow-md overflow-hidden mb-4' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-pink-500' }),
+          h('h2', { className: 'font-bold text-gray-800' }, 'Doshistorik')
+        ),
+        sortedDoses.length === 0
+          ? h('p', { className: 'text-center text-gray-400 py-8' }, 'Ingen dos loggad ännu')
+          : h('div', { className: 'divide-y divide-gray-50' },
+              sortedDoses.map(function(dose) {
+                return h('div', { key: dose.id, className: 'flex items-center justify-between px-6 py-3 hover:bg-gray-50' },
+                  h('div', { className: 'flex items-center gap-4' },
+                    h('div', { className: 'text-center min-w-[60px]' },
+                      h('p', { className: 'font-bold text-gray-800 text-sm' }, new Date(dose.date).toLocaleDateString('sv-SE',{day:'numeric',month:'short'})),
+                      h('p', { className: 'text-xs text-gray-400' }, new Date(dose.date).toLocaleDateString('sv-SE',{weekday:'short'}))
+                    ),
+                    h('div', { className: 'bg-purple-100 text-purple-700 font-bold text-sm px-3 py-1 rounded-full' }, dose.dose+' mg'),
+                    h('div', null,
+                      dose.side_effects ? h('p', { className: 'text-xs text-gray-500' }, '⚠️ '+dose.side_effects) : null,
+                      dose.weight_at_dose ? h('p', { className: 'text-xs text-gray-400' }, '⚖️ '+dose.weight_at_dose+' kg') : null,
+                      dose.notes ? h('p', { className: 'text-xs text-gray-400 italic' }, dose.notes) : null
+                    )
+                  ),
+                  h('button', { onClick: function(){ setWegovyDoses(function(prev){ var n=prev.filter(function(x){return x.id!==dose.id;}); window.storage.set('wegovy-doses',JSON.stringify(n)); return n; }); }, className: 'text-gray-300 hover:text-red-500 text-lg transition-colors' }, '✕')
                 );
               })
             )
-          );
-        })
-      )
-    );
-  }
-
-  function renderRecept() {
-    var cats = ['alla','Frukost','Lunch','Middag','Mellanmal'];
-    var filtered = RECIPES_DEF.filter(function(r){
-      if(recipeFilter!=='alla' && r.cat!==recipeFilter) return false;
-      if(recipeSearch && !(r.name+r.ingredients.map(function(i){return i.n;}).join()).toLowerCase().includes(recipeSearch.toLowerCase())) return false;
-      return true;
-    });
-    return h('div',{className:'space-y-4'},
-      h('div',{className:'bg-white rounded-xl p-4 shadow-md'},
-        h('input',{type:'text',placeholder:'Sök recept…',value:recipeSearch,
-          onChange:function(e){setRecipeSearch(e.target.value);},
-          className:'w-full px-4 py-3 border rounded-xl outline-none mb-3'}),
-        h('div',{className:'flex gap-2 flex-wrap'},
-          cats.map(function(cat){
-            return h('button',{key:cat,onClick:function(){setRecipeFilter(cat);},
-              className:'px-4 py-1.5 rounded-full text-sm font-medium border transition-colors '+(recipeFilter===cat?'bg-indigo-600 text-white border-indigo-600':'border-gray-200 text-gray-600 hover:border-indigo-300')
-            },cat==='alla'?'Alla':cat);
-          })
-        )
-      ),
-      h('div',{className:'grid grid-cols-1 md:grid-cols-2 gap-4'},
-        filtered.map(function(rec){
-          var isOpen = openRecipe===rec.id;
-          var isFav = recipeFavs.includes(rec.id);
-          return h('div',{key:rec.id,className:'bg-white rounded-xl shadow-md overflow-hidden'},
-            h('div',{className:'p-4 cursor-pointer hover:bg-gray-50',onClick:function(){setOpenRecipe(isOpen?null:rec.id);}},
-              h('div',{className:'flex items-start justify-between gap-2'},
-                h('div',{className:'flex-1'},
-                  h('span',{className:'text-xs font-semibold px-2 py-0.5 rounded-full mr-2 bg-indigo-100 text-indigo-700'},rec.cat),
-                  h('span',{className:'font-bold text-gray-800'},rec.name),
-                  h('div',{className:'flex gap-4 mt-1'},
-                    h('span',{className:'text-xs text-gray-400'},'Kcal: '+rec.kcal),
-                    h('span',{className:'text-xs text-gray-400'},'Protein: '+rec.protein+'g')
-                  )
-                ),
-                h('button',{onClick:function(e){e.stopPropagation();setRecipeFavs(function(prev){return prev.includes(rec.id)?prev.filter(function(x){return x!==rec.id;}):[].concat(prev,[rec.id]);});},
-                  className:'text-xl flex-shrink-0 '+(isFav?'text-yellow-400':'text-gray-300 hover:text-yellow-400')
-                },isFav?'*':'-')
-              )
-            ),
-            isOpen?h('div',{className:'border-t px-4 pb-4'},
-              h('p',{className:'text-xs font-bold text-gray-400 uppercase tracking-wide mt-3 mb-2'},'Ingredienser'),
-              h('ul',{className:'space-y-1'},
-                rec.ingredients.map(function(ing,ii){
-                  return h('li',{key:ii,className:'flex gap-2 text-sm'},
-                    h('span',{className:'font-bold text-gray-700 w-24 text-right flex-shrink-0'},ing.a),
-                    h('span',{className:'text-gray-600'},ing.n)
-                  );
-                })
-              ),
-              h('p',{className:'text-xs font-bold text-gray-400 uppercase tracking-wide mt-3 mb-1'},'Tillagning'),
-              h('p',{className:'text-sm text-gray-600 leading-relaxed'},rec.steps)
-            ):null
-          );
-        })
-      )
-    );
-  }
-
-  function renderHandla() {
-    return h('div',{className:'space-y-4'},
-      h('div',{className:'flex items-center justify-between bg-white rounded-xl p-4 shadow-md'},
-        h('h2',{className:'text-lg font-bold text-gray-800'},'Handlingslista'),
-        h('button',{onClick:function(){setBoughtItems({});},className:'text-xs text-gray-400 hover:text-red-500'},'Rensa')
-      ),
-      h('div',{className:'bg-white rounded-xl p-4 shadow-md'},
-        h('div',{className:'space-y-1'},
-          SHOPPING.map(function(item){
-            var bought=!!boughtItems[item];
-            return h('div',{key:item,
-              className:'flex items-center gap-3 py-2 px-2 rounded-lg cursor-pointer hover:bg-gray-50',
-              onClick:function(){setBoughtItems(function(prev){var n=Object.assign({},prev);n[item]=!n[item];return n;})}
-            },
-              h('div',{className:'w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 '+(bought?'bg-green-500 border-green-500':'border-gray-300')},
-                bought?h('span',{className:'text-white text-xs leading-none'},'v'):null
-              ),
-              h('span',{className:'text-sm '+(bought?'line-through text-gray-400':'text-gray-700')},item)
-            );
-          })
-        )
       )
     );
   }
@@ -2121,14 +1924,9 @@ function WeightStepTracker() {
     { id:'add', label:'➕ Lägg till vikt', group:'h' },
     { id:'workouts', label:'💪 Träning', group:'h' },
     { id:'history', label:'📋 Historik', group:'h' },
-    { id:'weekly', label:'📅 Veckor', group:'h' },
-    { id:'habits', label:'🎯 Vanor', group:'h' },
     { id:'oura', label:'💍 Oura', group:'h' },
+    { id:'wegovy', label:'💉 Wegovy', group:'h' },
     { id:'settings', label:'⚙️ Inställningar', group:'h' },
-    { id:'idag', label:'🍽️ Idag', group:'k' },
-    { id:'meny', label:'📆 Veckans meny', group:'k' },
-    { id:'recept', label:'👨‍🍳 Recept', group:'k' },
-    { id:'handla', label:'🛒 Handla', group:'k' },
   ];
   var backupPanel = showImport ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
     h('div', { className: 'flex items-center justify-between mb-5' },
@@ -2191,14 +1989,6 @@ function WeightStepTracker() {
             h('button', { onClick:function(){setShowImport(!showImport);},
               className:'text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-colors w-full '+(showImport?'bg-indigo-50 text-indigo-700 font-bold border-l-4 border-indigo-500':'text-gray-600 hover:bg-gray-50 border-l-4 border-transparent') }, '💾 Backup')
           ),
-          h('p', { className: 'text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1' }, 'Mat & Kost'),
-          h('nav', { className: 'flex flex-col gap-0.5' },
-            allNav.filter(function(n){return n.group==='k';}).map(function(n){
-              var active = view === n.id;
-              return h('button', { key:n.id, onClick:function(){setView(n.id);},
-                className:'text-left px-3 py-2.5 rounded-xl text-sm transition-colors w-full '+(active?'bg-green-50 text-green-700 font-bold border-l-4 border-green-500':'text-gray-600 hover:bg-gray-50 font-medium border-l-4 border-transparent') }, n.label);
-            })
-          )
         )
       ),
       h('main', { className: 'flex-1 md:ml-56 p-4 md:p-8 min-h-screen' },
@@ -2209,14 +1999,9 @@ function WeightStepTracker() {
           view === 'workouts' ? renderWorkouts()  : null,
           view === 'goals'    ? renderGoals()     : null,
           view === 'history'  ? renderHistory()   : null,
-          view === 'weekly'   ? renderWeekly()    : null,
-          view === 'habits'   ? renderHabits()    : null,
           view === 'settings' ? renderSettings()  : null,
           view === 'oura'     ? renderOura()      : null,
-          view === 'idag'     ? renderIdag()      : null,
-          view === 'meny'     ? renderMeny()      : null,
-          view === 'recept'   ? renderRecept()    : null,
-          view === 'handla'   ? renderHandla()    : null
+          view === 'wegovy'   ? renderWegovy()    : null
         )
       )
     )
