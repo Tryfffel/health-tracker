@@ -212,7 +212,7 @@ function WeightStepTracker() {
     };
     return {
       avgSleepScore: avg('sleep_score'),
-      avgReadiness: avg('readiness_score'),
+      avgReadiness: avg('dagsform_score'),
       avgHrv: avg('hrv_avg'),
       avgRestingHr: avg('resting_hr'),
       avgSleepMin: avg('total_sleep_min')
@@ -1540,7 +1540,7 @@ function WeightStepTracker() {
       return {
         datum: new Date(d.date).toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' }),
         sömn: d.sleep_score,
-        readiness: d.readiness_score,
+        readiness: d.dagsform_score,
         hrv: d.hrv_avg,
         vilohjärtfrekvens: d.resting_hr,
         sömntimmar: d.total_sleep_min ? parseFloat((d.total_sleep_min/60).toFixed(1)) : null
@@ -1565,9 +1565,9 @@ function WeightStepTracker() {
             h('p', { className: 'text-xs text-purple-200' }, sleepHours)
           ),
           h('div', { className: 'bg-white/15 rounded-xl p-3' },
-            h('p', { className: 'text-purple-200 text-xs' }, 'Readiness'),
-            h('p', { className: 'text-3xl font-black' }, ouraLatest.readiness_score),
-            h('p', { className: 'text-xs text-purple-200' }, ouraLatest.readiness_score >= 70 ? 'Bra' : ouraLatest.readiness_score >= 60 ? 'Ok' : 'Lågt')
+            h('p', { className: 'text-purple-200 text-xs' }, 'Dagsform'),
+            h('p', { className: 'text-3xl font-black' }, ouraLatest.dagsform_score),
+            h('p', { className: 'text-xs text-purple-200' }, ouraLatest.dagsform_score >= 70 ? 'Bra' : ouraLatest.dagsform_score >= 60 ? 'Ok' : 'Lågt')
           ),
           h('div', { className: 'bg-white/15 rounded-xl p-3' },
             h('p', { className: 'text-purple-200 text-xs' }, 'HRV (ms)'),
@@ -1598,14 +1598,14 @@ function WeightStepTracker() {
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
           h('div', { className: 'w-1 h-8 rounded-full bg-purple-500' }),
           h('div', null,
-            h('h2', { className: 'font-bold text-gray-800' }, 'Sömnpoäng & Readiness'),
+            h('h2', { className: 'font-bold text-gray-800' }, 'Sömnpoäng & Dagsform'),
             h('p', { className: 'text-xs text-gray-400' }, 'Senaste ' + ouraData.length + ' dagar')
           )
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: chartData, height: 220, lines: [
             { key: 'sömn', color: '#7c3aed', width: 2, name: 'Sömnpoäng' },
-            { key: 'readiness', color: '#10b981', width: 2, name: 'Readiness' }
+            { key: 'readiness', color: '#10b981', width: 2, name: 'Dagsform' }
           ]})
         )
       ),
