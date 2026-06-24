@@ -1,0 +1,104 @@
+name: Oura sync
+
+# Hämtar Oura-data och sparar den som oura-data.json i repot.
+# Körs automatiskt varje morgon (07:30 svensk tid) + kan köras manuellt.
+on:
+  schedule:
+    - cron: "30 5 * * *"   # 05:30 UTC = 07:30 sommar / 06:30 vinter (svensk tid)
+  workflow_dispatch:        # låter dig trycka "Run workflow" manuellt
+
+permissions:
+  contents: write           # behövs för att committa oura-data.json
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checka ut repot
+        uses: actions/checkout@v4
+
+      - name: Hämta Oura-data
+        env:
+          OURA_TOKEN: ${{ secrets.OURA_TOKEN }}
+        run: |
+          cat > fetch-oura.mjs <<'EOF'
+          const TOKEN = process.env.OURA_TOKEN;
+          if (!TOKEN) { console.error("OURA_TOKEN saknas"); process.exit(1); }
+          const BASE = "https://api.ouraring.com/v2/usercollection";
+          const DAYS = 120;
+
+          const ymd = (d) => d.getFullYear() + "-" +
+            String(d.getMonth() + 1).padStart(2, "0") + "-" +
+            String(d.getDate()).padStart(2, "0");
+
+          async function ouraGet(path, params) {
+            const u = new URL(BASE + path);
+            Object.entries(params).forEach(([k, v]) => u.searchParams.set(k, v));
+            const r = await fetch(u, { headers: { Authorization: "Bearer " + TOKEN } });
+            if (!r.ok) throw new Error("Oura " + path + " -> " + r.status + " " + (await r.text()).slice(0, 200));
+            const b = await r.json();
+            return Array.isArray(b.data) ? b.data : [];
+          }
+
+          const end = new Date();
+          const start = new Date(); start.setDate(start.getDate() - DAYS);
+          const endPlus = new Date(end); endPlus.setDate(endPlus.getDate() + 1);
+          const range = { start_date: ymd(start), end_date: ymd(endPlus) };
+
+          const [dailySleep, dailyReadiness, sleepSessions] = await Promise.all([
+            ouraGet("/daily_sleep", range),
+            ouraGet("/daily_readiness", range),
+            ouraGet("/sleep", range),
+          ]);
+
+          const byDay = {};
+          const ensure = (day) => (byDay[day] = byDay[day] || {
+            date: day, sleep_score: null, dagsform_score: null,
+            hrv_avg: null, resting_hr: null,
+            total_sleep_min: null, deep_sleep_min: null, rem_sleep_min: null,
+          });
+
+          dailySleep.forEach((d) => { if (d.day) ensure(d.day).sleep_score = d.score ?? null; });
+          dailyReadiness.forEach((d) => { if (d.day) ensure(d.day).dagsform_score = d.score ?? null; });
+
+          const mainByDay = {};
+          sleepSessions.forEach((s) => {
+            if (!s.day) return;
+            const cur = mainByDay[s.day];
+            const isLong = s.type === "long_sleep";
+            if (!cur) { mainByDay[s.day] = s; return; }
+            const curIsLong = cur.type === "long_sleep";
+            if (isLong && !curIsLong) { mainByDay[s.day] = s; return; }
+            if (isLong === curIsLong && (s.total_sleep_duration || 0) > (cur.total_sleep_duration || 0))
+              mainByDay[s.day] = s;
+          });
+
+          const min = (sec) => (sec != null ? Math.round(sec / 60) : null);
+          Object.entries(mainByDay).forEach(([day, s]) => {
+            const o = ensure(day);
+            o.total_sleep_min = min(s.total_sleep_duration);
+            o.deep_sleep_min = min(s.deep_sleep_duration);
+            o.rem_sleep_min = min(s.rem_sleep_duration);
+            o.hrv_avg = s.average_hrv != null ? Math.round(s.average_hrv) : null;
+            o.resting_hr = s.lowest_heart_rate != null ? Math.round(s.lowest_heart_rate) : null;
+          });
+
+          const out = Object.values(byDay).sort((a, b) => (a.date < b.date ? 1 : -1));
+          const fs = await import("node:fs");
+          fs.writeFileSync("oura-data.json", JSON.stringify(out));
+          console.log("Skrev oura-data.json med " + out.length + " dagar");
+          EOF
+          node fetch-oura.mjs
+
+      - name: Committa om datan ändrats
+        run: |
+          rm -f fetch-oura.mjs
+          if [ -n "$(git status --porcelain oura-data.json)" ]; then
+            git config user.name  "oura-bot"
+            git config user.email "oura-bot@users.noreply.github.com"
+            git add oura-data.json
+            git commit -m "Uppdatera Oura-data $(date -u +%Y-%m-%d)"
+            git push
+          else
+            echo "Ingen förändring i Oura-datan."
+          fi
