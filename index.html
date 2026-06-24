@@ -163,7 +163,7 @@ function WeightStepTracker() {
   }, []);
 
   const fetchOuraData = function(silent) {
-    return fetch(OURA_API + '/oura/data?days=90')
+    return fetch('oura-data.json?t=' + Date.now())
       .then(function(r) { return r.json(); })
       .then(function(data) {
         if (!Array.isArray(data)) throw new Error('Bad response');
@@ -185,8 +185,7 @@ function WeightStepTracker() {
 
   const triggerOuraSync = function() {
     setOuraSyncing(true);
-    fetch(OURA_API + '/oura/sync')
-      .then(function() { return fetchOuraData(false); })
+    fetchOuraData(false)
       .catch(function() { showToast('Sync misslyckades', 'error'); })
       .finally(function() { setOuraSyncing(false); });
   };
@@ -196,7 +195,7 @@ function WeightStepTracker() {
     if (loading) return;
     var lastSync = ouraLastSync ? new Date(ouraLastSync).getTime() : 0;
     var twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
-    if (ouraConnected && lastSync < twoHoursAgo) {
+    if (lastSync < twoHoursAgo) {
       fetchOuraData(true);
     }
   }, [loading, ouraConnected]);
