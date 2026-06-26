@@ -26,7 +26,7 @@ window.storage = {
 const h = React.createElement;
 const { useState, useEffect } = React;
 // ─── SVG Charts (no external library needed) ─────────────────────────────────
-function SvgLineChart({ data, lines, height }) {
+function SvgLineChart({ data, lines, height, markers }) {
   height = height || 260;
   if (!data || data.length < 2) return h('p', {className:'text-gray-400 text-sm text-center py-8'}, 'Lägg till fler mätningar för att se grafen');
   var PL=50,PR=20,PT=20,PB=36,W=800,H=height;
@@ -54,6 +54,8 @@ function SvgLineChart({ data, lines, height }) {
     }).join(' ');
     return h('polyline',{key:l.key,points:pts,fill:'none',stroke:l.color,strokeWidth:l.width||1.5,strokeDasharray:l.dashed?'5,5':undefined});
   });
+  var markerEls=[];
+  if(markers){ markers.forEach(function(m,mi){ if(m.i==null||m.i<0||m.i>=data.length) return; var mx=tx(m.i); markerEls.push(h('line',{key:'mk'+mi,x1:mx,y1:PT,x2:mx,y2:PT+chartH,stroke:'#db2777',strokeWidth:1,strokeDasharray:'3,3',opacity:0.6})); if(m.label) markerEls.push(h('text',{key:'mkl'+mi,x:mx,y:PT-4,textAnchor:'middle',fontSize:9,fill:'#db2777'},m.label)); }); }
   var legendEls=lines.map(function(l,i){
     var lx=PL+i*140;
     return h('g',{key:'leg'+i},
@@ -64,7 +66,7 @@ function SvgLineChart({ data, lines, height }) {
   return h('svg',{viewBox:'0 0 '+W+' '+H,style:{width:'100%',height:height+'px'},xmlns:'http://www.w3.org/2000/svg'},
     h('line',{x1:PL,y1:PT,x2:PL,y2:PT+chartH,stroke:'#e5e7eb',strokeWidth:1}),
     h('line',{x1:PL,y1:PT+chartH,x2:PL+chartW,y2:PT+chartH,stroke:'#e5e7eb',strokeWidth:1}),
-    ...gridEls, ...xLabels, ...lineEls, ...legendEls
+    ...gridEls, ...markerEls, ...xLabels, ...lineEls, ...legendEls
   );
 }
 function SvgBarChart({ data, dataKey, color, height }) {
@@ -350,6 +352,14 @@ function WeightStepTracker() {
   };
   const deleteEntry   = function(id) { setEntries(function(prev) { return prev.filter(function(e) { return e.id !== id; }); }); };
   const deleteWorkout = function(id) { setWorkouts(function(prev) { return prev.filter(function(w) { return w.id !== id; }); }); };
+  const editEntry = function(entry) {
+    var nw = window.prompt('Ny vikt (kg):', entry.weight);
+    if (nw === null) return;
+    var v = parseFloat(String(nw).replace(',', '.'));
+    if (isNaN(v)) { showToast('Ogiltig vikt', 'error'); return; }
+    setEntries(function(prev){ return prev.map(function(e){ return e.id === entry.id ? Object.assign({}, e, { weight: v }) : e; }); });
+    showToast('✓ Vikt uppdaterad');
+  };
   const exportData = () => {
     const data = { entries, workouts, goalWeight, height, yearlyGoal, exportDate: new Date().toISOString() };
     const blob  = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -821,7 +831,47 @@ function WeightStepTracker() {
       var ds = dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0');
       return { name: name, hasEntry: entries.some(function(e){return e.date===ds;}), hasWorkout: workouts.some(function(w){return w.date===ds;}), isToday: ds === (todayD3.getFullYear()+'-'+String(todayD3.getMonth()+1).padStart(2,'0')+'-'+String(todayD3.getDate()).padStart(2,'0')) };
     });
+    var todayDS = todayD3.getFullYear()+'-'+String(todayD3.getMonth()+1).padStart(2,'0')+'-'+String(todayD3.getDate()).padStart(2,'0');
+    var reminders = [];
+    if (todayD3.getDay() === 2 && wegovyDoses && !wegovyDoses.some(function(d){return d.date===todayDS;})) reminders.push({icon:'💉', text:'Dags för Wegovy-dos idag (tisdag).'});
+    if (!entries.some(function(e){return e.date===todayDS;})) reminders.push({icon:'⚖️', text:'Du har inte loggat din vikt idag.'});
+    var sc7 = ouraData.slice(0,7);
+    var scAvg = function(key){ var v=sc7.map(function(d){return d[key];}).filter(function(x){return x!=null;}); return v.length?v.reduce(function(a,b){return a+b;},0)/v.length:null; };
+    var aktSc = scAvg('steps')!=null ? Math.min(100, scAvg('steps')/12000*100) : null;
+    var stressSc = scAvg('stress_high_min')!=null ? Math.max(0, 100 - scAvg('stress_high_min')/2) : null;
+    var recent7 = entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}).filter(function(e){ return (todayD3 - new Date(e.date)) <= 7*86400000; });
+    var viktChange = recent7.length>=2 ? recent7[recent7.length-1].weight - recent7[0].weight : null;
+    var viktSc = viktChange!=null ? Math.max(0, Math.min(100, 50 - viktChange*100)) : null;
+    var scParts = [['Sömn',scAvg('sleep_score')],['Återhämtning',scAvg('dagsform_score')],['Aktivitet',aktSc],['Lugn (låg stress)',stressSc],['Vikttrend',viktSc]].filter(function(p){return p[1]!=null;});
+    var scOverall = scParts.length ? Math.round(scParts.reduce(function(a,b){return a+b[1];},0)/scParts.length) : null;
+    var scGrade = scOverall==null?'–':scOverall>=85?'A':scOverall>=70?'B':scOverall>=55?'C':scOverall>=40?'D':'E';
     return h('div', null,
+      // Reminders
+      reminders.length ? h('div', { className: 'space-y-2 mb-4' },
+        reminders.map(function(r,i){ return h('div', { key:i, className: 'flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3' },
+          h('span', { className:'text-2xl' }, r.icon),
+          h('p', { className:'text-sm font-medium text-blue-800' }, r.text)
+        ); })
+      ) : null,
+      // Veckoscorecard
+      scOverall != null ? h('div', { className: 'bg-gradient-to-br from-slate-700 to-slate-900 rounded-2xl shadow-xl mb-4 p-6 text-white' },
+        h('div', { className: 'flex items-center justify-between mb-4' },
+          h('div', null,
+            h('p', { className:'text-slate-300 text-xs font-semibold uppercase tracking-widest' }, '🏅 Veckoscore (7 dygn)'),
+            h('p', { className:'text-xs text-slate-400 mt-0.5' }, 'Sömn · återhämtning · aktivitet · lugn · vikt')
+          ),
+          h('div', { className:'text-right' },
+            h('p', { className:'text-5xl font-black leading-none' }, scOverall),
+            h('p', { className:'text-sm text-slate-300 mt-1' }, 'Betyg ' + scGrade)
+          )
+        ),
+        h('div', { className:'space-y-2' },
+          scParts.map(function(p,i){ var v=Math.round(p[1]); return h('div', { key:i },
+            h('div', { className:'flex justify-between text-xs text-slate-300 mb-0.5' }, h('span',null,p[0]), h('span',null,v)),
+            h('div', { className:'h-2 bg-white/15 rounded-full overflow-hidden' }, h('div', { className:'h-2 rounded-full ' + (v>=70?'bg-green-400':v>=50?'bg-amber-400':'bg-rose-400'), style:{ width: v+'%' } }))
+          ); })
+        )
+      ) : null,
       // Plateau warning banner
       plateau ? h('div', { className: 'bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl p-5 mb-4 shadow-sm' },
         h('div', { className: 'flex items-start gap-3' },
@@ -1482,7 +1532,7 @@ function WeightStepTracker() {
                   : null),
                 h('td', { className: 'px-3 py-3 text-sm text-gray-500' }, entry.steps ? '👟 ' + entry.steps.toLocaleString() : '–'),
                 h('td', { className: 'px-3 py-3 text-xs text-gray-400 max-w-xs truncate' }, entry.mood ? ['😴','😔','😐','😊','🤩'][entry.mood-1] + ' ' : '', entry.comment || ''),
-                h('td', { className: 'px-3 py-3' }, h('button', { onClick: function(){deleteEntry(entry.id);}, className:'text-gray-300 hover:text-red-500 transition-colors' }, '✕'))
+                h('td', { className: 'px-3 py-3 whitespace-nowrap' }, h('button', { onClick: function(){editEntry(entry);}, className:'text-gray-300 hover:text-indigo-500 transition-colors mr-3', title:'Redigera vikt' }, '✎'), h('button', { onClick: function(){deleteEntry(entry.id);}, className:'text-gray-300 hover:text-red-500 transition-colors' }, '✕'))
               );
             })
           )
@@ -1982,6 +2032,12 @@ function WeightStepTracker() {
       showToast('💉 Dos loggad!');
     }
 
+    var wgStart = wegovyProtocol.start_date;
+    var respEntries = wgStart ? entries.filter(function(e){return e.date>=wgStart;}).slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}) : [];
+    var respData = respEntries.map(function(e){ return { datum:new Date(e.date).toLocaleDateString('sv-SE',{month:'short',day:'numeric'}), vikt:e.weight }; });
+    var dosesAsc = wegovyDoses.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+    var escMarkers = []; var prevDoseVal = null;
+    dosesAsc.forEach(function(d){ if(prevDoseVal!=null && d.dose>prevDoseVal){ var idx=-1; for(var i=0;i<respEntries.length;i++){ if(respEntries[i].date>=d.date){idx=i;break;} } if(idx>=0) escMarkers.push({i:idx, label:d.dose+'mg'}); } prevDoseVal=d.dose; });
     return h('div', null,
       h('div', { className: 'bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600 rounded-2xl shadow-xl mb-5 p-6 text-white' },
         h('div', { className: 'flex items-start justify-between mb-4' },
@@ -2046,6 +2102,18 @@ function WeightStepTracker() {
           h('input', { type:'text', value: doseForm.notes||'', placeholder:'Valfritt...', onChange: function(e){ setDoseForm(Object.assign({},doseForm,{notes:e.target.value})); }, className: 'w-full px-3 py-2 border rounded-lg text-sm outline-none' })
         ),
         h('button', { onClick: submitDose, className: 'w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold py-3 rounded-xl' }, 'Spara dos')
+      ) : null,
+      respData.length >= 2 ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-pink-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, 'Viktrespons på Wegovy'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Vikt sedan start · rosa streck = dosökning')
+          )
+        ),
+        h('div', { className: 'px-4 py-4' },
+          h(SvgLineChart, { data: respData, height: 230, lines: [ { key:'vikt', color:'#db2777', width:2.5, name:'Vikt (kg)' } ], markers: escMarkers })
+        )
       ) : null,
       h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center justify-between px-6 py-4 border-b border-gray-50' },
