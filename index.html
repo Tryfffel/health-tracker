@@ -854,21 +854,21 @@ function WeightStepTracker() {
         ); })
       ) : null,
       // Veckoscorecard
-      scOverall != null ? h('div', { className: 'bg-gradient-to-br from-slate-700 to-slate-900 rounded-2xl shadow-xl mb-4 p-6 text-white' },
+      scOverall != null ? h('div', { className: 'bg-gradient-to-br from-sky-400 via-indigo-400 to-violet-400 rounded-2xl shadow-xl mb-4 p-6 text-white' },
         h('div', { className: 'flex items-center justify-between mb-4' },
           h('div', null,
-            h('p', { className:'text-slate-300 text-xs font-semibold uppercase tracking-widest' }, '🏅 Veckoscore (7 dygn)'),
-            h('p', { className:'text-xs text-slate-400 mt-0.5' }, 'Sömn · återhämtning · aktivitet · lugn · vikt')
+            h('p', { className:'text-white/90 text-xs font-semibold uppercase tracking-widest' }, '🏅 Veckoscore (7 dygn)'),
+            h('p', { className:'text-xs text-white/75 mt-0.5' }, 'Sömn · återhämtning · aktivitet · lugn · vikt')
           ),
           h('div', { className:'text-right' },
             h('p', { className:'text-5xl font-black leading-none' }, scOverall),
-            h('p', { className:'text-sm text-slate-300 mt-1' }, 'Betyg ' + scGrade)
+            h('p', { className:'text-sm text-white/90 mt-1' }, 'Betyg ' + scGrade)
           )
         ),
         h('div', { className:'space-y-2' },
           scParts.map(function(p,i){ var v=Math.round(p[1]); return h('div', { key:i },
-            h('div', { className:'flex justify-between text-xs text-slate-300 mb-0.5' }, h('span',null,p[0]), h('span',null,v)),
-            h('div', { className:'h-2 bg-white/15 rounded-full overflow-hidden' }, h('div', { className:'h-2 rounded-full ' + (v>=70?'bg-green-400':v>=50?'bg-amber-400':'bg-rose-400'), style:{ width: v+'%' } }))
+            h('div', { className:'flex justify-between text-xs text-white/90 mb-0.5' }, h('span',null,p[0]), h('span',null,v)),
+            h('div', { className:'h-2 bg-white/25 rounded-full overflow-hidden' }, h('div', { className:'h-2 rounded-full ' + (v>=70?'bg-green-400':v>=50?'bg-amber-400':'bg-rose-400'), style:{ width: v+'%' } }))
           ); })
         )
       ) : null,
