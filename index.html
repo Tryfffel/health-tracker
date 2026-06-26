@@ -1542,7 +1542,17 @@ function WeightStepTracker() {
         readiness: d.dagsform_score,
         hrv: d.hrv_avg,
         vilohjärtfrekvens: d.resting_hr,
-        sömntimmar: d.total_sleep_min ? parseFloat((d.total_sleep_min/60).toFixed(1)) : null
+        sömntimmar: d.total_sleep_min ? parseFloat((d.total_sleep_min/60).toFixed(1)) : null,
+        steg: d.steps,
+        akt_kcal: d.active_cal,
+        tot_kcal: d.total_cal,
+        andning: d.breath_avg,
+        spo2: d.spo2_avg,
+        effektivitet: d.sleep_efficiency,
+        sömnpuls: d.avg_hr_sleep,
+        stress: d.stress_high_min != null ? Math.round(d.stress_high_min) : null,
+        aterhamtning: d.recovery_high_min != null ? Math.round(d.recovery_high_min) : null,
+        temp: d.temp_dev
       };
     });
     return h('div', null,
@@ -1577,6 +1587,27 @@ function WeightStepTracker() {
             h('p', { className: 'text-purple-200 text-xs' }, 'Vilo-HR'),
             h('p', { className: 'text-3xl font-black' }, ouraLatest.resting_hr),
             ouraStats ? h('p', { className: 'text-xs text-purple-200' }, '7d snitt: ' + ouraStats.avgRestingHr.toFixed(0)) : null
+          )
+        ),
+        // Aktivitet / hälsa (igår)
+        h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-3 mt-3' },
+          h('div', { className: 'bg-white/15 rounded-xl p-3' },
+            h('p', { className: 'text-purple-200 text-xs' }, 'Steg (igår)'),
+            h('p', { className: 'text-3xl font-black' }, ouraLatest.steps != null ? ouraLatest.steps.toLocaleString('sv-SE') : '–')
+          ),
+          h('div', { className: 'bg-white/15 rounded-xl p-3' },
+            h('p', { className: 'text-purple-200 text-xs' }, 'Kalorier (tot)'),
+            h('p', { className: 'text-3xl font-black' }, ouraLatest.total_cal != null ? ouraLatest.total_cal.toLocaleString('sv-SE') : '–'),
+            ouraLatest.active_cal != null ? h('p', { className: 'text-xs text-purple-200' }, ouraLatest.active_cal + ' aktiva') : null
+          ),
+          h('div', { className: 'bg-white/15 rounded-xl p-3' },
+            h('p', { className: 'text-purple-200 text-xs' }, 'SpO2'),
+            h('p', { className: 'text-3xl font-black' }, ouraLatest.spo2_avg != null ? ouraLatest.spo2_avg + '%' : '–'),
+            ouraLatest.breath_avg != null ? h('p', { className: 'text-xs text-purple-200' }, ouraLatest.breath_avg + ' and/min') : null
+          ),
+          h('div', { className: 'bg-white/15 rounded-xl p-3' },
+            h('p', { className: 'text-purple-200 text-xs' }, 'Temp-avvikelse'),
+            h('p', { className: 'text-3xl font-black' }, ouraLatest.temp_dev != null ? ((ouraLatest.temp_dev>0?'+':'') + ouraLatest.temp_dev + '°') : '–')
           )
         ),
         // Sleep stages
@@ -1646,6 +1677,100 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgBarChart, { data: chartData, dataKey: 'sömntimmar', color: '#3b82f6', height: 180 })
+        )
+      ),
+      // ── Aktivitet ──
+      h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-orange-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, 'Förbrända kalorier'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Totalt vs aktivt (Oura)')
+          )
+        ),
+        h('div', { className: 'px-4 py-4' },
+          h(SvgLineChart, { data: chartData, height: 200, lines: [
+            { key: 'tot_kcal', color: '#f97316', width: 2, name: 'Totalt (kcal)' },
+            { key: 'akt_kcal', color: '#fbbf24', width: 2, name: 'Aktivt (kcal)' }
+          ]})
+        )
+      ),
+      h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-amber-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, 'Steg (Oura)'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Dagliga steg från ringen')
+          )
+        ),
+        h('div', { className: 'px-4 py-4' },
+          h(SvgBarChart, { data: chartData, dataKey: 'steg', color: '#f59e0b', height: 180 })
+        )
+      ),
+      // ── Sömnkvalitet ──
+      h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-indigo-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, 'Sömneffektivitet'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Andel av tiden i säng som du sov (%)')
+          )
+        ),
+        h('div', { className: 'px-4 py-4' },
+          h(SvgLineChart, { data: chartData, height: 180, lines: [
+            { key: 'effektivitet', color: '#6366f1', width: 2, name: 'Effektivitet (%)' }
+          ]})
+        )
+      ),
+      // ── Andning & syresättning ──
+      h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-cyan-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, 'Andning & syresättning'),
+            h('p', { className: 'text-xs text-gray-400' }, 'SpO2 (%) och andningsfrekvens (andetag/min)')
+          )
+        ),
+        h('div', { className: 'px-4 py-2' },
+          h('p', { className: 'text-xs text-gray-400 px-2 pt-2' }, 'Syresättning SpO2 (%)'),
+          h(SvgLineChart, { data: chartData, height: 150, lines: [
+            { key: 'spo2', color: '#06b6d4', width: 2, name: 'SpO2 (%)' }
+          ]}),
+          h('p', { className: 'text-xs text-gray-400 px-2 pt-3' }, 'Andningsfrekvens (andetag/min)'),
+          h(SvgLineChart, { data: chartData, height: 150, lines: [
+            { key: 'andning', color: '#0ea5e9', width: 2, name: 'Andning' }
+          ]})
+        )
+      ),
+      // ── Stress ──
+      h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-rose-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, 'Stress vs återhämtning'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Minuter hög stress vs hög återhämtning per dag')
+          )
+        ),
+        h('div', { className: 'px-4 py-4' },
+          h(SvgLineChart, { data: chartData, height: 180, lines: [
+            { key: 'stress', color: '#f43f5e', width: 2, name: 'Stress (min)' },
+            { key: 'aterhamtning', color: '#10b981', width: 2, name: 'Återhämtning (min)' }
+          ]})
+        )
+      ),
+      // ── Kroppstemperatur ──
+      h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-teal-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, 'Kroppstemperatur-avvikelse'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Avvikelse från din normalnivå (°C)')
+          )
+        ),
+        h('div', { className: 'px-4 py-4' },
+          h(SvgLineChart, { data: chartData, height: 160, lines: [
+            { key: 'temp', color: '#14b8a6', width: 2, name: 'Temp-avvikelse (°C)' }
+          ]})
         )
       ),
       // Sync info footer
