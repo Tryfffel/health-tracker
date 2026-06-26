@@ -25,7 +25,7 @@ jobs:
           const TOKEN = process.env.OURA_TOKEN;
           if (!TOKEN) { console.error("OURA_TOKEN saknas"); process.exit(1); }
           const BASE = "https://api.ouraring.com/v2/usercollection";
-          const DAYS = 120;
+          const DAYS = 200;
 
           const ymd = (d) => d.getFullYear() + "-" +
             String(d.getMonth() + 1).padStart(2, "0") + "-" +
