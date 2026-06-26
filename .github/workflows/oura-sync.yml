@@ -35,7 +35,7 @@ jobs:
             const u = new URL(BASE + path);
             Object.entries(params).forEach(([k, v]) => u.searchParams.set(k, v));
             const r = await fetch(u, { headers: { Authorization: "Bearer " + TOKEN } });
-            if (!r.ok) throw new Error("Oura " + path + " -> " + r.status + " " + (await r.text()).slice(0, 200));
+            if (!r.ok) { console.warn("Oura " + path + " -> " + r.status); return []; }
             const b = await r.json();
             return Array.isArray(b.data) ? b.data : [];
           }
@@ -45,22 +45,43 @@ jobs:
           const endPlus = new Date(end); endPlus.setDate(endPlus.getDate() + 1);
           const range = { start_date: ymd(start), end_date: ymd(endPlus) };
 
-          const [dailySleep, dailyReadiness, sleepSessions] = await Promise.all([
-            ouraGet("/daily_sleep", range),
-            ouraGet("/daily_readiness", range),
-            ouraGet("/sleep", range),
-          ]);
+          const [dailySleep, dailyReadiness, sleepSessions, dailyActivity, dailyStress, dailySpo2] =
+            await Promise.all([
+              ouraGet("/daily_sleep", range),
+              ouraGet("/daily_readiness", range),
+              ouraGet("/sleep", range),
+              ouraGet("/daily_activity", range),
+              ouraGet("/daily_stress", range),
+              ouraGet("/daily_spo2", range),
+            ]);
 
           const byDay = {};
           const ensure = (day) => (byDay[day] = byDay[day] || {
-            date: day, sleep_score: null, dagsform_score: null,
-            hrv_avg: null, resting_hr: null,
-            total_sleep_min: null, deep_sleep_min: null, rem_sleep_min: null,
+            date: day,
+            // Sömn
+            sleep_score: null, total_sleep_min: null, deep_sleep_min: null, rem_sleep_min: null,
+            sleep_efficiency: null, sleep_latency_min: null, avg_hr_sleep: null, breath_avg: null,
+            // Återhämtning
+            dagsform_score: null, hrv_avg: null, resting_hr: null, temp_dev: null,
+            // Aktivitet
+            steps: null, active_cal: null, total_cal: null,
+            // Stress / andning
+            stress_high_min: null, recovery_high_min: null, stress_summary: null,
+            spo2_avg: null, breathing_disturbance: null,
           });
 
-          dailySleep.forEach((d) => { if (d.day) ensure(d.day).sleep_score = d.score ?? null; });
-          dailyReadiness.forEach((d) => { if (d.day) ensure(d.day).dagsform_score = d.score ?? null; });
+          const r1 = (v) => (v != null ? Math.round(v) : null);
+          const min = (sec) => (sec != null ? Math.round(sec / 60) : null);
 
+          dailySleep.forEach((d) => { if (d.day) ensure(d.day).sleep_score = d.score ?? null; });
+          dailyReadiness.forEach((d) => {
+            if (!d.day) return;
+            const o = ensure(d.day);
+            o.dagsform_score = d.score ?? null;
+            o.temp_dev = d.temperature_deviation != null ? Math.round(d.temperature_deviation * 100) / 100 : null;
+          });
+
+          // Huvudsömnen per dag (long_sleep, annars längsta)
           const mainByDay = {};
           sleepSessions.forEach((s) => {
             if (!s.day) return;
@@ -72,15 +93,41 @@ jobs:
             if (isLong === curIsLong && (s.total_sleep_duration || 0) > (cur.total_sleep_duration || 0))
               mainByDay[s.day] = s;
           });
-
-          const min = (sec) => (sec != null ? Math.round(sec / 60) : null);
           Object.entries(mainByDay).forEach(([day, s]) => {
             const o = ensure(day);
             o.total_sleep_min = min(s.total_sleep_duration);
             o.deep_sleep_min = min(s.deep_sleep_duration);
             o.rem_sleep_min = min(s.rem_sleep_duration);
-            o.hrv_avg = s.average_hrv != null ? Math.round(s.average_hrv) : null;
-            o.resting_hr = s.lowest_heart_rate != null ? Math.round(s.lowest_heart_rate) : null;
+            o.hrv_avg = r1(s.average_hrv);
+            o.resting_hr = r1(s.lowest_heart_rate);
+            o.avg_hr_sleep = r1(s.average_heart_rate);
+            o.breath_avg = s.average_breath != null ? Math.round(s.average_breath * 10) / 10 : null;
+            o.sleep_efficiency = r1(s.efficiency);
+            o.sleep_latency_min = min(s.latency);
+          });
+
+          dailyActivity.forEach((d) => {
+            if (!d.day) return;
+            const o = ensure(d.day);
+            o.steps = d.steps ?? null;
+            o.active_cal = r1(d.active_calories);
+            o.total_cal = r1(d.total_calories);
+          });
+
+          dailyStress.forEach((d) => {
+            if (!d.day) return;
+            const o = ensure(d.day);
+            o.stress_high_min = min(d.stress_high);
+            o.recovery_high_min = min(d.recovery_high);
+            o.stress_summary = d.day_summary ?? null;
+          });
+
+          dailySpo2.forEach((d) => {
+            if (!d.day) return;
+            const o = ensure(d.day);
+            o.spo2_avg = (d.spo2_percentage && d.spo2_percentage.average != null)
+              ? Math.round(d.spo2_percentage.average * 10) / 10 : null;
+            o.breathing_disturbance = d.breathing_disturbance_index ?? null;
           });
 
           const out = Object.values(byDay).sort((a, b) => (a.date < b.date ? 1 : -1));
