@@ -1650,6 +1650,37 @@ function WeightStepTracker() {
     var minBy=function(key){ var a=ouraData.filter(function(d){return d[key]!=null;}); return a.length?a.reduce(function(p,c){return c[key]<p[key]?c:p;}):null; };
     var recBestSleep=maxBy('sleep_score'), recMaxHrv=maxBy('hrv_avg'), recMinRhr=minBy('resting_hr'), recMaxSteps=maxBy('steps');
     var fmtD=function(d){ return d?new Date(d.date).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}):'–'; };
+    // ── Veckocoach (regelbaserad sammanfattning) ──
+    var coach = (function(){
+      if(last7.length<3) return null;
+      var sleepNow=oAvg(last7,'sleep_score'), hrvNow=oAvg(last7,'hrv_avg'), hrvPrev=oAvg(prev7,'hrv_avg');
+      var stepsNow=oAvg(last7,'steps'), stressNow=oAvg(last7,'stress_high_min');
+      var rc=entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}).filter(function(e){ return (new Date() - new Date(e.date)) <= 7*86400000; });
+      var viktChange = rc.length>=2 ? rc[rc.length-1].weight - rc[0].weight : null;
+      var parts=[], tips=[], tone='mixed';
+      if(sleepNow!=null){
+        if(sleepNow>=80) parts.push('Sömnen har varit stark (snitt ' + Math.round(sleepNow) + ').');
+        else if(sleepNow>=70) parts.push('Sömnen har varit okej (snitt ' + Math.round(sleepNow) + ').');
+        else { parts.push('Sömnen har varit låg (snitt ' + Math.round(sleepNow) + ').'); tips.push('Prioritera läggtiden — sikta på 7–8 h och samma tid varje kväll.'); }
+      }
+      if(hrvNow!=null && hrvPrev!=null){
+        if(hrvNow < hrvPrev*0.9){ parts.push('Återhämtningen är på väg ned — HRV har sjunkit mot veckan innan.'); tips.push('Lägg in en lugn dag eller extra vila innan nästa hårda pass.'); tone='tough'; }
+        else if(hrvNow > hrvPrev*1.1){ parts.push('Återhämtningen ser stark ut — HRV har stigit.'); if(tone!=='tough') tone='good'; }
+      }
+      if(stepsNow!=null){
+        if(stepsNow<7000){ parts.push('Aktiviteten har varit låg (' + Math.round(stepsNow).toLocaleString('sv-SE') + ' steg/dag).'); tips.push('Lägg till en extra 20-minuterspromenad om dagen.'); }
+        else if(stepsNow>=10000) parts.push('Bra aktivitetsnivå (' + Math.round(stepsNow).toLocaleString('sv-SE') + ' steg/dag).');
+      }
+      if(viktChange!=null){
+        if(viktChange<=-0.3){ parts.push('Vikten är på väg ned (' + viktChange.toFixed(1) + ' kg denna vecka) — åt rätt håll.'); if(tone!=='tough') tone='good'; }
+        else if(viktChange>=0.3){ parts.push('Vikten gick upp lite (+' + viktChange.toFixed(1) + ' kg) — ofta vätska, men håll koll.'); }
+        else parts.push('Vikten ligger stabil denna vecka.');
+      }
+      if(stressNow!=null && stressNow>120) tips.push('Höga stressnivåer — lägg in andningspauser eller en kort promenad mitt på dagen.');
+      if(!tips.length) tips.push('Fortsätt som du gör — det funkar.');
+      var headline = tone==='good'?'Stark vecka 💪' : tone==='tough'?'Kroppen behöver vila 🛌' : 'Stabil vecka 👍';
+      return { headline:headline, paragraph:parts.join(' '), tips:tips.slice(0,3), tone:tone };
+    })();
     // ── Samband: Oura-mått vs nästa dags viktförändring ──
     var wByDate = {};
     entries.forEach(function(e){ wByDate[e.date] = e.weight; });
@@ -1747,6 +1778,16 @@ function WeightStepTracker() {
           )
         )
       ),
+      // ── Veckocoach ──
+      coach ? h('div', { className: 'rounded-2xl shadow-xl mb-4 p-6 text-white bg-gradient-to-br ' + (coach.tone==='good'?'from-emerald-500 to-teal-600':coach.tone==='tough'?'from-amber-500 to-orange-600':'from-indigo-500 to-blue-600') },
+        h('p', { className:'text-white/80 text-xs font-semibold uppercase tracking-widest mb-1' }, '🧠 Veckocoach'),
+        h('h2', { className:'text-2xl font-black mb-2' }, coach.headline),
+        h('p', { className:'text-sm text-white/90 leading-relaxed mb-3' }, coach.paragraph),
+        h('div', { className:'bg-white/15 rounded-xl p-3 space-y-1.5' },
+          h('p', { className:'text-xs font-semibold text-white/80 uppercase tracking-wide mb-1' }, 'Fokus framåt'),
+          coach.tips.map(function(t,i){ return h('div', { key:i, className:'flex items-start gap-2 text-sm' }, h('span',null,'→'), h('span',null,t)); })
+        )
+      ) : null,
       // ── Hälsoflaggor ──
       h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
