@@ -9,6 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Hälsodagbok">
   <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -362,7 +363,7 @@ function WeightStepTracker() {
     showToast('✓ Vikt uppdaterad');
   };
   const exportData = () => {
-    const data = { entries, workouts, goalWeight, height, yearlyGoal, exportDate: new Date().toISOString() };
+    const data = { entries, workouts, goalWeight, height, yearlyGoal, targetRate, wegovyDoses, wegovyProtocol, exportDate: new Date().toISOString() };
     const blob  = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url   = URL.createObjectURL(blob);
     const link  = document.createElement('a');
@@ -386,6 +387,9 @@ function WeightStepTracker() {
         if (data.goalWeight) setGoalWeight(data.goalWeight);
         if (data.yearlyGoal) setYearlyGoal(data.yearlyGoal);
         if (data.height)     setHeight(data.height);
+        if (data.targetRate != null) setTargetRate(data.targetRate);
+        if (data.wegovyDoses) { setWegovyDoses(data.wegovyDoses); window.storage.set('wegovy-doses', JSON.stringify(data.wegovyDoses)); }
+        if (data.wegovyProtocol) { setWegovyProtocol(data.wegovyProtocol); window.storage.set('wegovy-protocol', JSON.stringify(data.wegovyProtocol)); }
         showToast('✓ Data importerad!');
         setShowImport(false);
         setView('overview');
@@ -2429,5 +2433,6 @@ function WeightStepTracker() {
 ReactDOM.createRoot(document.getElementById('root')).render(h(WeightStepTracker, null));
 
 </script>
+  <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script>
 </body>
 </html>
