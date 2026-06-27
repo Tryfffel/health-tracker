@@ -264,17 +264,14 @@ function WeightStepTracker() {
 
   // ─── WEGOVY STATE ────────────────────────────────────────────────────────
   const WEGOVY_DEFAULT_PROTOCOL = {
-    start_date: '2026-04-28', current_dose: 0.25, weeks_per_step: 6,
+    start_date: null, current_dose: 0.25, weeks_per_step: 6,
     titration_plan: [
       { weeks: '1-6',  dose: 0.25 }, { weeks: '7-12', dose: 0.5  },
       { weeks: '13-18',dose: 1.0  }, { weeks: '19-24',dose: 1.7  },
       { weeks: '25+',  dose: 2.4  }
     ]
   };
-  const WEGOVY_DEFAULT_DOSES = [
-    { id: 1745798400000, date: '2026-04-28', dose: 0.25, side_effects: '', notes: '', weight_at_dose: null },
-    { id: 1746403200000, date: '2026-05-05', dose: 0.25, side_effects: '', notes: '', weight_at_dose: null }
-  ];
+  const WEGOVY_DEFAULT_DOSES = [];
   const [wegovyDoses, setWegovyDoses] = useState(null);
   const [wegovyProtocol, setWegovyProtocol] = useState(null);
   const [wgovLoading, setWgovLoading] = useState(true);
@@ -2347,7 +2344,7 @@ function WeightStepTracker() {
           h('button', { onClick: function(){ setEditProtocol(!editProtocol); }, className: 'text-xs text-indigo-600 hover:underline' }, editProtocol ? 'Stäng' : 'Redigera')
         ),
         editProtocol ? h('div', { className: 'px-6 py-4 border-b border-gray-50' },
-          h('label', { className: 'text-xs font-medium text-gray-600 block mb-2' }, 'Veckor per steg (David kör 6v pga defekt penna)'),
+          h('label', { className: 'text-xs font-medium text-gray-600 block mb-2' }, 'Veckor per steg'),
           h('div', { className: 'flex gap-2' },
             [4,5,6,8].map(function(w) {
               return h('button', { key:w, onClick: function(){
