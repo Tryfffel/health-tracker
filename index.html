@@ -1622,6 +1622,8 @@ function WeightStepTracker() {
         spo2: d.spo2_avg,
         effektivitet: d.sleep_efficiency,
         sömnpuls: d.avg_hr_sleep,
+        djup: d.deep_sleep_min,
+        rem: d.rem_sleep_min,
         stress: d.stress_high_min != null ? Math.round(d.stress_high_min) : null,
         aterhamtning: d.recovery_high_min != null ? Math.round(d.recovery_high_min) : null,
         temp: d.temp_dev
@@ -1831,6 +1833,22 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgBarChart, { data: chartData, dataKey: 'sömntimmar', color: '#3b82f6', height: 180 })
+        )
+      ),
+      // ── Sömnstadier över tid ──
+      h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-indigo-400' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, 'Sömnstadier över tid'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Djupsömn & REM per natt (minuter)')
+          )
+        ),
+        h('div', { className: 'px-4 py-4' },
+          h(SvgLineChart, { data: chartData, height: 200, lines: [
+            { key:'djup', color:'#4f46e5', width:2, name:'Djupsömn (min)' },
+            { key:'rem', color:'#a78bfa', width:2, name:'REM (min)' }
+          ]})
         )
       ),
       // ── Aktivitet ──
