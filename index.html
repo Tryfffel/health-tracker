@@ -172,6 +172,7 @@ function WeightStepTracker() {
   const [ouraLastSync, setOuraLastSync] = useState(null);
   const [ouraConnected, setOuraConnected] = useState(false);
   const [ouraSyncing, setOuraSyncing] = useState(false);
+  const [ouraRange, setOuraRange] = useState(90);
 
   useEffect(function() {
     // Load cached Oura data
@@ -1607,7 +1608,7 @@ function WeightStepTracker() {
     var deepPct = Math.round(ouraLatest.deep_sleep_min / ouraLatest.total_sleep_min * 100);
     var remPct = Math.round(ouraLatest.rem_sleep_min / ouraLatest.total_sleep_min * 100);
     // Format chart data (oldest first for charts)
-    var chartData = ouraData.slice().reverse().map(function(d) {
+    var chartData = ouraData.slice(0, ouraRange>0?ouraRange:ouraData.length).reverse().map(function(d) {
       return {
         datum: new Date(d.date).toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' }),
         sömn: d.sleep_score,
@@ -1629,6 +1630,26 @@ function WeightStepTracker() {
         temp: d.temp_dev
       };
     });
+    // ── Hälsoflaggor, trender & rekord ──
+    var oAvg = function(arr,key){ var v=arr.map(function(d){return d[key];}).filter(function(x){return x!=null;}); return v.length?v.reduce(function(a,b){return a+b;},0)/v.length:null; };
+    var last7 = ouraData.slice(0,7), prior30 = ouraData.slice(7,37), prev7 = ouraData.slice(7,14);
+    var flags = [];
+    var hrv7=oAvg(last7,'hrv_avg'), hrvBase=oAvg(prior30,'hrv_avg');
+    if(hrv7!=null && hrvBase!=null && hrv7 < hrvBase*0.8) flags.push({lvl:'warn',icon:'💔',text:'HRV ligger '+Math.round((1-hrv7/hrvBase)*100)+'% under din 30-dagarsnivå ('+Math.round(hrv7)+' vs '+Math.round(hrvBase)+' ms).'});
+    var rhr7=oAvg(last7,'resting_hr'), rhrBase=oAvg(prior30,'resting_hr');
+    if(rhr7!=null && rhrBase!=null && rhr7 > rhrBase+4) flags.push({lvl:'warn',icon:'❤️',text:'Vilopulsen är förhöjd ('+Math.round(rhr7)+' vs '+Math.round(rhrBase)+' i snitt).'});
+    var tempSpike = ouraData.slice(0,3).find(function(d){return d.temp_dev!=null && d.temp_dev>=0.5;});
+    if(tempSpike) flags.push({lvl:'warn',icon:'🌡️',text:'Förhöjd kroppstemperatur (+'+tempSpike.temp_dev+'°) senaste dygnen — kan vara stress eller begynnande infektion.'});
+    var lowSpo2 = ouraData.slice(0,7).find(function(d){return d.spo2_avg!=null && d.spo2_avg<94;});
+    if(lowSpo2) flags.push({lvl:'info',icon:'🫁',text:'Låg syresättning en natt ('+lowSpo2.spo2_avg+'%).'});
+    var poorSleep = ouraData.slice(0,5).filter(function(d){return d.sleep_score!=null && d.sleep_score<70;});
+    if(poorSleep.length>=3) flags.push({lvl:'info',icon:'😴',text:poorSleep.length+' av senaste 5 nätterna under sömnpoäng 70.'});
+    var trendMetrics = [{key:'sleep_score',name:'Sömnpoäng',better:'up'},{key:'hrv_avg',name:'HRV',better:'up'},{key:'resting_hr',name:'Vilopuls',better:'down'},{key:'steps',name:'Steg',better:'up'}];
+    var trends = trendMetrics.map(function(m){ var a=oAvg(last7,m.key), b=oAvg(prev7,m.key); if(a==null||b==null) return null; return {name:m.name, now:Math.round(a), diff:a-b, better:m.better}; }).filter(function(x){return x;});
+    var maxBy=function(key){ var a=ouraData.filter(function(d){return d[key]!=null;}); return a.length?a.reduce(function(p,c){return c[key]>p[key]?c:p;}):null; };
+    var minBy=function(key){ var a=ouraData.filter(function(d){return d[key]!=null;}); return a.length?a.reduce(function(p,c){return c[key]<p[key]?c:p;}):null; };
+    var recBestSleep=maxBy('sleep_score'), recMaxHrv=maxBy('hrv_avg'), recMinRhr=minBy('resting_hr'), recMaxSteps=maxBy('steps');
+    var fmtD=function(d){ return d?new Date(d.date).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}):'–'; };
     // ── Samband: Oura-mått vs nästa dags viktförändring ──
     var wByDate = {};
     entries.forEach(function(e){ wByDate[e.date] = e.weight; });
@@ -1726,6 +1747,49 @@ function WeightStepTracker() {
           )
         )
       ),
+      // ── Hälsoflaggor ──
+      h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full ' + (flags.length?'bg-amber-500':'bg-green-500') }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, flags.length ? '⚠️ Att hålla koll på' : '✅ Allt ser stabilt ut'),
+            h('p', { className: 'text-xs text-gray-400' }, flags.length ? 'Avvikelser mot din egen baslinje' : 'Inga avvikelser mot din baslinje senaste veckan')
+          )
+        ),
+        h('div', { className: 'px-4 py-4 space-y-2' },
+          flags.length ? flags.map(function(fl,i){ return h('div', { key:i, className: 'flex items-start gap-3 rounded-xl px-4 py-3 ' + (fl.lvl==='warn'?'bg-amber-50 border border-amber-200':'bg-blue-50 border border-blue-100') },
+            h('span', { className:'text-xl' }, fl.icon),
+            h('p', { className:'text-sm ' + (fl.lvl==='warn'?'text-amber-800':'text-blue-800') }, fl.text)
+          ); }) : h('p', { className:'text-sm text-gray-400 text-center py-2' }, 'Sömn, HRV, vilopuls, temp och SpO2 ligger inom dina vanliga nivåer. 👍'),
+          flags.some(function(fl){return fl.lvl==='warn';}) ? h('p', { className:'text-xs text-gray-400 mt-1' }, 'Enstaka avvikelser är normalt. Håller något i sig flera veckor kan det vara värt att ta upp med läkare.') : null
+        )
+      ),
+      // ── Trender & rekord ──
+      h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-emerald-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, '📈 Trender & rekord'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Senaste 7 dagarna vs föregående · personliga rekord')
+          )
+        ),
+        h('div', { className: 'px-4 py-4' },
+          h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-2 mb-4' },
+            trends.map(function(t,i){ var good = t.better==='up' ? t.diff>0 : t.diff<0; var arrow = t.diff>0?'▲':t.diff<0?'▼':'■'; return h('div', { key:i, className: 'bg-gray-50 rounded-lg px-3 py-2' },
+              h('p', { className:'text-xs text-gray-400' }, t.name),
+              h('p', { className:'text-lg font-bold text-gray-800' }, t.now),
+              h('p', { className:'text-xs font-semibold ' + (t.diff===0?'text-gray-400':good?'text-green-600':'text-red-500') }, arrow + ' ' + (t.diff>0?'+':'') + (Math.round(t.diff*10)/10))
+            ); })
+          ),
+          h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-2' },
+            [['🌙 Bästa sömn',recBestSleep,'sleep_score',''],['💗 Högsta HRV',recMaxHrv,'hrv_avg',' ms'],['❤️ Lägsta vilopuls',recMinRhr,'resting_hr',' slag'],['👟 Flest steg',recMaxSteps,'steps','']].map(function(r,i){ var d=r[1]; return h('div', { key:i, className: 'bg-emerald-50 rounded-lg px-3 py-2' },
+              h('p', { className:'text-xs text-emerald-700' }, r[0]),
+              h('p', { className:'text-lg font-bold text-emerald-800' }, d ? (d[r[2]].toLocaleString('sv-SE') + r[3]) : '–'),
+              h('p', { className:'text-xs text-emerald-500' }, fmtD(d))
+            ); })
+          )
+        )
+      ),
       // ── Samband Oura <-> vikt ──
       h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
@@ -1778,6 +1842,11 @@ function WeightStepTracker() {
             { key:'nsteg', color:'#f59e0b', width:1.5, name:'Steg' }
           ].filter(function(x){return x;}) })
         )
+      ),
+      // Tidsspann-väljare
+      h('div', { className: 'flex items-center gap-2 mb-4' },
+        h('span', { className:'text-xs text-gray-400 mr-1' }, 'Visa:'),
+        [['30 d',30],['90 d',90],['180 d',180],['Allt',0]].map(function(o,i){ var active=ouraRange===o[1]; return h('button', { key:i, onClick:function(){setOuraRange(o[1]);}, className:'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ' + (active?'bg-indigo-600 text-white':'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50') }, o[0]); })
       ),
       // Charts
       h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
