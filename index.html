@@ -121,6 +121,21 @@ function SvgScatter({ points, xName, yName, color, height }) {
     h('text',{x:16,y:PT+chartH/2,textAnchor:'middle',fontSize:11,fill:'#6b7280',transform:'rotate(-90 16 '+(PT+chartH/2)+')'},yName)
   );
 }
+function SvgDonut({ segments, size }) {
+  size = size || 170;
+  var total = segments.reduce(function(s,x){return s+x.value;},0);
+  if(!total) return h('p',{className:'text-gray-400 text-sm text-center py-8'},'Ingen data ännu');
+  var cx=size/2, cy=size/2, r=size*0.38, C=2*Math.PI*r, acc=0;
+  var arcs = segments.map(function(seg,i){
+    var frac=seg.value/total, dash=C*frac, off=C*acc; acc+=frac;
+    return h('circle',{key:i,cx:cx,cy:cy,r:r,fill:'none',stroke:seg.color,strokeWidth:size*0.17,strokeDasharray:dash+' '+(C-dash),strokeDashoffset:-off,transform:'rotate(-90 '+cx+' '+cy+')'});
+  });
+  return h('svg',{viewBox:'0 0 '+size+' '+size,style:{width:size+'px',height:size+'px'},xmlns:'http://www.w3.org/2000/svg'},
+    arcs,
+    h('text',{x:cx,y:cy-2,textAnchor:'middle',fontSize:size*0.14,fontWeight:'bold',fill:'#374151'}, Math.round(total/60)+'h'),
+    h('text',{x:cx,y:cy+size*0.12,textAnchor:'middle',fontSize:size*0.07,fill:'#9ca3af'},'totalt')
+  );
+}
 // ─── Sub-components ──────────────────────────────────────────────────────────
 const Toast = ({ toast, onClose }) => {
   if (!toast) return null;
@@ -1309,6 +1324,25 @@ function WeightStepTracker() {
       var wCount = workouts.filter(function(w){ var d=new Date(w.date); d.setHours(0,0,0,0); return d>=wMonday && d<=wEnd; }).length;
       weekChartData.push({ datum: new Date(wMonday).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}), pass: wCount });
     }
+    // ── Träningsanalys ──
+    var TYPE_COLORS=['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1','#14b8a6','#a855f7'];
+    var byType={}; workouts.forEach(function(w){ byType[w.type]=(byType[w.type]||0)+w.duration; });
+    var typeSegs = Object.keys(byType).map(function(k){ return {label:k, value:byType[k]}; }).sort(function(a,b){return b.value-a.value;}).map(function(seg,i){ seg.color=TYPE_COLORS[i%TYPE_COLORS.length]; return seg; });
+    var typeTotal = typeSegs.reduce(function(s,x){return s+x.value;},0);
+    var volData=[]; for(var vi=-15; vi<=0; vi++){ var vM=new Date(todayD); vM.setDate(todayD.getDate()-(dow===0?6:dow-1)+vi*7); var vE=new Date(vM); vE.setDate(vM.getDate()+6); var vMin=workouts.filter(function(w){var d=new Date(w.date);d.setHours(0,0,0,0);return d>=vM&&d<=vE;}).reduce(function(s,w){return s+w.duration;},0); volData.push({datum:new Date(vM).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}), min:vMin}); }
+    var intLabels=['Mycket lätt','Lätt','Medel','Hård','Mycket hård'];
+    var intCounts=[0,0,0,0,0]; workouts.forEach(function(w){ var k=Math.min(5,Math.max(1, w.intensity||3)); intCounts[k-1]++; });
+    var intData=intCounts.map(function(c,i){ return {datum:String(i+1), n:c}; });
+    var intTotal=intCounts.reduce(function(a,b){return a+b;},0);
+    // träning -> nästa dags HRV
+    var minByDate={}; workouts.forEach(function(w){ minByDate[w.date]=(minByDate[w.date]||0)+w.duration; });
+    var hrvByDate={}; ouraData.forEach(function(d){ if(d.hrv_avg!=null) hrvByDate[d.date]=d.hrv_avg; });
+    var addDay=function(ds){ var dd=new Date(ds); dd.setDate(dd.getDate()+1); return dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0'); };
+    var trainHrvPts=[]; Object.keys(minByDate).forEach(function(ds){ var hy=hrvByDate[addDay(ds)]; if(hy!=null) trainHrvPts.push({x:minByDate[ds], y:hy}); });
+    var thCorr=null; if(trainHrvPts.length>=3){ var n=trainHrvPts.length,sx=0,sy=0,sxy=0,sxx=0,syy=0; trainHrvPts.forEach(function(p){sx+=p.x;sy+=p.y;sxy+=p.x*p.y;sxx+=p.x*p.x;syy+=p.y*p.y;}); var den=Math.sqrt((n*sxx-sx*sx)*(n*syy-sy*sy)); thCorr=den?(n*sxy-sx*sy)/den:null; }
+    // heatmap (17 veckor)
+    var hmWeeks=[]; for(var hw=-16; hw<=0; hw++){ var hM=new Date(todayD); hM.setDate(todayD.getDate()-(dow===0?6:dow-1)+hw*7); var col=[]; for(var hd=0; hd<7; hd++){ var cD=new Date(hM); cD.setDate(hM.getDate()+hd); var cs=cD.getFullYear()+'-'+String(cD.getMonth()+1).padStart(2,'0')+'-'+String(cD.getDate()).padStart(2,'0'); col.push({date:cs, min:(minByDate[cs]||0), future: cD>todayD}); } hmWeeks.push(col); }
+    var hmColor=function(m){ return m===0?'#eef2f7':m<=20?'#bbf7d0':m<=45?'#4ade80':m<=80?'#22c55e':'#15803d'; };
     return h('div', null,
       // ── HERO WEEK CARD ──────────────────────────────────────────────────────
       h('div', { className: 'bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-6 mb-6 text-white shadow-xl' },
@@ -1383,6 +1417,60 @@ function WeightStepTracker() {
           h(SvgBarChart, { data: weekChartData, dataKey: 'pass', color: '#3b82f6', height: 100 })
         ) : null
       ),
+      // ── TRÄNINGSANALYS ──────────────────────────────────────────────────────
+      workouts.length > 0 ? h('div', null,
+        // Fördelning per typ (donut)
+        h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
+          h('h2', { className:'text-lg font-bold text-gray-800 mb-1' }, '🍩 Fördelning per typ'),
+          h('p', { className:'text-xs text-gray-400 mb-4' }, 'Andel av din träningstid'),
+          h('div', { className:'flex flex-col md:flex-row items-center gap-6' },
+            h('div', { className:'shrink-0' }, h(SvgDonut, { segments: typeSegs, size: 170 })),
+            h('div', { className:'flex-1 w-full space-y-1.5' },
+              typeSegs.slice(0,8).map(function(seg,i){ var pct=Math.round(seg.value/typeTotal*100); return h('div', { key:i, className:'flex items-center gap-2 text-sm' },
+                h('span', { className:'w-3 h-3 rounded-full shrink-0', style:{ backgroundColor:seg.color } }),
+                h('span', { className:'text-gray-700 flex-1' }, seg.label),
+                h('span', { className:'text-gray-400' }, Math.round(seg.value/60)+'h'),
+                h('span', { className:'text-gray-700 font-semibold w-10 text-right' }, pct+'%')
+              ); })
+            )
+          )
+        ),
+        // Veckovolym
+        h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
+          h('h2', { className:'text-lg font-bold text-gray-800 mb-1' }, '📊 Veckovolym'),
+          h('p', { className:'text-xs text-gray-400 mb-4' }, 'Träningsminuter per vecka · senaste 16 veckorna'),
+          h(SvgBarChart, { data: volData, dataKey:'min', color:'#6366f1', height: 180 })
+        ),
+        // Intensitetsfördelning
+        h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
+          h('h2', { className:'text-lg font-bold text-gray-800 mb-1' }, '🔥 Intensitetsfördelning'),
+          h('p', { className:'text-xs text-gray-400 mb-4' }, 'Antal pass per intensitetsnivå (1 = mycket lätt, 5 = mycket hård)'),
+          h('div', { className:'space-y-2' },
+            intCounts.map(function(c,i){ var pct=intTotal?Math.round(c/intTotal*100):0; var cols=['#a7f3d0','#86efac','#fbbf24','#fb923c','#ef4444']; return h('div', { key:i, className:'flex items-center gap-3' },
+              h('span', { className:'text-xs text-gray-500 w-24 shrink-0' }, (i+1)+' · '+intLabels[i]),
+              h('div', { className:'flex-1 bg-gray-100 rounded-full h-4 overflow-hidden' }, h('div', { className:'h-4 rounded-full', style:{ width:(intTotal?Math.max(pct,c>0?4:0):0)+'%', backgroundColor:cols[i] } })),
+              h('span', { className:'text-sm font-semibold text-gray-700 w-12 text-right' }, c+' st')
+            ); })
+          )
+        ),
+        // Träning vs HRV
+        trainHrvPts.length>=3 ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
+          h('h2', { className:'text-lg font-bold text-gray-800 mb-1' }, '🔗 Träning vs återhämtning'),
+          h('p', { className:'text-xs text-gray-400 mb-3' }, 'Träningsminuter en dag vs HRV nästa morgon' + (thCorr!=null ? ' · samband ' + (thCorr>0?'+':'') + thCorr.toFixed(2) : '')),
+          h(SvgScatter, { points: trainHrvPts, xName:'Träningsminuter', yName:'HRV nästa dag (ms)', color:'#6366f1', height: 230 }),
+          thCorr!=null && thCorr < -0.3 ? h('p', { className:'text-xs text-amber-600 mt-2' }, 'Hård träning verkar sänka nästa dags HRV — se till att varva med återhämtning.') : null
+        ) : null,
+        // Heatmap
+        h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
+          h('h2', { className:'text-lg font-bold text-gray-800 mb-1' }, '🟩 Träningskalender'),
+          h('p', { className:'text-xs text-gray-400 mb-4' }, 'Senaste 17 veckorna · mörkare = mer träning'),
+          h('div', { className:'flex gap-1 overflow-x-auto pb-1' },
+            hmWeeks.map(function(col,ci){ return h('div', { key:ci, className:'flex flex-col gap-1' },
+              col.map(function(cell,ri){ return h('div', { key:ri, title: cell.date+': '+cell.min+' min', className:'w-3.5 h-3.5 rounded-sm', style:{ backgroundColor: cell.future ? 'transparent' : hmColor(cell.min) } }); })
+            ); })
+          )
+        )
+      ) : null,
       // ── ADD WORKOUT FORM ────────────────────────────────────────────────────
       h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
         h('h2', { className: 'text-lg font-bold mb-4 text-gray-800' }, '+ Lägg till träningspass'),
