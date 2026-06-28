@@ -189,6 +189,7 @@ function WeightStepTracker() {
   const [ouraConnected, setOuraConnected] = useState(false);
   const [ouraSyncing, setOuraSyncing] = useState(false);
   const [ouraRange, setOuraRange] = useState(90);
+  const [showAllInsights, setShowAllInsights] = useState(false);
 
   useEffect(function() {
     // Load cached Oura data
@@ -870,25 +871,6 @@ function WeightStepTracker() {
           h('p', { className:'text-sm font-medium text-blue-800' }, r.text)
         ); })
       ) : null,
-      // Veckoscorecard
-      scOverall != null ? h('div', { className: 'bg-gradient-to-br from-sky-400 via-indigo-400 to-violet-400 rounded-2xl shadow-xl mb-4 p-6 text-white' },
-        h('div', { className: 'flex items-center justify-between mb-4' },
-          h('div', null,
-            h('p', { className:'text-white/90 text-xs font-semibold uppercase tracking-widest' }, '🏅 Veckoscore (7 dygn)'),
-            h('p', { className:'text-xs text-white/75 mt-0.5' }, 'Sömn · återhämtning · aktivitet · lugn · vikt')
-          ),
-          h('div', { className:'text-right' },
-            h('p', { className:'text-5xl font-black leading-none' }, scOverall),
-            h('p', { className:'text-sm text-white/90 mt-1' }, 'Betyg ' + scGrade)
-          )
-        ),
-        h('div', { className:'space-y-2' },
-          scParts.map(function(p,i){ var v=Math.round(p[1]); return h('div', { key:i },
-            h('div', { className:'flex justify-between text-xs text-white/90 mb-0.5' }, h('span',null,p[0]), h('span',null,v)),
-            h('div', { className:'h-2 bg-white/25 rounded-full overflow-hidden' }, h('div', { className:'h-2 rounded-full ' + (v>=70?'bg-green-400':v>=50?'bg-amber-400':'bg-rose-400'), style:{ width: v+'%' } }))
-          ); })
-        )
-      ) : null,
       // Plateau warning banner
       plateau ? h('div', { className: 'bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl p-5 mb-4 shadow-sm' },
         h('div', { className: 'flex items-start gap-3' },
@@ -960,6 +942,25 @@ function WeightStepTracker() {
           )
         )
       ),
+      // Veckoscorecard
+      scOverall != null ? h('div', { className: 'bg-gradient-to-br from-sky-400 via-indigo-400 to-violet-400 rounded-2xl shadow-xl mb-4 p-6 text-white' },
+        h('div', { className: 'flex items-center justify-between mb-4' },
+          h('div', null,
+            h('p', { className:'text-white/90 text-xs font-semibold uppercase tracking-widest' }, '🏅 Veckoscore (7 dygn)'),
+            h('p', { className:'text-xs text-white/75 mt-0.5' }, 'Sömn · återhämtning · aktivitet · lugn · vikt')
+          ),
+          h('div', { className:'text-right' },
+            h('p', { className:'text-5xl font-black leading-none' }, scOverall),
+            h('p', { className:'text-sm text-white/90 mt-1' }, 'Betyg ' + scGrade)
+          )
+        ),
+        h('div', { className:'space-y-2' },
+          scParts.map(function(p,i){ var v=Math.round(p[1]); return h('div', { key:i },
+            h('div', { className:'flex justify-between text-xs text-white/90 mb-0.5' }, h('span',null,p[0]), h('span',null,v)),
+            h('div', { className:'h-2 bg-white/25 rounded-full overflow-hidden' }, h('div', { className:'h-2 rounded-full ' + (v>=70?'bg-green-400':v>=50?'bg-amber-400':'bg-rose-400'), style:{ width: v+'%' } }))
+          ); })
+        )
+      ) : null,
       // Stats row (merged)
       h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-6' },
         h(StatCard, { emoji:'🔥', label:'Total förändring', value: (lostSoFar >= 0 ? '-' : '+') + Math.abs(parseFloat(stats.totalLoss)) + ' kg', sub: entries.length + ' mätningar', subColor: lostSoFar >= 0 ? 'text-green-600' : 'text-red-500', accent: lostSoFar >= 0 ? 'border-orange-400' : 'border-red-400', bg: lostSoFar >= 0 ? 'bg-orange-400' : 'bg-red-400' }),
@@ -1083,6 +1084,7 @@ function WeightStepTracker() {
           )
         ) : null
       ),
+      h('h2', { className: 'text-sm font-bold text-gray-400 uppercase tracking-wider mt-6 mb-2 px-1' }, 'Insikter'),
       // Workout Correlation card
       workoutCorr ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
@@ -1137,35 +1139,6 @@ function WeightStepTracker() {
             : h('p', { className: 'text-sm text-gray-400 text-center py-2' }, 'Logga fler veckor med och utan träning för att se skillnaden')
         )
       ) : null,
-      // Weekly auto-report
-      weeklyReport ? h('div', { className: 'bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 rounded-xl p-5 shadow-sm mb-4' },
-        h('div', { className: 'flex items-center gap-2 mb-3' },
-          h('span', { className: 'text-xl' }, '📋'),
-          h('h2', { className: 'font-bold text-gray-800' }, 'Veckorapport ' + weeklyReport.weekLabel)
-        ),
-        h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-3' },
-          h('div', { className: 'bg-white rounded-lg p-3 text-center shadow-sm' },
-            h('p', { className: 'text-2xl font-bold ' + (weeklyReport.change <= 0 ? 'text-green-600' : 'text-red-500') },
-              (weeklyReport.change > 0 ? '+' : '') + weeklyReport.change + ' kg'),
-            h('p', { className: 'text-xs text-gray-500 mt-1' }, 'Viktförändring')
-          ),
-          h('div', { className: 'bg-white rounded-lg p-3 text-center shadow-sm' },
-            h('p', { className: 'text-2xl font-bold text-indigo-600' }, weeklyReport.avgW + ' kg'),
-            h('p', { className: 'text-xs text-gray-500 mt-1' }, 'Snittevikt')
-          ),
-          h('div', { className: 'bg-white rounded-lg p-3 text-center shadow-sm' },
-            h('p', { className: 'text-2xl font-bold text-orange-500' }, weeklyReport.workouts + ' 💪'),
-            h('p', { className: 'text-xs text-gray-500 mt-1' }, weeklyReport.totalMin + ' min träning')
-          ),
-          h('div', { className: 'bg-white rounded-lg p-3 text-center shadow-sm' },
-            h('p', { className: 'text-2xl font-bold text-blue-500' },
-              weeklyReport.avgSteps > 0 ? (weeklyReport.avgSteps >= 1000 ? Math.round(weeklyReport.avgSteps/1000*10)/10+'k' : weeklyReport.avgSteps) : '—'),
-            h('p', { className: 'text-xs text-gray-500 mt-1' }, 'Snitt steg/dag')
-          )
-        ),
-        h('p', { className: 'text-xs text-gray-400 mt-3 text-center' }, weeklyReport.logDays + ' loggade dagar · ' +
-          (weeklyReport.change <= -0.5 ? '🔥 Bra jobbat!' : weeklyReport.change <= 0 ? '👍 På rätt spår' : '💡 Justera kosten lite denna vecka'))
-      ) : null,
       // Smart insights
       insights.length > 0 ? h('div', { className: 'bg-gradient-to-br from-violet-50 to-indigo-50 border border-indigo-100 rounded-xl p-5 shadow-sm mb-6' },
         h('div', { className: 'flex items-center gap-2 mb-3' },
@@ -1174,7 +1147,7 @@ function WeightStepTracker() {
           h('span', { className: 'text-xs text-indigo-400 ml-auto' }, 'baserat på din data')
         ),
         h('div', { className: 'space-y-2' },
-          insights.map(function(ins, i) {
+          (showAllInsights ? insights : insights.slice(0,4)).map(function(ins, i) {
             var insColors = { '📅':'border-blue-400 bg-blue-50', '👟':'border-teal-400 bg-teal-50', '💪':'border-orange-400 bg-orange-50', '📈':'border-green-400 bg-green-50', '🏆':'border-amber-400 bg-amber-50', '📊':'border-purple-400 bg-purple-50', '🎯':'border-indigo-400 bg-indigo-50', '⚠️':'border-red-400 bg-red-50' };
             var cls = insColors[ins.icon] || 'border-gray-300 bg-white';
             return h('div', { key: i, className: 'flex items-start gap-3 rounded-xl px-4 py-3 border-l-4 ' + cls },
@@ -1182,8 +1155,10 @@ function WeightStepTracker() {
               h('p', { className: 'text-sm text-gray-700 leading-snug' }, ins.text)
             );
           })
-        )
+        ),
+        insights.length > 4 ? h('button', { onClick: function(){ setShowAllInsights(!showAllInsights); }, className: 'mt-3 text-sm text-indigo-600 font-medium hover:underline' }, showAllInsights ? 'Visa färre' : 'Visa fler (' + (insights.length-4) + ')') : null
       ) : null,
+      h('h2', { className: 'text-sm font-bold text-gray-400 uppercase tracking-wider mt-6 mb-2 px-1' }, 'Grafer'),
       // Weight chart
       h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
