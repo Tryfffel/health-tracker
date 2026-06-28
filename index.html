@@ -947,7 +947,7 @@ function WeightStepTracker() {
         h('div', { className: 'flex items-center justify-between mb-4' },
           h('div', null,
             h('p', { className:'text-white/90 text-xs font-semibold uppercase tracking-widest' }, '🏅 Veckoscore (7 dygn)'),
-            h('p', { className:'text-xs text-white/75 mt-0.5' }, 'Sömn · återhämtning · aktivitet · lugn · vikt')
+            h('p', { className:'text-xs text-white/75 mt-0.5' }, 'Snitt av 5 delpoäng (0–100): sömn · återhämtning · aktivitet · lugn · vikttrend')
           ),
           h('div', { className:'text-right' },
             h('p', { className:'text-5xl font-black leading-none' }, scOverall),
@@ -962,12 +962,11 @@ function WeightStepTracker() {
         )
       ) : null,
       // Stats row (merged)
-      h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-6' },
+      h('div', { className: 'grid grid-cols-2 md:grid-cols-3 gap-4 mb-6' },
         h(StatCard, { emoji:'🔥', label:'Total förändring', value: (lostSoFar >= 0 ? '-' : '+') + Math.abs(parseFloat(stats.totalLoss)) + ' kg', sub: entries.length + ' mätningar', subColor: lostSoFar >= 0 ? 'text-green-600' : 'text-red-500', accent: lostSoFar >= 0 ? 'border-orange-400' : 'border-red-400', bg: lostSoFar >= 0 ? 'bg-orange-400' : 'bg-red-400' }),
         stats.bmi
           ? h(StatCard, { emoji:'⚖️', label:'BMI', value: stats.bmi, sub: stats.bmiCat ? stats.bmiCat.label : '', subColor: stats.bmiCat ? stats.bmiCat.color : '', accent: 'border-purple-400', bg: 'bg-purple-500' })
           : null,
-        h(StatCard, { emoji:'🏆', label:'Inloggningssvit', value: stats.streak + ' 🔥', sub: stats.streak > 0 ? 'dagar i rad' : 'Logga idag!', accent: 'border-amber-400', bg: 'bg-amber-400' }),
         h(StatCard, { emoji:'👟', label:'Snitt steg (7d)', value: stats.avgSteps.toLocaleString(), sub: 'senaste veckan', accent: 'border-teal-400', bg: 'bg-teal-500' })
       ),
       // This/last week
