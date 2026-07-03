@@ -277,12 +277,22 @@ function WeightStepTracker() {
 
   // ─── WEGOVY STATE ────────────────────────────────────────────────────────
   const WEGOVY_DEFAULT_PROTOCOL = {
-    start_date: null, current_dose: 0.25, weeks_per_step: 6,
+    start_date: null, current_dose: 0.25, first_step_weeks: 6, weeks_per_step: 4,
     titration_plan: [
-      { weeks: '1-6',  dose: 0.25 }, { weeks: '7-12', dose: 0.5  },
-      { weeks: '13-18',dose: 1.0  }, { weeks: '19-24',dose: 1.7  },
-      { weeks: '25+',  dose: 2.4  }
+      { weeks: '1-6',  dose: 0.25 }, { weeks: '7-10', dose: 0.5  },
+      { weeks: '11-14',dose: 1.0  }, { weeks: '15-18',dose: 1.7  },
+      { weeks: '19+',  dose: 2.4  }
     ]
+  };
+  const buildTitrationPlan = function(firstW, stepW) {
+    var doses = [0.25, 0.5, 1.0, 1.7, 2.4];
+    var plan = [], start = 1;
+    for (var i = 0; i < doses.length; i++) {
+      var len = i === 0 ? firstW : stepW;
+      if (i === doses.length - 1) plan.push({ weeks: start + '+', dose: doses[i] });
+      else { plan.push({ weeks: start + '-' + (start + len - 1), dose: doses[i] }); start += len; }
+    }
+    return plan;
   };
   const WEGOVY_DEFAULT_DOSES = [];
   const [wegovyDoses, setWegovyDoses] = useState(null);
@@ -2755,6 +2765,7 @@ function WeightStepTracker() {
     function submitDose() {
       if (!doseForm.date || !doseForm.dose) return;
       saveDoses(wegovyDoses.concat([{ id: Date.now(), date: doseForm.date, dose: parseFloat(doseForm.dose), side_effects: doseForm.side_effects||'', notes: doseForm.notes||'', weight_at_dose: doseForm.weight_at_dose ? parseFloat(doseForm.weight_at_dose) : null }]));
+      if (!wegovyProtocol.start_date) saveProtocol(Object.assign({}, wegovyProtocol, { start_date: doseForm.date }));
       setShowDoseForm(false);
       showToast('💉 Dos loggad!');
     }
@@ -2879,6 +2890,31 @@ function WeightStepTracker() {
         noise = { sd: parseFloat(sd.toFixed(2)), muWeek: parseFloat((mu*7).toFixed(2)), n: diffs.length, withinPct: Math.round(within/diffs.length*100) };
       }
       return (bars || noise) ? { bars: bars, noise: noise } : null;
+    })();
+    // ── Injektionscykeln: mönster per dag efter dos ──
+    var cycleData = (function(){
+      if (dosesAsc.length < 3) return null;
+      var addDaysStr = function(ds, n){ var dd = new Date(ds); dd.setDate(dd.getDate()+n); return toDateStr(dd); };
+      var wBD = {}, mBD = {}, sBD = {};
+      entries.forEach(function(e){ wBD[e.date] = e.weight; if (e.mood) mBD[e.date] = e.mood; });
+      ouraData.forEach(function(d){ if (d.sleep_score != null) sBD[d.date] = d.sleep_score; });
+      var offsets = [];
+      for (var o = 0; o < 7; o++) offsets.push({ o: o, dw: [], mood: [], sleep: [] });
+      dosesAsc.forEach(function(d){
+        for (var o = 0; o < 7; o++) {
+          var day = addDaysStr(d.date, o), next = addDaysStr(d.date, o+1);
+          if (wBD[day] != null && wBD[next] != null) offsets[o].dw.push(wBD[next] - wBD[day]);
+          if (mBD[day] != null) offsets[o].mood.push(mBD[day]);
+          if (sBD[day] != null) offsets[o].sleep.push(sBD[day]);
+        }
+      });
+      var avg = function(a){ return a.length ? a.reduce(function(x,y){ return x+y; },0)/a.length : null; };
+      var rows = offsets.map(function(x){ return { o: x.o, dw: avg(x.dw), nDw: x.dw.length, mood: avg(x.mood), sleep: avg(x.sleep) }; });
+      if (!rows.some(function(r){ return r.dw != null && r.nDw >= 3; })) return null;
+      var withDw = rows.filter(function(r){ return r.dw != null; });
+      var bestDay = withDw.length ? withDw.reduce(function(p,c){ return c.dw < p.dw ? c : p; }) : null;
+      var worstDay = withDw.length ? withDw.reduce(function(p,c){ return c.dw > p.dw ? c : p; }) : null;
+      return { rows: rows, bestDay: bestDay, worstDay: worstDay, nDoses: dosesAsc.length };
     })();
     return h('div', null,
       h('div', { className: 'bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600 rounded-2xl shadow-xl mb-5 p-6 text-white' },
@@ -3060,6 +3096,42 @@ function WeightStepTracker() {
           ) : null
         )
       ) : null,
+      // ── Injektionscykeln ──
+      cycleData ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-purple-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, '🔄 Injektionscykeln'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Genomsnittligt mönster per dag efter dos · ' + cycleData.nDoses + ' doser')
+          )
+        ),
+        h('div', { className: 'p-5' },
+          h('div', { className: 'overflow-x-auto mb-3' },
+            h('table', { className: 'w-full text-sm' },
+              h('thead', null, h('tr', { className: 'bg-gray-50' },
+                h('th', { className: 'text-left px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Dag efter dos'),
+                h('th', { className: 'text-right px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'ViktΔ / dag'),
+                h('th', { className: 'text-right px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Humör'),
+                h('th', { className: 'text-right px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Sömn')
+              )),
+              h('tbody', null,
+                cycleData.rows.map(function(r, ri) {
+                  var label = r.o === 0 ? 'Dosdag' : 'Dag ' + r.o;
+                  return h('tr', { key: ri, className: ri % 2 ? 'bg-gray-50/50' : '' },
+                    h('td', { className: 'px-3 py-1.5 font-semibold text-gray-600' }, label),
+                    h('td', { className: 'px-3 py-1.5 text-right font-bold ' + (r.dw == null ? 'text-gray-300' : r.dw <= 0 ? 'text-green-600' : 'text-red-500') }, r.dw == null ? '–' : (r.dw > 0 ? '+' : '') + r.dw.toFixed(2) + ' kg'),
+                    h('td', { className: 'px-3 py-1.5 text-right text-gray-600' }, r.mood != null ? r.mood.toFixed(1) : '–'),
+                    h('td', { className: 'px-3 py-1.5 text-right text-gray-600' }, r.sleep != null ? Math.round(r.sleep) : '–')
+                  );
+                })
+              )
+            )
+          ),
+          cycleData.bestDay && cycleData.worstDay && cycleData.bestDay.o !== cycleData.worstDay.o ? h('p', { className: 'text-xs text-gray-500' },
+            'Vikten sjunker mest dag ' + cycleData.bestDay.o + ' efter dosen (' + cycleData.bestDay.dw.toFixed(2) + ' kg/dag) och minst dag ' + cycleData.worstDay.o + ' (' + (cycleData.worstDay.dw > 0 ? '+' : '') + cycleData.worstDay.dw.toFixed(2) + ' kg/dag). Mönstret blir stabilare för varje vecka som loggas.'
+          ) : null
+        )
+      ) : null,
       // ── Takt över tid + signal vs brus ──
       taktData ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
@@ -3108,20 +3180,31 @@ function WeightStepTracker() {
           ),
           h('button', { onClick: function(){ setEditProtocol(!editProtocol); }, className: 'text-xs text-indigo-600 hover:underline' }, editProtocol ? 'Stäng' : 'Redigera')
         ),
-        editProtocol ? h('div', { className: 'px-6 py-4 border-b border-gray-50' },
-          h('label', { className: 'text-xs font-medium text-gray-600 block mb-2' }, 'Veckor per steg'),
-          h('div', { className: 'flex gap-2' },
-            [4,5,6,8].map(function(w) {
-              return h('button', { key:w, onClick: function(){
-                var plan = wegovyProtocol.titration_plan.map(function(step, i) {
-                  var doses = [0.25,0.5,1.0,1.7,2.4];
-                  if (i === wegovyProtocol.titration_plan.length-1) return { weeks: (w*i+1)+'+', dose: doses[i]||step.dose };
-                  return { weeks: (w*i+1)+'-'+(w*(i+1)), dose: doses[i]||step.dose };
-                });
-                saveProtocol(Object.assign({},wegovyProtocol,{weeks_per_step:w,titration_plan:plan}));
-              }, className: 'px-4 py-2 rounded-lg text-sm border-2 font-medium '+(wegovyProtocol.weeks_per_step===w?'bg-purple-600 text-white border-purple-600':'border-gray-200 text-gray-600') }, w+'v');
-            })
-          )
+        editProtocol ? h('div', { className: 'px-6 py-4 border-b border-gray-50 space-y-3' },
+          h('div', null,
+            h('label', { className: 'text-xs font-medium text-gray-600 block mb-2' }, 'Veckor på första steget (0,25 mg)'),
+            h('div', { className: 'flex gap-2' },
+              [4,5,6,8].map(function(w) {
+                var firstW = wegovyProtocol.first_step_weeks || wegovyProtocol.weeks_per_step || 6;
+                return h('button', { key:w, onClick: function(){
+                  var stepW = wegovyProtocol.weeks_per_step || 4;
+                  saveProtocol(Object.assign({},wegovyProtocol,{first_step_weeks:w,titration_plan:buildTitrationPlan(w, stepW)}));
+                }, className: 'px-4 py-2 rounded-lg text-sm border-2 font-medium '+(firstW===w?'bg-purple-600 text-white border-purple-600':'border-gray-200 text-gray-600') }, w+'v');
+              })
+            )
+          ),
+          h('div', null,
+            h('label', { className: 'text-xs font-medium text-gray-600 block mb-2' }, 'Veckor per följande steg'),
+            h('div', { className: 'flex gap-2' },
+              [4,5,6,8].map(function(w) {
+                return h('button', { key:w, onClick: function(){
+                  var firstW = wegovyProtocol.first_step_weeks || 6;
+                  saveProtocol(Object.assign({},wegovyProtocol,{weeks_per_step:w,titration_plan:buildTitrationPlan(firstW, w)}));
+                }, className: 'px-4 py-2 rounded-lg text-sm border-2 font-medium '+((wegovyProtocol.weeks_per_step||4)===w?'bg-purple-600 text-white border-purple-600':'border-gray-200 text-gray-600') }, w+'v');
+              })
+            )
+          ),
+          h('p', { className: 'text-xs text-gray-400' }, 'Din plan: ' + (wegovyProtocol.first_step_weeks || 6) + ' veckor på 0,25 mg, sedan ' + (wegovyProtocol.weeks_per_step || 4) + '-veckorsintervall per steg. Upptrappningen sker alltid i samråd med läkare.')
         ) : null,
         h('div', { className: 'px-6 py-5' },
           h('div', { className: 'flex gap-2 overflow-x-auto pb-2' },
