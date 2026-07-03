@@ -181,6 +181,27 @@ function WeightStepTracker() {
   const [lastCloudBackup, setLastCloudBackup] = useState(null);
   const [experiments, setExperiments] = useState([]);
   const [expForm, setExpForm] = useState({ date: '', label: '' });
+  const [checkups, setCheckups] = useState([]);
+  const [checkupForm, setCheckupForm] = useState({});
+  const [showCheckupForm, setShowCheckupForm] = useState(false);
+  const CHECKUP_FIELDS = [
+    { key: 'sys', label: 'Blodtryck systoliskt', unit: 'mmHg', dec: 0, better: 'down', ref: function(v){ return v < 120 ? 'good' : v < 140 ? 'warn' : 'bad'; } },
+    { key: 'dia', label: 'Blodtryck diastoliskt', unit: 'mmHg', dec: 0, better: 'down', ref: function(v){ return v < 80 ? 'good' : v < 90 ? 'warn' : 'bad'; } },
+    { key: 'pulse', label: 'Vilopuls (mätt)', unit: 'slag/min', dec: 0, better: 'down', ref: function(v){ return v < 70 ? 'good' : v < 80 ? 'warn' : 'bad'; } },
+    { key: 'totchol', label: 'Totalkolesterol', unit: 'mmol/L', dec: 1, better: 'down', ref: function(v){ return v < 5.0 ? 'good' : v < 6.2 ? 'warn' : 'bad'; } },
+    { key: 'ldl', label: 'LDL', unit: 'mmol/L', dec: 1, better: 'down', ref: function(v){ return v < 3.0 ? 'good' : v < 4.1 ? 'warn' : 'bad'; } },
+    { key: 'hdl', label: 'HDL', unit: 'mmol/L', dec: 1, better: 'up', ref: function(v){ return v >= 1.2 ? 'good' : v >= 1.0 ? 'warn' : 'bad'; } },
+    { key: 'tg', label: 'Triglycerider', unit: 'mmol/L', dec: 1, better: 'down', ref: function(v){ return v < 1.7 ? 'good' : v < 2.3 ? 'warn' : 'bad'; } },
+    { key: 'hba1c', label: 'HbA1c', unit: 'mmol/mol', dec: 0, better: 'down', ref: function(v){ return v < 42 ? 'good' : v < 48 ? 'warn' : 'bad'; } },
+    { key: 'glucose', label: 'Glukos (fastande)', unit: 'mmol/L', dec: 1, better: 'down', ref: function(v){ return v < 6.1 ? 'good' : v < 7.0 ? 'warn' : 'bad'; } },
+    { key: 'crp', label: 'hsCRP', unit: 'mg/L', dec: 1, better: 'down', ref: function(v){ return v < 1 ? 'good' : v < 3 ? 'warn' : 'bad'; } },
+    { key: 'waist', label: 'Midjemått', unit: 'cm', dec: 0, better: 'down', ref: function(v){ return v < 94 ? 'good' : v < 102 ? 'warn' : 'bad'; } },
+    { key: 'grip', label: 'Greppstyrka', unit: 'kg', dec: 0, better: 'up', ref: function(v){ return v >= 40 ? 'good' : v >= 30 ? 'warn' : 'bad'; } }
+  ];
+  const saveCheckups = function(list) {
+    setCheckups(list);
+    window.storage.set('checkups', JSON.stringify(list));
+  };
   const CryptoBox = {
     b64: function(buf){ var b=''; new Uint8Array(buf).forEach(function(x){ b += String.fromCharCode(x); }); return btoa(b); },
     ub64: function(s){ var bin = atob(s); var a = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a; },
@@ -355,6 +376,7 @@ function WeightStepTracker() {
         window.storage.get('app-settings'),
         window.storage.get('last-cloud-backup'),
         window.storage.get('experiments'),
+        window.storage.get('checkups'),
       ]);
       if (results[0] && results[0].value) setEntries(JSON.parse(results[0].value));
       if (results[1] && results[1].value) setWorkouts(JSON.parse(results[1].value));
@@ -366,6 +388,7 @@ function WeightStepTracker() {
       if (results[7] && results[7].value) setAppSettings(Object.assign({ injectionDay: 2, stepGoal: 8000, stepTarget: 12000, sleepNeed: 450, latitude: 59.3, ghToken: '', backupPassword: '' }, JSON.parse(results[7].value)));
       if (results[8] && results[8].value) setLastCloudBackup(results[8].value);
       if (results[9] && results[9].value) setExperiments(JSON.parse(results[9].value));
+      if (results[10] && results[10].value) setCheckups(JSON.parse(results[10].value));
     } catch (err) {
       console.log('Ingen sparad data', err);
     } finally {
@@ -436,7 +459,7 @@ function WeightStepTracker() {
     showToast('✓ Vikt uppdaterad');
   };
   const exportData = () => {
-    const data = { entries, workouts, goalWeight, height, yearlyGoal, targetRate, wegovyDoses, wegovyProtocol, experiments, exportDate: new Date().toISOString() };
+    const data = { entries, workouts, goalWeight, height, yearlyGoal, targetRate, wegovyDoses, wegovyProtocol, experiments, checkups, exportDate: new Date().toISOString() };
     const blob  = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url   = URL.createObjectURL(blob);
     const link  = document.createElement('a');
@@ -452,7 +475,7 @@ function WeightStepTracker() {
     showToast('💾 Backup nedladdad!');
   };
   const buildBackupObj = function() {
-    return { entries: entries, workouts: workouts, goalWeight: goalWeight, height: height, yearlyGoal: yearlyGoal, targetRate: targetRate, wegovyDoses: wegovyDoses, wegovyProtocol: wegovyProtocol, experiments: experiments, exportDate: new Date().toISOString() };
+    return { entries: entries, workouts: workouts, goalWeight: goalWeight, height: height, yearlyGoal: yearlyGoal, targetRate: targetRate, wegovyDoses: wegovyDoses, wegovyProtocol: wegovyProtocol, experiments: experiments, checkups: checkups, exportDate: new Date().toISOString() };
   };
   const exportEncrypted = async function() {
     var p = appSettings.backupPassword || window.prompt('Lösenord för krypteringen:');
@@ -485,6 +508,7 @@ function WeightStepTracker() {
         if (data.wegovyDoses) { setWegovyDoses(data.wegovyDoses); window.storage.set('wegovy-doses', JSON.stringify(data.wegovyDoses)); }
         if (data.wegovyProtocol) { setWegovyProtocol(data.wegovyProtocol); window.storage.set('wegovy-protocol', JSON.stringify(data.wegovyProtocol)); }
         if (data.experiments) { setExperiments(data.experiments); window.storage.set('experiments', JSON.stringify(data.experiments)); }
+        if (data.checkups) { setCheckups(data.checkups); window.storage.set('checkups', JSON.stringify(data.checkups)); }
         showToast('✓ Krypterad backup återställd!');
         setShowImport(false); setView('overview');
       } catch(err) { showToast('Fel lösenord eller trasig fil', 'error'); }
@@ -535,6 +559,8 @@ function WeightStepTracker() {
         if (data.targetRate != null) setTargetRate(data.targetRate);
         if (data.wegovyDoses) { setWegovyDoses(data.wegovyDoses); window.storage.set('wegovy-doses', JSON.stringify(data.wegovyDoses)); }
         if (data.wegovyProtocol) { setWegovyProtocol(data.wegovyProtocol); window.storage.set('wegovy-protocol', JSON.stringify(data.wegovyProtocol)); }
+        if (data.experiments) { setExperiments(data.experiments); window.storage.set('experiments', JSON.stringify(data.experiments)); }
+        if (data.checkups) { setCheckups(data.checkups); window.storage.set('checkups', JSON.stringify(data.checkups)); }
         showToast('✓ Data importerad!');
         setShowImport(false);
         setView('overview');
@@ -3995,6 +4021,113 @@ function WeightStepTracker() {
     );
   }
 
+  // ── Provsvar (Neko Health / labbvärden) ─────────────────────────────────────
+  function renderCheckups() {
+    var sorted = checkups.slice().sort(function(a,b){ return new Date(b.date) - new Date(a.date); });
+    var refCls = { good: 'text-green-600', warn: 'text-amber-600', bad: 'text-red-600' };
+    var refBg = { good: 'bg-green-50', warn: 'bg-amber-50', bad: 'bg-red-50' };
+    function submitCheckup() {
+      if (!checkupForm.date) { showToast('Ange datum', 'error'); return; }
+      var vals = {};
+      var any = false;
+      CHECKUP_FIELDS.forEach(function(f){
+        var raw = checkupForm[f.key];
+        if (raw != null && String(raw).trim() !== '') {
+          var v = parseFloat(String(raw).replace(',', '.'));
+          if (!isNaN(v)) { vals[f.key] = v; any = true; }
+        }
+      });
+      if (!any) { showToast('Fyll i minst ett värde', 'error'); return; }
+      saveCheckups(checkups.concat([{ id: Date.now(), date: checkupForm.date, source: checkupForm.source || 'Neko Health', notes: checkupForm.notes || '', values: vals }]));
+      setCheckupForm({}); setShowCheckupForm(false);
+      showToast('🩺 Provsvar sparade!');
+    }
+    return h('div', null,
+      h('div', { className: 'bg-gradient-to-br from-cyan-600 via-teal-600 to-emerald-600 rounded-2xl shadow-xl mb-5 p-6 text-white' },
+        h('div', { className: 'flex items-start justify-between' },
+          h('div', null,
+            h('p', { className: 'text-teal-100 text-xs font-semibold uppercase tracking-widest mb-1' }, '🩺 Provsvar & hälsokontroller'),
+            h('p', { className: 'text-3xl font-black' }, sorted.length ? sorted.length + (sorted.length === 1 ? ' kontroll' : ' kontroller') : 'Inga kontroller ännu'),
+            h('p', { className: 'text-teal-100 text-sm mt-1' }, sorted.length ? 'Senaste: ' + sorted[0].date + ' (' + sorted[0].source + ')' : 'Lägg in värdena från din Neko Health-undersökning')
+          ),
+          h('button', { onClick: function(){ setCheckupForm({ date: todayStr() }); setShowCheckupForm(true); }, className: 'bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl text-sm' }, '+ Ny kontroll')
+        )
+      ),
+      showCheckupForm ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 p-6' },
+        h('div', { className: 'flex items-center justify-between mb-4' },
+          h('h2', { className: 'font-bold text-gray-800 text-lg' }, 'Registrera provsvar'),
+          h('button', { onClick: function(){ setShowCheckupForm(false); }, className: 'text-gray-400 hover:text-gray-600 text-2xl leading-none' }, '×')
+        ),
+        h('div', { className: 'grid grid-cols-2 gap-3 mb-3' },
+          h('div', null,
+            h('label', { className: 'text-xs text-gray-500 block mb-1' }, 'Datum'),
+            h('input', { type:'date', value: checkupForm.date || '', onChange: function(e){ setCheckupForm(Object.assign({}, checkupForm, { date: e.target.value })); }, className: 'w-full px-3 py-2 border rounded-lg text-sm outline-none' })
+          ),
+          h('div', null,
+            h('label', { className: 'text-xs text-gray-500 block mb-1' }, 'Källa'),
+            h('input', { type:'text', value: checkupForm.source || '', placeholder: 'Neko Health', onChange: function(e){ setCheckupForm(Object.assign({}, checkupForm, { source: e.target.value })); }, className: 'w-full px-3 py-2 border rounded-lg text-sm outline-none' })
+          )
+        ),
+        h('div', { className: 'grid grid-cols-2 md:grid-cols-3 gap-3 mb-3' },
+          CHECKUP_FIELDS.map(function(f) {
+            return h('div', { key: f.key },
+              h('label', { className: 'text-xs text-gray-500 block mb-1' }, f.label + ' (' + f.unit + ')'),
+              h('input', { type:'text', inputMode:'decimal', value: checkupForm[f.key] || '', onChange: function(e){ var o = Object.assign({}, checkupForm); o[f.key] = e.target.value; setCheckupForm(o); }, className: 'w-full px-3 py-2 border rounded-lg text-sm outline-none' })
+            );
+          })
+        ),
+        h('input', { type:'text', value: checkupForm.notes || '', placeholder: 'Anteckningar (valfritt)', onChange: function(e){ setCheckupForm(Object.assign({}, checkupForm, { notes: e.target.value })); }, className: 'w-full px-3 py-2 border rounded-lg text-sm outline-none mb-4' }),
+        h('button', { onClick: submitCheckup, className: 'w-full bg-gradient-to-r from-teal-500 to-emerald-600 text-white font-bold py-3 rounded-xl' }, 'Spara provsvar'),
+        h('p', { className: 'text-xs text-gray-400 mt-2' }, 'Fyll bara i de fält du har värden för — resten lämnas tomma.')
+      ) : null,
+      sorted.length ? h('div', { className: 'bg-white rounded-2xl shadow-md overflow-hidden mb-4' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-teal-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, 'Utveckling över tid'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Färg = mot referensintervall · Δ = mot föregående kontroll')
+          )
+        ),
+        h('div', { className: 'overflow-x-auto' },
+          h('table', { className: 'w-full text-sm' },
+            h('thead', null, h('tr', { className: 'bg-gray-50' },
+              h('th', { className: 'text-left px-4 py-2 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Mått'),
+              sorted.map(function(c, i) {
+                return h('th', { key: i, className: 'text-right px-3 py-2 text-xs font-bold uppercase tracking-wide text-gray-500' },
+                  new Date(c.date).toLocaleDateString('sv-SE', { month:'short', year:'2-digit' }),
+                  h('button', { onClick: function(){ if (window.confirm('Ta bort kontrollen ' + c.date + '?')) saveCheckups(checkups.filter(function(x){ return x.id !== c.id; })); }, className: 'ml-1.5 text-gray-300 hover:text-red-400', title: 'Ta bort' }, '✕')
+                );
+              })
+            )),
+            h('tbody', null,
+              CHECKUP_FIELDS.filter(function(f){ return sorted.some(function(c){ return c.values[f.key] != null; }); }).map(function(f, fi) {
+                return h('tr', { key: fi, className: fi % 2 ? 'bg-gray-50/50' : '' },
+                  h('td', { className: 'px-4 py-2 text-gray-600 whitespace-nowrap' }, f.label, h('span', { className: 'text-xs text-gray-400' }, ' ' + f.unit)),
+                  sorted.map(function(c, ci) {
+                    var v = c.values[f.key];
+                    if (v == null) return h('td', { key: ci, className: 'px-3 py-2 text-right text-gray-300' }, '–');
+                    var prev = sorted.slice(ci+1).find(function(x){ return x.values[f.key] != null; });
+                    var diff = prev ? v - prev.values[f.key] : null;
+                    var good = diff == null ? null : (f.better === 'up' ? diff > 0 : diff < 0);
+                    var status = f.ref(v);
+                    return h('td', { key: ci, className: 'px-3 py-2 text-right ' + refBg[status] },
+                      h('span', { className: 'font-bold ' + refCls[status] }, v.toFixed(f.dec)),
+                      diff != null && Math.abs(diff) >= Math.pow(10, -f.dec)/2 ? h('span', { className: 'text-xs ml-1 ' + (good ? 'text-green-500' : 'text-red-400') }, (diff > 0 ? '▲' : '▼') + Math.abs(diff).toFixed(f.dec)) : null
+                    );
+                  })
+                );
+              })
+            )
+          )
+        ),
+        h('p', { className: 'text-xs text-gray-400 px-6 py-3' }, 'Referensintervallen är allmänna riktvärden — din läkares bedömning gäller. Grön = bra · gul = gränsvärde · röd = förhöjt.')
+      ) : h('div', { className: 'bg-white rounded-2xl shadow-md p-8 text-center text-gray-400' },
+        h('p', { className: 'text-4xl mb-3' }, '🩺'),
+        h('p', { className: 'text-sm' }, 'Efter din Neko Health-undersökning: öppna deras app, läs av värdena och mata in dem här. Från kontroll två får du automatisk år-för-år-jämförelse — extra intressant under Wegovy-resan (blodfetter och HbA1c brukar förbättras med viktnedgång).')
+      ),
+      sorted.length ? h('p', { className: 'text-xs text-gray-400 px-1' }, 'Provsvaren ingår i alla backuper (vanlig, krypterad och moln).') : null
+    );
+  }
   // ── Dag-drilldown modal ─────────────────────────────────────────────────────
   function renderDayModal() {
     if (!selectedDay) return null;
@@ -4073,6 +4206,7 @@ function WeightStepTracker() {
     { id:'history', label:'📋 Historik', group:'h' },
     { id:'oura', label:'💍 Oura', group:'h' },
     { id:'wegovy', label:'📉 Viktminskning', group:'h' },
+    { id:'checkups', label:'🩺 Provsvar', group:'h' },
     { id:'settings', label:'⚙️ Inställningar', group:'h' },
   ];
   var backupPanel = showImport ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
@@ -4155,7 +4289,8 @@ function WeightStepTracker() {
           view === 'history'  ? renderHistory()   : null,
           view === 'settings' ? renderSettings()  : null,
           view === 'oura'     ? renderOura()      : null,
-          view === 'wegovy'   ? renderWegovy()    : null
+          view === 'wegovy'   ? renderWegovy()    : null,
+          view === 'checkups' ? renderCheckups()  : null
         )
       )
     )
