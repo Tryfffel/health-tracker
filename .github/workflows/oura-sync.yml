@@ -52,7 +52,7 @@ jobs:
           const endPlus = new Date(end); endPlus.setDate(endPlus.getDate() + 1);
           const range = { start_date: ymd(start), end_date: ymd(endPlus) };
 
-          const [dailySleep, dailyReadiness, sleepSessions, dailyActivity, dailyStress, dailySpo2] =
+          const [dailySleep, dailyReadiness, sleepSessions, dailyActivity, dailyStress, dailySpo2, dailyResilience, vo2Max, cardioAge] =
             await Promise.all([
               ouraGet("/daily_sleep", range),
               ouraGet("/daily_readiness", range),
@@ -60,6 +60,9 @@ jobs:
               ouraGet("/daily_activity", range),
               ouraGet("/daily_stress", range),
               ouraGet("/daily_spo2", range),
+              ouraGet("/daily_resilience", range),
+              ouraGet("/vO2_max", range),
+              ouraGet("/daily_cardiovascular_age", range),
             ]);
 
           const byDay = {};
@@ -75,6 +78,13 @@ jobs:
             // Stress / andning
             stress_high_min: null, recovery_high_min: null, stress_summary: null,
             spo2_avg: null, breathing_disturbance: null,
+            // Läggtider & sömndetaljer
+            bedtime_start: null, bedtime_end: null, awake_min: null, time_in_bed_min: null, restless: null,
+            // Aktivitetsdetaljer
+            high_act_min: null, med_act_min: null, low_act_min: null, sedentary_min: null,
+            inactivity_alerts: null, met_min: null,
+            // Långsiktiga mått
+            resilience: null, vo2max: null, cardio_age: null,
           });
 
           const r1 = (v) => (v != null ? Math.round(v) : null);
@@ -111,6 +121,11 @@ jobs:
             o.breath_avg = s.average_breath != null ? Math.round(s.average_breath * 10) / 10 : null;
             o.sleep_efficiency = r1(s.efficiency);
             o.sleep_latency_min = min(s.latency);
+            o.bedtime_start = s.bedtime_start || null;
+            o.bedtime_end = s.bedtime_end || null;
+            o.awake_min = min(s.awake_time);
+            o.time_in_bed_min = min(s.time_in_bed);
+            o.restless = s.restless_periods ?? null;
           });
 
           dailyActivity.forEach((d) => {
@@ -119,6 +134,12 @@ jobs:
             o.steps = d.steps ?? null;
             o.active_cal = r1(d.active_calories);
             o.total_cal = r1(d.total_calories);
+            o.high_act_min = min(d.high_activity_time);
+            o.med_act_min = min(d.medium_activity_time);
+            o.low_act_min = min(d.low_activity_time);
+            o.sedentary_min = min(d.sedentary_time);
+            o.inactivity_alerts = d.inactivity_alerts ?? null;
+            o.met_min = d.average_met_minutes != null ? r1(d.average_met_minutes) : null;
           });
 
           dailyStress.forEach((d) => {
@@ -135,6 +156,19 @@ jobs:
             o.spo2_avg = (d.spo2_percentage && d.spo2_percentage.average != null)
               ? Math.round(d.spo2_percentage.average * 10) / 10 : null;
             o.breathing_disturbance = d.breathing_disturbance_index ?? null;
+          });
+
+          dailyResilience.forEach((d) => {
+            if (d.day) ensure(d.day).resilience = d.level ?? null;
+          });
+
+          vo2Max.forEach((d) => {
+            const day = d.day || (d.timestamp || "").slice(0, 10);
+            if (day && d.vo2_max != null) ensure(day).vo2max = Math.round(d.vo2_max * 10) / 10;
+          });
+
+          cardioAge.forEach((d) => {
+            if (d.day && d.vascular_age != null) ensure(d.day).cardio_age = d.vascular_age;
           });
 
           const out = Object.values(byDay).sort((a, b) => (a.date < b.date ? 1 : -1));
