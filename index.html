@@ -177,7 +177,9 @@ function WeightStepTracker() {
   const [toast, setToast]           = useState(null);
   const [loading, setLoading]       = useState(true);
   const [lastBackup, setLastBackup] = useState(null);
-  const [appSettings, setAppSettings] = useState({ injectionDay: 2, stepGoal: 8000, stepTarget: 12000 });
+  const [appSettings, setAppSettings] = useState({ injectionDay: 2, stepGoal: 8000, stepTarget: 12000, sleepNeed: 450 });
+  const [pixelMetric, setPixelMetric] = useState('mood');
+  const mulberry32 = function(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; var t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; };
   const [selectedDay, setSelectedDay] = useState(null);
   const [compareWeeks, setCompareWeeks] = useState(4);
   const WEEKDAY_NAMES = ['söndag','måndag','tisdag','onsdag','torsdag','fredag','lördag'];
@@ -334,7 +336,7 @@ function WeightStepTracker() {
       if (results[4] && results[4].value) setHeight(parseFloat(results[4].value));
       if (results[5] && results[5].value) setTargetRate(parseFloat(results[5].value));
       if (results[6] && results[6].value) setLastBackup(results[6].value);
-      if (results[7] && results[7].value) setAppSettings(Object.assign({ injectionDay: 2, stepGoal: 8000, stepTarget: 12000 }, JSON.parse(results[7].value)));
+      if (results[7] && results[7].value) setAppSettings(Object.assign({ injectionDay: 2, stepGoal: 8000, stepTarget: 12000, sleepNeed: 450 }, JSON.parse(results[7].value)));
     } catch (err) {
       console.log('Ingen sparad data', err);
     } finally {
@@ -731,6 +733,71 @@ function WeightStepTracker() {
       bestDow: bestDow, bestDowAvg: bestDowAvg, worstDow: worstDow, worstDowAvg: worstDowAvg,
       workoutMood: avgM(wd), restMood: avgM(rd), nWorkout: wd.length, nRest: rd.length, n: moodEntries.length };
   };
+  // ── ALGORITHM: Tvillingdagar (nearest neighbor mot idag) ────────────────────
+  const getTwinDays = function() {
+    if (ouraData.length < 40 || !ouraLatest) return null;
+    var feats = ['sleep_score','hrv_avg','resting_hr','stress_high_min','total_sleep_min'];
+    var hist = ouraData.slice(1);
+    var fstats = {};
+    feats.forEach(function(f){
+      var v = hist.map(function(d){ return d[f]; }).filter(function(x){ return x != null; });
+      if (v.length < 20) return;
+      var mu = v.reduce(function(a,b){ return a+b; },0)/v.length;
+      var sd = Math.sqrt(v.reduce(function(s,x){ return s+Math.pow(x-mu,2); },0)/v.length) || 1;
+      fstats[f] = { mu: mu, sd: sd };
+    });
+    var fkeys = Object.keys(fstats).filter(function(f){ return ouraLatest[f] != null; });
+    if (fkeys.length < 3) return null;
+    var dist = function(d) {
+      var s = 0, n = 0;
+      fkeys.forEach(function(f){
+        if (d[f] == null) return;
+        var z1 = (d[f]-fstats[f].mu)/fstats[f].sd, z0 = (ouraLatest[f]-fstats[f].mu)/fstats[f].sd;
+        s += Math.pow(z1-z0, 2); n++;
+      });
+      return n >= 3 ? Math.sqrt(s/n) : null;
+    };
+    var scored = hist.map(function(d){ return { d: d, dist: dist(d) }; })
+      .filter(function(x){ return x.dist != null; })
+      .sort(function(a,b){ return a.dist - b.dist; }).slice(0, 5);
+    if (scored.length < 3) return null;
+    var addD = function(ds,n){ var dd = new Date(ds); dd.setDate(dd.getDate()+n); return dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0'); };
+    var moodBD = {}, wBD = {};
+    entries.forEach(function(e){ if (e.mood) moodBD[e.date] = e.mood; wBD[e.date] = e.weight; });
+    var avg = function(a){ return a.length ? a.reduce(function(x,y){ return x+y; },0)/a.length : null; };
+    var moods = scored.map(function(x){ return moodBD[x.d.date]; }).filter(function(x){ return x != null; });
+    var dws = scored.map(function(x){ var a = wBD[x.d.date], b = wBD[addD(x.d.date,1)]; return (a != null && b != null) ? b-a : null; }).filter(function(x){ return x != null; });
+    var nextSleeps = scored.map(function(x){ var nd = ouraData.find(function(y){ return y.date === addD(x.d.date,1); }); return nd ? nd.sleep_score : null; }).filter(function(x){ return x != null; });
+    var steps = scored.map(function(x){ return x.d.steps; }).filter(function(x){ return x != null; });
+    return { days: scored, avgMood: avg(moods), nMood: moods.length, avgDw: avg(dws), nDw: dws.length,
+      avgNextSleep: avg(nextSleeps), avgSteps: avg(steps), feats: fkeys.length };
+  };
+  // ── ALGORITHM: Receptet på dina bästa dagar ─────────────────────────────────
+  const getPerfectDayRecipe = function() {
+    var days = ouraData.filter(function(d){ return d.dagsform_score != null; });
+    if (days.length < 30) return null;
+    var sorted = days.slice().sort(function(a,b){ return b.dagsform_score - a.dagsform_score; });
+    var cut = Math.max(5, Math.floor(days.length * 0.15));
+    var top = sorted.slice(0, cut), rest = sorted.slice(cut);
+    var byDate = {}; ouraData.forEach(function(d){ byDate[d.date] = d; });
+    var workoutDates = {}; workouts.forEach(function(w){ workoutDates[w.date] = true; });
+    var addD = function(ds,n){ var dd = new Date(ds); dd.setDate(dd.getDate()+n); return dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0'); };
+    var toMin = function(iso){ var dt = new Date(iso); var m = dt.getHours()*60+dt.getMinutes(); return m < 720 ? m+1440 : m; };
+    var fmtT = function(m){ m = Math.round(m)%1440; return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); };
+    var prof = function(arr) {
+      var avg = function(vals){ var v = vals.filter(function(x){ return x != null; }); return v.length ? v.reduce(function(a,b){ return a+b; },0)/v.length : null; };
+      var beds = avg(arr.map(function(d){ return d.bedtime_start ? toMin(d.bedtime_start) : null; }));
+      return {
+        bed: beds != null ? fmtT(beds) : null,
+        sleepMin: avg(arr.map(function(d){ return d.total_sleep_min; })),
+        prevSteps: avg(arr.map(function(d){ var p = byDate[addD(d.date,-1)]; return p ? p.steps : null; })),
+        prevStress: avg(arr.map(function(d){ var p = byDate[addD(d.date,-1)]; return p ? p.stress_high_min : null; })),
+        prevTrainPct: Math.round(arr.filter(function(d){ return workoutDates[addD(d.date,-1)]; }).length / arr.length * 100),
+        n: arr.length
+      };
+    };
+    return { top: prof(top), rest: prof(rest), cutScore: Math.round(top[top.length-1].dagsform_score) };
+  };
   // ── ALGORITHM: Monthly table (senaste 6 månaderna) ──────────────────────────
   const getMonthlyTable = function() {
     if (!entries.length && !ouraData.length) return null;
@@ -946,6 +1013,8 @@ function WeightStepTracker() {
   const workoutCorr = getWorkoutCorrelation();
   const moodAnalysis = getMoodAnalysis();
   const weekCompare = getWeekComparison();
+  const twinDays = getTwinDays();
+  const perfectDay = getPerfectDayRecipe();
   const NavButton = function(props) {
     return h('button', {
       onClick: function() { setView(props.id); },
@@ -1063,6 +1132,38 @@ function WeightStepTracker() {
               );
             })
           )
+        )
+      ) : null,
+      // ── Tvillingdagar ──
+      twinDays ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-teal-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, '🪞 Dagar som idag'),
+            h('p', { className: 'text-xs text-gray-400' }, 'De 5 mest lika dagarna i din historik (' + twinDays.feats + ' mått jämförda) · klicka för detaljer')
+          )
+        ),
+        h('div', { className: 'p-5' },
+          h('div', { className: 'flex flex-wrap gap-2 mb-3' },
+            twinDays.days.map(function(x, i) {
+              return h('button', { key: i, onClick: function(){ setSelectedDay(x.d.date); },
+                className: 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-100' },
+                new Date(x.d.date).toLocaleDateString('sv-SE', { day:'numeric', month:'short' }) + ' · likhet ' + Math.max(0, Math.round((1 - x.dist/2) * 100)) + '%');
+            })
+          ),
+          h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-2' },
+            [twinDays.avgMood != null ? ['😊 Humör såna dagar', twinDays.avgMood.toFixed(1) + ' / 5'] : null,
+             twinDays.avgDw != null ? ['⚖️ Viktändring dagen efter', (twinDays.avgDw > 0 ? '+' : '') + twinDays.avgDw.toFixed(2) + ' kg'] : null,
+             twinDays.avgNextSleep != null ? ['🌙 Nästa natts sömn', Math.round(twinDays.avgNextSleep)] : null,
+             twinDays.avgSteps != null ? ['👟 Steg såna dagar', Math.round(twinDays.avgSteps).toLocaleString('sv-SE')] : null
+            ].filter(function(x){ return x; }).map(function(s, i) {
+              return h('div', { key: i, className: 'bg-gray-50 rounded-lg px-3 py-2 text-center' },
+                h('p', { className: 'text-xs text-gray-400' }, s[0]),
+                h('p', { className: 'text-base font-black text-gray-800' }, s[1])
+              );
+            })
+          ),
+          h('p', { className: 'text-xs text-gray-400 mt-2' }, 'Kroppen har mönster. Så här brukar dagar med den här sömn/HRV/stress-profilen utvecklas.')
         )
       ) : null,
       // Plateau warning banner
@@ -1488,6 +1589,49 @@ function WeightStepTracker() {
           ) : null
         )
       ) : null,
+      // ── Receptet på dina bästa dagar ──
+      perfectDay ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-6 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-amber-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, '📜 Receptet på dina bästa dagar'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Vad som föregår dina topp-15%-dagar (dagsform ≥ ' + perfectDay.cutScore + ') jämfört med övriga')
+          )
+        ),
+        h('div', { className: 'overflow-x-auto' },
+          h('table', { className: 'w-full text-sm' },
+            h('thead', null, h('tr', { className: 'bg-gray-50' },
+              h('th', { className: 'text-left px-6 py-2 text-xs font-bold uppercase tracking-wide text-gray-400' }, ''),
+              h('th', { className: 'text-right px-3 py-2 text-xs font-bold uppercase tracking-wide text-amber-600' }, '⭐ Toppdagar (' + perfectDay.top.n + ')'),
+              h('th', { className: 'text-right px-6 py-2 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Övriga (' + perfectDay.rest.n + ')')
+            )),
+            h('tbody', null,
+              [
+                ['🌙 Läggtid natten innan', perfectDay.top.bed, perfectDay.rest.bed, 'time'],
+                ['⏰ Sömnlängd', perfectDay.top.sleepMin, perfectDay.rest.sleepMin, 'dur'],
+                ['👟 Steg dagen innan', perfectDay.top.prevSteps, perfectDay.rest.prevSteps, 'num'],
+                ['🔥 Stress dagen innan', perfectDay.top.prevStress, perfectDay.rest.prevStress, 'min'],
+                ['💪 Tränade dagen innan', perfectDay.top.prevTrainPct, perfectDay.rest.prevTrainPct, 'pct']
+              ].map(function(row, ri) {
+                var fmt = function(v) {
+                  if (v == null) return '–';
+                  if (row[3] === 'time') return v;
+                  if (row[3] === 'dur') return Math.floor(v/60) + 'h ' + Math.round(v%60) + 'm';
+                  if (row[3] === 'pct') return v + '%';
+                  if (row[3] === 'min') return Math.round(v) + ' min';
+                  return Math.round(v).toLocaleString('sv-SE');
+                };
+                return h('tr', { key: ri, className: ri % 2 ? 'bg-gray-50/50' : '' },
+                  h('td', { className: 'px-6 py-2 text-gray-600' }, row[0]),
+                  h('td', { className: 'px-3 py-2 text-right font-bold text-amber-700' }, fmt(row[1])),
+                  h('td', { className: 'px-6 py-2 text-right text-gray-500' }, fmt(row[2]))
+                );
+              })
+            )
+          )
+        ),
+        h('p', { className: 'text-xs text-gray-400 px-6 py-3' }, 'Vill du ha fler toppdagar? Härma vänsterkolumnen.')
+      ) : null,
       h('h2', { className: 'text-sm font-bold text-gray-400 uppercase tracking-wider mt-6 mb-2 px-1' }, 'Grafer'),
       // Weight chart
       h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
@@ -1882,7 +2026,66 @@ function WeightStepTracker() {
         )
       )
     ) : null;
-    return h('div', null, monthCard, h('div', { className: 'bg-white rounded-xl shadow-md overflow-hidden' },
+    // ── Året i pixlar ──
+    var pixelCard = (function(){
+      var moodBD = {}, sleepBD = {};
+      entries.forEach(function(e){ if (e.mood) moodBD[e.date] = e.mood; });
+      ouraData.forEach(function(d){ if (d.sleep_score != null) sleepBD[d.date] = d.sleep_score; });
+      var src = pixelMetric === 'mood' ? moodBD : sleepBD;
+      if (Object.keys(src).length < 14) return null;
+      var moodCols = ['#f87171','#fb923c','#facc15','#a3e635','#22c55e'];
+      var colorOf = function(v){
+        if (pixelMetric === 'mood') return moodCols[Math.max(0, Math.min(4, v-1))];
+        return v >= 90 ? '#22c55e' : v >= 80 ? '#a3e635' : v >= 70 ? '#facc15' : v >= 60 ? '#fb923c' : '#f87171';
+      };
+      var today = new Date(); today.setHours(0,0,0,0);
+      var dow = today.getDay();
+      var mon = new Date(today); mon.setDate(today.getDate() - (dow===0?6:dow-1));
+      var cols = [];
+      for (var w = -51; w <= 0; w++) {
+        var col = [];
+        for (var d = 0; d < 7; d++) {
+          var cd = new Date(mon); cd.setDate(mon.getDate() + w*7 + d);
+          var ds = cd.getFullYear()+'-'+String(cd.getMonth()+1).padStart(2,'0')+'-'+String(cd.getDate()).padStart(2,'0');
+          col.push({ ds: ds, v: src[ds], future: cd > today });
+        }
+        cols.push(col);
+      }
+      return h('div', { className: 'bg-white rounded-xl shadow-md overflow-hidden mb-6' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-emerald-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, '🎨 Året i pixlar'),
+            h('p', { className: 'text-xs text-gray-400' }, 'En pixel per dag, senaste 52 veckorna · klicka en dag')
+          ),
+          h('div', { className: 'ml-auto flex gap-1.5' },
+            [['mood','😊 Humör'],['sleep','🌙 Sömn']].map(function(m) {
+              return h('button', { key: m[0], onClick: function(){ setPixelMetric(m[0]); },
+                className: 'px-3 py-1.5 rounded-lg text-xs font-semibold ' + (pixelMetric === m[0] ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600') }, m[1]);
+            })
+          )
+        ),
+        h('div', { className: 'p-4 overflow-x-auto' },
+          h('div', { className: 'flex gap-0.5' },
+            cols.map(function(col, ci) {
+              return h('div', { key: ci, className: 'flex flex-col gap-0.5' },
+                col.map(function(cell, ri) {
+                  return h('div', {
+                    key: ri,
+                    onClick: cell.v != null ? function(){ setSelectedDay(cell.ds); } : undefined,
+                    title: cell.ds + (cell.v != null ? ': ' + cell.v : ''),
+                    className: 'w-3 h-3 rounded-sm' + (cell.v != null ? ' cursor-pointer hover:ring-2 hover:ring-emerald-400' : ''),
+                    style: { backgroundColor: cell.future ? 'transparent' : (cell.v != null ? colorOf(cell.v) : '#f1f5f9') }
+                  });
+                })
+              );
+            })
+          ),
+          h('p', { className: 'text-xs text-gray-400 mt-2' }, pixelMetric === 'mood' ? 'Rött = tungt · grönt = toppen. Leta stråk och säsonger.' : 'Rött = sömnpoäng under 60 · grönt = 90+.')
+        )
+      );
+    })();
+    return h('div', null, pixelCard, monthCard, h('div', { className: 'bg-white rounded-xl shadow-md overflow-hidden' },
       h('div', { className: 'flex items-center justify-between px-6 py-4 border-b border-gray-100' },
         h('div', null,
           h('h2', { className: 'text-xl font-bold text-gray-800' }, '📋 Mätningshistorik'),
@@ -1984,6 +2187,11 @@ function WeightStepTracker() {
                   h('label', { className: 'text-xs text-gray-500' }, '🏅 Steg för full poäng'),
                   h('input', { type:'number', step:'500', value:appSettings.stepTarget, onChange:function(e){setAppSettings(Object.assign({},appSettings,{stepTarget:parseInt(e.target.value)||12000}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1' })
                 )
+              ),
+              h('div', null,
+                h('label', { className: 'text-xs text-gray-500' }, '🛌 Sömnbehov per natt (minuter)'),
+                h('input', { type:'number', step:'15', value:appSettings.sleepNeed || 450, onChange:function(e){setAppSettings(Object.assign({},appSettings,{sleepNeed:parseInt(e.target.value)||450}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1' }),
+                h('p', { className: 'text-xs text-gray-400 mt-1' }, '450 min = 7,5 h. Används av Sömnbanken.')
               ),
               h('p', { className: 'text-xs text-gray-400' }, 'Stegmålet används i insikter och coach. "Full poäng" är nivån som ger 100 i veckoscorens aktivitetsdel.')
             )
@@ -2264,6 +2472,16 @@ function WeightStepTracker() {
       return (res.resilience || res.vo2 || res.cardio) ? res : null;
     })();
     var RESILIENCE_LABELS = { 'limited': 'Begränsad', 'adequate': 'Godkänd', 'solid': 'Stabil', 'strong': 'Stark', 'exceptional': 'Exceptionell' };
+    // ── Sömnbanken: ackumulerad skuld/överskott 14 nätter ──
+    var sleepBank = (function(){
+      var nights = ouraData.slice(0, 14).filter(function(d){ return d.total_sleep_min != null; });
+      if (nights.length < 7) return null;
+      var need = appSettings.sleepNeed || 450;
+      var balance = nights.reduce(function(s,d){ return s + (d.total_sleep_min - need); }, 0);
+      var bars = nights.slice().reverse().map(function(d){ return { date: d.date, diff: d.total_sleep_min - need }; });
+      var payback = balance < 0 ? Math.ceil(Math.abs(balance) / 60) : null;
+      return { balance: Math.round(balance), bars: bars, need: need, n: nights.length, payback: payback };
+    })();
     // Normaliserad överlagring (senaste 90 dagar)
     var ovRaw = ouraData.slice(0,90).reverse();
     var mkNorm = function(getter){ var vals=ovRaw.map(getter).filter(function(v){return v!=null;}); if(vals.length<2) return null; var mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals),r=(mx-mn)||1; return function(v){return v==null?null:Math.round((v-mn)/r*100);}; };
@@ -2466,6 +2684,38 @@ function WeightStepTracker() {
             (sleepReg.jetlag != null && Math.abs(sleepReg.jetlag) > 45
               ? 'Din helgsömn avviker ' + Math.abs(sleepReg.jetlag) + ' min från vardagarna ("social jetlag") — försök hålla samma tider även på helgen.'
               : 'Din helgrytm ligger nära vardagsrytmen — bra!')
+          )
+        )
+      ) : null,
+      // ── Sömnbanken ──
+      sleepBank ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full ' + (sleepBank.balance >= 0 ? 'bg-green-500' : 'bg-rose-500') }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, '🏦 Sömnbanken'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Saldo mot ditt behov (' + Math.floor(sleepBank.need/60) + 'h ' + (sleepBank.need%60) + 'm/natt) · senaste ' + sleepBank.n + ' nätterna')
+          ),
+          h('div', { className: 'ml-auto text-right' },
+            h('p', { className: 'text-2xl font-black ' + (sleepBank.balance >= 0 ? 'text-green-600' : 'text-rose-600') },
+              (sleepBank.balance >= 0 ? '+' : '−') + Math.floor(Math.abs(sleepBank.balance)/60) + 'h ' + Math.abs(sleepBank.balance)%60 + 'm'),
+            h('p', { className: 'text-xs text-gray-400' }, sleepBank.balance >= 0 ? 'överskott' : 'sömnskuld')
+          )
+        ),
+        h('div', { className: 'p-5' },
+          h('div', { className: 'flex items-end gap-1 h-20 mb-2' },
+            sleepBank.bars.map(function(b, i) {
+              var hgt = Math.min(100, Math.abs(b.diff) / 120 * 100);
+              return h('div', { key: i, className: 'flex-1 flex flex-col justify-end items-center h-full', title: b.date + ': ' + (b.diff > 0 ? '+' : '') + b.diff + ' min' },
+                b.diff >= 0
+                  ? h('div', { className: 'w-full rounded-t bg-green-400', style: { height: Math.max(hgt, 4) + '%' } })
+                  : h('div', { className: 'w-full rounded-t bg-rose-400', style: { height: Math.max(hgt, 4) + '%' } })
+              );
+            })
+          ),
+          h('p', { className: 'text-xs text-gray-500' },
+            sleepBank.balance < -60
+              ? 'Du ligger back. Skulden betalas inte av på en natt — lägg dig ' + Math.min(60, Math.round(Math.abs(sleepBank.balance)/7)) + ' min tidigare i en vecka så är du ikapp.'
+              : sleepBank.balance >= 0 ? 'Banken är på plus — det syns ofta i HRV och dagsform.' : 'Nästan i balans — en tidig kväll räcker.'
           )
         )
       ) : null,
@@ -3039,6 +3289,37 @@ function WeightStepTracker() {
       }
       return (bars || noise) ? { bars: bars, noise: noise } : null;
     })();
+    // ── Monte Carlo-prognos: bootstrap av dina egna veckoutfall ──
+    var monteCarlo = (function(){
+      if (respEntries.length < 14 || !stats) return null;
+      var wkMap = {};
+      respEntries.forEach(function(e){ var wk = getWeekNumber(e.date); (wkMap[wk] = wkMap[wk] || []).push(e.weight); });
+      var wks = Object.keys(wkMap).sort();
+      if (wks.length < 5) return null;
+      var avgs = wks.map(function(k){ var a = wkMap[k]; return a.reduce(function(x,y){ return x+y; },0)/a.length; });
+      var deltas = [];
+      for (var i = 1; i < avgs.length; i++) deltas.push(avgs[i]-avgs[i-1]);
+      deltas = deltas.slice(-12);
+      if (deltas.length < 4) return null;
+      var lastW = respEntries[respEntries.length-1].weight;
+      if (lastW <= goalWeight) return null;
+      var rnd = mulberry32(parseInt(todayStr.replace(/-/g,'')) || 42);
+      var sims = 2000, horizon = 156, arrivals = [];
+      for (var s = 0; s < sims; s++) {
+        var w = lastW, t = null;
+        for (var k = 1; k <= horizon; k++) {
+          w += deltas[Math.floor(rnd()*deltas.length)];
+          if (w <= goalWeight) { t = k; break; }
+        }
+        if (t != null) arrivals.push(t);
+      }
+      var pReach = arrivals.length/sims;
+      if (!arrivals.length) return { pReach: 0, nDeltas: deltas.length };
+      arrivals.sort(function(a,b){ return a-b; });
+      var q = function(p){ return arrivals[Math.min(arrivals.length-1, Math.floor(p*arrivals.length))]; };
+      var dt = function(wk){ var d = new Date(); d.setDate(d.getDate()+wk*7); return d.toLocaleDateString('sv-SE',{month:'long',year:'numeric'}); };
+      return { pReach: Math.round(pReach*100), p50: q(0.5), d10: dt(q(0.1)), d50: dt(q(0.5)), d90: dt(q(0.9)), nDeltas: deltas.length };
+    })();
     // ── Injektionscykeln: mönster per dag efter dos ──
     var cycleData = (function(){
       if (dosesAsc.length < 3) return null;
@@ -3172,6 +3453,17 @@ function WeightStepTracker() {
             : doseResponse.pace != null && doseResponse.pace >= -0.05
               ? h('p', { className: 'text-sm text-amber-600' }, 'Vikten står still eller ökar just nu — prognos visas när trenden pekar nedåt igen.')
               : null,
+          monteCarlo ? h('div', { className: 'mt-3 rounded-xl px-4 py-3 bg-fuchsia-50 border-l-4 border-fuchsia-300' },
+            h('p', { className: 'text-sm font-semibold text-gray-700 mb-0.5' }, '🎲 Sannolikhetsprognos (2 000 simuleringar)'),
+            monteCarlo.pReach > 0 ? h('p', { className: 'text-sm text-gray-600' },
+              'Istället för en rak linje: jag drar slumpade veckor ur dina egna ' + monteCarlo.nDeltas + ' senaste veckoutfall, om och om igen. Resultat: ',
+              h('span', { className: 'font-bold text-fuchsia-700' }, '50 % chans'), ' att du når ' + goalWeight + ' kg till ',
+              h('span', { className: 'font-bold text-fuchsia-700' }, monteCarlo.d50),
+              ', och 80 % av simuleringarna landar mellan ' + monteCarlo.d10 + ' och ' + monteCarlo.d90 + '. ' +
+              (monteCarlo.pReach < 100 ? monteCarlo.pReach + '% av simuleringarna når målet inom 3 år.' : '')
+            ) : h('p', { className: 'text-sm text-gray-600' }, 'Med de senaste veckornas utfall når simuleringarna inte målet inom 3 år — trenden behöver vända först.'),
+            h('p', { className: 'text-xs text-gray-400 mt-1' }, 'Bootstrap på din egen variation — fångar osäkerheten som en rät linje döljer.')
+          ) : null,
           doseResponse.chart ? h('div', { className: 'mt-3' },
             h('p', { className: 'text-xs font-semibold text-gray-500 mb-1' }, 'Din väg till målet (streckad linje = prognos)'),
             h(SvgLineChart, { data: doseResponse.chart, height: 230, lines: [
