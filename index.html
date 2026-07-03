@@ -179,6 +179,7 @@ function WeightStepTracker() {
   const [lastBackup, setLastBackup] = useState(null);
   const [appSettings, setAppSettings] = useState({ injectionDay: 2, stepGoal: 8000, stepTarget: 12000 });
   const [selectedDay, setSelectedDay] = useState(null);
+  const [compareWeeks, setCompareWeeks] = useState(4);
   const WEEKDAY_NAMES = ['söndag','måndag','tisdag','onsdag','torsdag','fredag','lördag'];
   const calcPearson = function(pairs) {
     var n = pairs.length; if (n < 3) return null;
@@ -667,13 +668,14 @@ function WeightStepTracker() {
     var ouraByDate = {}; ouraData.forEach(function(d){ ouraByDate[d.date] = d; });
     var wByDate = {}; entries.forEach(function(e){ wByDate[e.date] = e.weight; });
     var addD = function(ds,n){ var dd=new Date(ds); dd.setDate(dd.getDate()+n); return dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0'); };
-    var sleepPairs=[], hrvPairs=[], stressPairs=[], wtPairs=[];
+    var sleepPairs=[], hrvPairs=[], stressPairs=[], wtPairs=[], stepPairs=[];
     moodEntries.forEach(function(e){
       var o = ouraByDate[e.date];
       if (o) {
         if (o.sleep_score != null) sleepPairs.push([o.sleep_score, e.mood]);
         if (o.hrv_avg != null) hrvPairs.push([o.hrv_avg, e.mood]);
         if (o.stress_high_min != null) stressPairs.push([o.stress_high_min, e.mood]);
+        if (o.steps != null) stepPairs.push([o.steps, e.mood]);
       }
       var w1 = wByDate[addD(e.date,1)];
       if (w1 != null) wtPairs.push([e.mood, parseFloat((w1 - e.weight).toFixed(2))]);
@@ -683,13 +685,41 @@ function WeightStepTracker() {
     var rd = moodEntries.filter(function(e){ return !workoutDates[e.date]; });
     var avgM = function(a){ return a.length ? a.reduce(function(s,e){ return s+e.mood; },0)/a.length : null; };
     var rows = [
-      { name:'Nattens sömnpoäng → humör', r: calcPearson(sleepPairs), n: sleepPairs.length, posMeans:'bättre sömn → bättre humör' },
-      { name:'Nattens HRV → humör', r: calcPearson(hrvPairs), n: hrvPairs.length, posMeans:'högre HRV → bättre humör' },
-      { name:'Dagens stress → humör', r: calcPearson(stressPairs), n: stressPairs.length, posMeans:'mer stress → bättre humör' },
-      { name:'Humör → nästa dags viktändring', r: calcPearson(wtPairs), n: wtPairs.length, posMeans:'bättre humör → vikt upp' }
+      { name:'Nattens sömnpoäng → humör', r: calcPearson(sleepPairs), n: sleepPairs.length, posMeans:'bättre sömn → bättre humör', pairs: sleepPairs, xName:'Sömnpoäng' },
+      { name:'Nattens HRV → humör', r: calcPearson(hrvPairs), n: hrvPairs.length, posMeans:'högre HRV → bättre humör', pairs: hrvPairs, xName:'HRV (ms)' },
+      { name:'Dagens stress → humör', r: calcPearson(stressPairs), n: stressPairs.length, posMeans:'mer stress → bättre humör', pairs: stressPairs, xName:'Stress (min)' },
+      { name:'Dagens steg → humör', r: calcPearson(stepPairs), n: stepPairs.length, posMeans:'fler steg → bättre humör', pairs: stepPairs, xName:'Steg' },
+      { name:'Humör → nästa dags viktändring', r: calcPearson(wtPairs), n: wtPairs.length, posMeans:'bättre humör → vikt upp', pairs: wtPairs, xName:'Humör (1–5)' }
     ].filter(function(x){ return x.r != null; });
+    // Starkaste sambandet (för scatterplot)
+    var top = rows.slice().sort(function(a,b){ return Math.abs(b.r)-Math.abs(a.r); })[0] || null;
+    // "Så ser dina bästa dagar ut": profil för toppdagar (4–5) vs bottendagar (1–2)
+    var goodDays = moodEntries.filter(function(e){ return e.mood >= 4; });
+    var badDays = moodEntries.filter(function(e){ return e.mood <= 2; });
+    var profile = null;
+    if (goodDays.length >= 3 && badDays.length >= 3) {
+      var prof = function(days){
+        var os = days.map(function(e){ return ouraByDate[e.date]; }).filter(function(o){ return o; });
+        var avg = function(arr, key){ var v = arr.map(function(o){ return o[key]; }).filter(function(x){ return x != null; }); return v.length ? v.reduce(function(a,b){ return a+b; },0)/v.length : null; };
+        var trained = days.filter(function(e){ return workoutDates[e.date]; }).length;
+        return { sleep: avg(os,'sleep_score'), hrv: avg(os,'hrv_avg'), steps: avg(os,'steps'), sleepMin: avg(os,'total_sleep_min'), stress: avg(os,'stress_high_min'), trainedPct: Math.round(trained/days.length*100), n: days.length };
+      };
+      profile = { good: prof(goodDays), bad: prof(badDays) };
+    }
+    // Bästa veckodag för humör
+    var byDow = {};
+    moodEntries.forEach(function(e){ var d = new Date(e.date).getDay(); (byDow[d] = byDow[d] || []).push(e.mood); });
+    var bestDow = null, bestDowAvg = 0, worstDow = null, worstDowAvg = 6;
+    Object.keys(byDow).forEach(function(d){
+      if (byDow[d].length < 3) return;
+      var a = byDow[d].reduce(function(s,v){ return s+v; },0)/byDow[d].length;
+      if (a > bestDowAvg) { bestDowAvg = a; bestDow = parseInt(d); }
+      if (a < worstDowAvg) { worstDowAvg = a; worstDow = parseInt(d); }
+    });
     if (!rows.length && (wd.length < 3 || rd.length < 3)) return null;
-    return { rows: rows, workoutMood: avgM(wd), restMood: avgM(rd), nWorkout: wd.length, nRest: rd.length, n: moodEntries.length };
+    return { rows: rows, top: top, profile: profile,
+      bestDow: bestDow, bestDowAvg: bestDowAvg, worstDow: worstDow, worstDowAvg: worstDowAvg,
+      workoutMood: avgM(wd), restMood: avgM(rd), nWorkout: wd.length, nRest: rd.length, n: moodEntries.length };
   };
   // ── ALGORITHM: Week comparison (this week vs 4 weeks ago) ───────────────────
   const getWeekComparison = function() {
@@ -709,13 +739,17 @@ function WeightStepTracker() {
         label: monday.toLocaleDateString('sv-SE',{day:'numeric',month:'short'}) + '–' + end.toLocaleDateString('sv-SE',{day:'numeric',month:'short'}),
         avgWeight: avg(we, function(e){ return e.weight; }),
         sleep: avg(wo, function(d){ return d.sleep_score; }),
+        sleepMin: avg(wo, function(d){ return d.total_sleep_min; }),
         hrv: avg(wo, function(d){ return d.hrv_avg; }),
+        rhr: avg(wo, function(d){ return d.resting_hr; }),
+        stress: avg(wo, function(d){ return d.stress_high_min; }),
+        mood: avg(we, function(e){ return e.mood; }),
         steps: steps,
         passes: ww.length,
         minutes: ww.reduce(function(s,w){ return s+w.duration; },0)
       };
     };
-    var monPrev = new Date(mon); monPrev.setDate(mon.getDate()-28);
+    var monPrev = new Date(mon); monPrev.setDate(mon.getDate()-compareWeeks*7);
     var a = mkWeek(mon), b = mkWeek(monPrev);
     if ((a.avgWeight == null && a.sleep == null) || (b.avgWeight == null && b.sleep == null)) return null;
     return { now: a, then: b };
@@ -949,6 +983,29 @@ function WeightStepTracker() {
     var scParts = [['Sömn',scAvg('sleep_score')],['Återhämtning',scAvg('dagsform_score')],['Aktivitet',aktSc],['Lugn (låg stress)',stressSc],['Vikttrend',viktSc]].filter(function(p){return p[1]!=null;});
     var scOverall = scParts.length ? Math.round(scParts.reduce(function(a,b){return a+b[1];},0)/scParts.length) : null;
     var scGrade = scOverall==null?'–':scOverall>=85?'A':scOverall>=70?'B':scOverall>=55?'C':scOverall>=40?'D':'E';
+    // ── Dagens form: träningsrekommendation från nattens data ──
+    var dagensForm = (function(){
+      if (!ouraLatest || ouraLatest.dagsform_score == null) return null;
+      var base = function(key){ var v = ouraData.slice(7,37).map(function(d){ return d[key]; }).filter(function(x){ return x != null; }); return v.length ? v.reduce(function(a,b){ return a+b; },0)/v.length : null; };
+      var hrvB = base('hrv_avg'), rhrB = base('resting_hr');
+      var score = ouraLatest.dagsform_score;
+      var hrvOk = (ouraLatest.hrv_avg == null || hrvB == null) ? true : ouraLatest.hrv_avg >= hrvB * 0.9;
+      var rhrOk = (ouraLatest.resting_hr == null || rhrB == null) ? true : ouraLatest.resting_hr <= rhrB + 3;
+      var sleepOk = ouraLatest.sleep_score == null || ouraLatest.sleep_score >= 70;
+      var level, headline, advice;
+      if (score >= 75 && hrvOk && rhrOk && sleepOk) {
+        level = 'green'; headline = 'Grönt ljus 🟢';
+        advice = 'Kroppen är återhämtad — bra dag för ett hårt pass eller att pusha lite extra.';
+      } else if (score >= 60 && (hrvOk || rhrOk)) {
+        level = 'yellow'; headline = 'Okej form 🟡';
+        advice = 'Normal träning funkar, men lyssna på kroppen — spara maxpasset till en bättre dag.';
+      } else {
+        level = 'red'; headline = 'Ta det lugnt 🔴';
+        advice = 'Kroppen signalerar att den behöver vila. En promenad eller lätt rörlighet räcker idag.';
+      }
+      return { level: level, headline: headline, advice: advice, score: score,
+        hrv: ouraLatest.hrv_avg, hrvB: hrvB, rhr: ouraLatest.resting_hr, rhrB: rhrB, sleep: ouraLatest.sleep_score };
+    })();
     return h('div', null,
       // Reminders
       reminders.length ? h('div', { className: 'space-y-2 mb-4' },
@@ -957,6 +1014,28 @@ function WeightStepTracker() {
           h('p', { className:'text-sm font-medium flex-1 ' + (r.action ? 'text-amber-800' : 'text-blue-800') }, r.text),
           r.action ? h('button', { onClick: r.action, className:'bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap' }, r.actionLabel) : null
         ); })
+      ) : null,
+      // ── Dagens form ──
+      dagensForm ? h('div', { className: 'rounded-2xl shadow-md mb-4 p-5 border-2 ' + (dagensForm.level === 'green' ? 'bg-emerald-50 border-emerald-200' : dagensForm.level === 'yellow' ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200') },
+        h('div', { className: 'flex items-start justify-between gap-4 flex-wrap' },
+          h('div', { className: 'flex-1 min-w-[220px]' },
+            h('p', { className: 'text-xs font-semibold uppercase tracking-widest mb-0.5 ' + (dagensForm.level === 'green' ? 'text-emerald-500' : dagensForm.level === 'yellow' ? 'text-amber-500' : 'text-rose-500') }, '⚡ Dagens form'),
+            h('h2', { className: 'text-xl font-black text-gray-800 mb-1' }, dagensForm.headline),
+            h('p', { className: 'text-sm text-gray-600' }, dagensForm.advice)
+          ),
+          h('div', { className: 'flex gap-2' },
+            [['Dagsform', dagensForm.score, ''],
+             ['Sömn', dagensForm.sleep, ''],
+             ['HRV', dagensForm.hrv, dagensForm.hrvB != null && dagensForm.hrv != null ? (dagensForm.hrv >= dagensForm.hrvB ? '▲' : '▼') : ''],
+             ['Vilopuls', dagensForm.rhr, dagensForm.rhrB != null && dagensForm.rhr != null ? (dagensForm.rhr <= dagensForm.rhrB ? '▼' : '▲') : '']
+            ].filter(function(s){ return s[1] != null; }).map(function(s, i) {
+              return h('div', { key: i, className: 'bg-white/70 rounded-xl px-3 py-2 text-center min-w-[64px]' },
+                h('p', { className: 'text-xs text-gray-400' }, s[0]),
+                h('p', { className: 'text-lg font-black text-gray-800' }, s[1] + (s[2] ? ' ' + s[2] : ''))
+              );
+            })
+          )
+        )
       ) : null,
       // Plateau warning banner
       plateau ? h('div', { className: 'bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl p-5 mb-4 shadow-sm' },
@@ -1096,15 +1175,21 @@ function WeightStepTracker() {
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
           h('div', { className: 'w-1 h-8 rounded-full bg-cyan-500' }),
           h('div', null,
-            h('h2', { className: 'font-bold text-gray-800' }, '⏳ Denna vecka vs för 4 veckor sedan'),
+            h('h2', { className: 'font-bold text-gray-800' }, '⏳ Denna vecka vs för ' + compareWeeks + ' ' + (compareWeeks === 1 ? 'vecka' : 'veckor') + ' sedan'),
             h('p', { className: 'text-xs text-gray-400' }, weekCompare.then.label + ' → ' + weekCompare.now.label)
+          ),
+          h('div', { className: 'ml-auto flex gap-1.5' },
+            [1, 4, 12].map(function(w) {
+              return h('button', { key: w, onClick: function(){ setCompareWeeks(w); },
+                className: 'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ' + (compareWeeks === w ? 'bg-cyan-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-cyan-50') }, w + ' v');
+            })
           )
         ),
         h('div', { className: 'overflow-x-auto' },
           h('table', { className: 'w-full text-sm' },
             h('thead', null, h('tr', { className: 'bg-gray-50' },
               h('th', { className: 'text-left px-6 py-2 text-xs font-bold uppercase tracking-wide text-gray-400' }, ''),
-              h('th', { className: 'text-right px-3 py-2 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'För 4 v sedan'),
+              h('th', { className: 'text-right px-3 py-2 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'För ' + compareWeeks + ' v sedan'),
               h('th', { className: 'text-right px-3 py-2 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Denna vecka'),
               h('th', { className: 'text-right px-6 py-2 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Skillnad')
             )),
@@ -1112,7 +1197,11 @@ function WeightStepTracker() {
               [
                 ['⚖️ Snitt vikt', weekCompare.then.avgWeight, weekCompare.now.avgWeight, 'kg', 1, 'down'],
                 ['🌙 Sömnpoäng', weekCompare.then.sleep, weekCompare.now.sleep, '', 0, 'up'],
+                ['⏰ Sömntid', weekCompare.then.sleepMin != null ? weekCompare.then.sleepMin/60 : null, weekCompare.now.sleepMin != null ? weekCompare.now.sleepMin/60 : null, 'h', 1, 'up'],
                 ['💗 HRV', weekCompare.then.hrv, weekCompare.now.hrv, 'ms', 0, 'up'],
+                ['❤️ Vilopuls', weekCompare.then.rhr, weekCompare.now.rhr, '', 0, 'down'],
+                ['🔥 Stress/dag', weekCompare.then.stress, weekCompare.now.stress, 'min', 0, 'down'],
+                ['😊 Humör', weekCompare.then.mood, weekCompare.now.mood, '/5', 1, 'up'],
                 ['👟 Steg/dag', weekCompare.then.steps, weekCompare.now.steps, '', 0, 'up'],
                 ['💪 Träningspass', weekCompare.then.passes, weekCompare.now.passes, 'st', 0, 'up'],
                 ['⏱ Träningsminuter', weekCompare.then.minutes, weekCompare.now.minutes, 'min', 0, 'up']
@@ -1315,6 +1404,40 @@ function WeightStepTracker() {
             }),
             (moodAnalysis.workoutMood - moodAnalysis.restMood) >= 0.3 ? h('p', { className: 'text-xs text-green-600 mt-1' }, '✓ Du mår tydligt bättre de dagar du tränar.') : null
           ) : null,
+          moodAnalysis.profile ? h('div', { className: 'mb-4' },
+            h('p', { className: 'text-xs font-semibold text-gray-500 mb-2' }, 'Så ser dina bästa dagar ut (humör 4–5 vs 1–2)'),
+            h('div', { className: 'overflow-x-auto' },
+              h('table', { className: 'w-full text-sm' },
+                h('thead', null, h('tr', { className: 'bg-gray-50' },
+                  h('th', { className: 'text-left px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-gray-400' }, ''),
+                  h('th', { className: 'text-right px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-green-600' }, '🤩 Toppdagar (' + moodAnalysis.profile.good.n + ')'),
+                  h('th', { className: 'text-right px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-gray-400' }, '😔 Bottendagar (' + moodAnalysis.profile.bad.n + ')')
+                )),
+                h('tbody', null,
+                  [
+                    ['🌙 Sömnpoäng natten innan', 'sleep', 0, ''],
+                    ['⏰ Sömntid', 'sleepMin', -1, ''],
+                    ['💗 HRV', 'hrv', 0, ' ms'],
+                    ['👟 Steg', 'steps', 0, ''],
+                    ['🔥 Stressminuter', 'stress', 0, ' min'],
+                    ['💪 Andel dagar med träning', 'trainedPct', 0, '%']
+                  ].map(function(row, ri) {
+                    var g = moodAnalysis.profile.good[row[1]], b = moodAnalysis.profile.bad[row[1]];
+                    var fmt = function(v){ if (v == null) return '–'; if (row[2] === -1) return Math.floor(v/60) + 'h ' + Math.round(v%60) + 'm'; return Math.round(v).toLocaleString('sv-SE') + row[3]; };
+                    return h('tr', { key: ri, className: ri % 2 ? 'bg-gray-50/50' : '' },
+                      h('td', { className: 'px-3 py-1.5 text-gray-600' }, row[0]),
+                      h('td', { className: 'px-3 py-1.5 text-right font-bold text-gray-800' }, fmt(g)),
+                      h('td', { className: 'px-3 py-1.5 text-right text-gray-500' }, fmt(b))
+                    );
+                  })
+                )
+              )
+            )
+          ) : null,
+          moodAnalysis.bestDow != null && moodAnalysis.worstDow != null && moodAnalysis.bestDow !== moodAnalysis.worstDow ? h('div', { className: 'flex items-start gap-3 rounded-xl px-4 py-3 border-l-4 border-pink-400 bg-pink-50 mb-4' },
+            h('span', { className: 'text-lg mt-0.5' }, '📅'),
+            h('p', { className: 'text-sm text-gray-700 leading-snug' }, 'Du mår bäst på ' + WEEKDAY_NAMES[moodAnalysis.bestDow] + 'ar (snitt ' + moodAnalysis.bestDowAvg.toFixed(1) + ') och sämst på ' + WEEKDAY_NAMES[moodAnalysis.worstDow] + 'ar (' + moodAnalysis.worstDowAvg.toFixed(1) + ').')
+          ) : null,
           moodAnalysis.rows.length ? h('div', null,
             h('p', { className: 'text-xs font-semibold text-gray-500 mb-2' }, 'Korrelationer'),
             h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-2' },
@@ -1329,6 +1452,10 @@ function WeightStepTracker() {
                 );
               })
             ),
+            moodAnalysis.top && Math.abs(moodAnalysis.top.r) >= 0.15 && moodAnalysis.top.pairs.length >= 5 ? h('div', { className: 'mt-3' },
+              h('p', { className: 'text-xs font-semibold text-gray-500 mb-1' }, 'Starkast: ' + moodAnalysis.top.name),
+              h(SvgScatter, { points: moodAnalysis.top.pairs.map(function(p){ return { x: p[0], y: p[1] }; }), xName: moodAnalysis.top.xName, yName: moodAnalysis.top.name.indexOf('viktändring') > -1 ? 'Viktändring (kg)' : 'Humör (1–5)', color: '#ec4899', height: 220 })
+            ) : null,
             h('p', { className: 'text-xs text-gray-400 mt-2' }, 'Samband = inte nödvändigtvis orsak. Värden nära 0 = inget tydligt mönster.')
           ) : null
         )
@@ -1851,22 +1978,55 @@ function WeightStepTracker() {
     var oAvg = function(arr,key){ var v=arr.map(function(d){return d[key];}).filter(function(x){return x!=null;}); return v.length?v.reduce(function(a,b){return a+b;},0)/v.length:null; };
     var last7 = ouraData.slice(0,7), prior30 = ouraData.slice(7,37), prev7 = ouraData.slice(7,14);
     var flags = [];
+    // Hur många av senaste 7 dagarna som avviker (varaktighet)
+    var devDays = function(key, test) {
+      var base = oAvg(prior30, key);
+      if (base == null) return { base: null, days: 0 };
+      var n = 0;
+      last7.forEach(function(d){ if (d[key] != null && test(d[key], base)) n++; });
+      return { base: base, days: n };
+    };
+    var durTxt = function(n){ return n >= 2 ? ' Pågått ' + n + ' av senaste 7 dagarna.' : ''; };
     var hrv7=oAvg(last7,'hrv_avg'), hrvBase=oAvg(prior30,'hrv_avg');
-    if(hrv7!=null && hrvBase!=null && hrv7 < hrvBase*0.8) flags.push({lvl:'warn',icon:'💔',text:'HRV ligger '+Math.round((1-hrv7/hrvBase)*100)+'% under din 30-dagarsnivå ('+Math.round(hrv7)+' vs '+Math.round(hrvBase)+' ms).'});
+    var hrvDev = devDays('hrv_avg', function(v,b){ return v < b*0.8; });
+    if(hrv7!=null && hrvBase!=null && hrv7 < hrvBase*0.8) flags.push({lvl:'warn',icon:'💔',key:'hrv',text:'HRV ligger '+Math.round((1-hrv7/hrvBase)*100)+'% under din 30-dagarsnivå ('+Math.round(hrv7)+' vs '+Math.round(hrvBase)+' ms).'+durTxt(hrvDev.days)});
     var rhr7=oAvg(last7,'resting_hr'), rhrBase=oAvg(prior30,'resting_hr');
-    if(rhr7!=null && rhrBase!=null && rhr7 > rhrBase+4) flags.push({lvl:'warn',icon:'❤️',text:'Vilopulsen är förhöjd ('+Math.round(rhr7)+' vs '+Math.round(rhrBase)+' i snitt).'});
+    var rhrDev = devDays('resting_hr', function(v,b){ return v > b+4; });
+    if(rhr7!=null && rhrBase!=null && rhr7 > rhrBase+4) flags.push({lvl:'warn',icon:'❤️',key:'rhr',text:'Vilopulsen är förhöjd ('+Math.round(rhr7)+' vs '+Math.round(rhrBase)+' i snitt).'+durTxt(rhrDev.days)});
     var tempSpike = ouraData.slice(0,3).find(function(d){return d.temp_dev!=null && d.temp_dev>=0.5;});
-    if(tempSpike) flags.push({lvl:'warn',icon:'🌡️',text:'Förhöjd kroppstemperatur (+'+tempSpike.temp_dev+'°) senaste dygnen — kan vara stress eller begynnande infektion.'});
+    if(tempSpike) flags.push({lvl:'warn',icon:'🌡️',key:'temp',text:'Förhöjd kroppstemperatur (+'+tempSpike.temp_dev+'°) senaste dygnen — kan vara stress eller begynnande infektion.'});
     var lowSpo2 = ouraData.slice(0,7).find(function(d){return d.spo2_avg!=null && d.spo2_avg<94;});
     if(lowSpo2) flags.push({lvl:'info',icon:'🫁',text:'Låg syresättning en natt ('+lowSpo2.spo2_avg+'%).'});
     var poorSleep = ouraData.slice(0,5).filter(function(d){return d.sleep_score!=null && d.sleep_score<70;});
     if(poorSleep.length>=3) flags.push({lvl:'info',icon:'😴',text:poorSleep.length+' av senaste 5 nätterna under sömnpoäng 70.'});
     var br7=oAvg(last7,'breath_avg'), brBase=oAvg(prior30,'breath_avg');
-    if(br7!=null && brBase!=null && br7 > brBase+1.5) flags.push({lvl:'warn',icon:'🫁',text:'Andningsfrekvensen i sömn är förhöjd ('+br7.toFixed(1)+' vs '+brBase.toFixed(1)+' andetag/min) — kan tyda på stress eller begynnande infektion.'});
+    var brDev = devDays('breath_avg', function(v,b){ return v > b+1.5; });
+    if(br7!=null && brBase!=null && br7 > brBase+1.5) flags.push({lvl:'warn',icon:'🫁',key:'breath',text:'Andningsfrekvensen i sömn är förhöjd ('+br7.toFixed(1)+' vs '+brBase.toFixed(1)+' andetag/min) — kan tyda på stress eller begynnande infektion.'+durTxt(brDev.days)});
     var shr7=oAvg(last7,'avg_hr_sleep'), shrBase=oAvg(prior30,'avg_hr_sleep');
-    if(shr7!=null && shrBase!=null && shr7 > shrBase+4) flags.push({lvl:'warn',icon:'💓',text:'Sömnpulsen ligger högre än vanligt ('+Math.round(shr7)+' vs '+Math.round(shrBase)+' slag/min i snitt).'});
+    if(shr7!=null && shrBase!=null && shr7 > shrBase+4) flags.push({lvl:'warn',icon:'💓',key:'shr',text:'Sömnpulsen ligger högre än vanligt ('+Math.round(shr7)+' vs '+Math.round(shrBase)+' slag/min i snitt).'});
     var eff7=oAvg(last7,'sleep_efficiency');
     if(eff7!=null && eff7 < 80) flags.push({lvl:'info',icon:'🛏️',text:'Sömneffektiviteten har varit låg ('+Math.round(eff7)+'%) — mycket vaken tid i sängen.'});
+    // Kroppslarm: flera fysiologiska mått avviker samtidigt (senaste 3 dygnen)
+    var bodyAlarm = (function(){
+      var last3 = ouraData.slice(0,3);
+      if (last3.length < 2) return null;
+      var a3 = function(key){ var v=last3.map(function(d){return d[key];}).filter(function(x){return x!=null;}); return v.length?v.reduce(function(a,b){return a+b;},0)/v.length:null; };
+      var hits = [];
+      var t3 = a3('temp_dev'); if (t3 != null && t3 >= 0.3) hits.push('temperatur');
+      var r3 = a3('resting_hr'); if (r3 != null && rhrBase != null && r3 > rhrBase + 3) hits.push('vilopuls');
+      var b3 = a3('breath_avg'); if (b3 != null && brBase != null && b3 > brBase + 1) hits.push('andning');
+      var h3 = a3('hrv_avg'); if (h3 != null && hrvBase != null && h3 < hrvBase * 0.82) hits.push('HRV');
+      return hits.length >= 2 ? hits : null;
+    })();
+    // Baslinjetabell: 7 dagar vs 30 dagar
+    var baselineRows = [
+      ['💗 HRV', hrv7, hrvBase, ' ms', 'up'],
+      ['❤️ Vilopuls', rhr7, rhrBase, '', 'down'],
+      ['💓 Sömnpuls', shr7, shrBase, '', 'down'],
+      ['🫁 Andning', br7, brBase, ' /min', 'down'],
+      ['🛏️ Sömneffektivitet', eff7, oAvg(prior30,'sleep_efficiency'), '%', 'up'],
+      ['🌙 Sömnpoäng', oAvg(last7,'sleep_score'), oAvg(prior30,'sleep_score'), '', 'up']
+    ].filter(function(r){ return r[1] != null && r[2] != null; });
     var trendMetrics = [{key:'sleep_score',name:'Sömnpoäng',better:'up'},{key:'hrv_avg',name:'HRV',better:'up'},{key:'resting_hr',name:'Vilopuls',better:'down'},{key:'steps',name:'Steg',better:'up'}];
     var trends = trendMetrics.map(function(m){ var a=oAvg(last7,m.key), b=oAvg(prev7,m.key); if(a==null||b==null) return null; return {name:m.name, now:Math.round(a), diff:a-b, better:m.better}; }).filter(function(x){return x;});
     var maxBy=function(key){ var a=ouraData.filter(function(d){return d[key]!=null;}); return a.length?a.reduce(function(p,c){return c[key]>p[key]?c:p;}):null; };
@@ -2021,11 +2181,34 @@ function WeightStepTracker() {
           )
         ),
         h('div', { className: 'px-4 py-4 space-y-2' },
+          bodyAlarm ? h('div', { className: 'flex items-start gap-3 rounded-xl px-4 py-3 bg-red-50 border-2 border-red-300' },
+            h('span', { className: 'text-xl' }, '🚨'),
+            h('div', null,
+              h('p', { className: 'text-sm font-bold text-red-800' }, 'Kroppslarm: ' + bodyAlarm.length + ' mått avviker samtidigt (' + bodyAlarm.join(', ') + ')'),
+              h('p', { className: 'text-xs text-red-600 mt-0.5' }, 'När flera fysiologiska mått drar åt fel håll samtidigt är det ofta begynnande sjukdom eller överbelastning. Ta det lugnt idag och prioritera sömn.')
+            )
+          ) : null,
           flags.length ? flags.map(function(fl,i){ return h('div', { key:i, className: 'flex items-start gap-3 rounded-xl px-4 py-3 ' + (fl.lvl==='warn'?'bg-amber-50 border border-amber-200':'bg-blue-50 border border-blue-100') },
             h('span', { className:'text-xl' }, fl.icon),
             h('p', { className:'text-sm ' + (fl.lvl==='warn'?'text-amber-800':'text-blue-800') }, fl.text)
           ); }) : h('p', { className:'text-sm text-gray-400 text-center py-2' }, 'Sömn, HRV, vilopuls, temp och SpO2 ligger inom dina vanliga nivåer. 👍'),
-          flags.some(function(fl){return fl.lvl==='warn';}) ? h('p', { className:'text-xs text-gray-400 mt-1' }, 'Enstaka avvikelser är normalt. Håller något i sig flera veckor kan det vara värt att ta upp med läkare.') : null
+          flags.some(function(fl){return fl.lvl==='warn';}) ? h('p', { className:'text-xs text-gray-400 mt-1' }, 'Enstaka avvikelser är normalt. Håller något i sig flera veckor kan det vara värt att ta upp med läkare.') : null,
+          baselineRows.length ? h('div', { className: 'pt-2' },
+            h('p', { className: 'text-xs font-semibold text-gray-500 mb-1.5' }, 'Dina nivåer: senaste 7 dagarna vs 30-dagarsbaslinje'),
+            h('div', { className: 'grid grid-cols-2 md:grid-cols-3 gap-2' },
+              baselineRows.map(function(r, i) {
+                var diff = r[1] - r[2];
+                var good = r[4] === 'up' ? diff >= 0 : diff <= 0;
+                var neutral = Math.abs(diff) < (r[2] * 0.02);
+                return h('div', { key: i, className: 'bg-gray-50 rounded-lg px-3 py-2' },
+                  h('p', { className: 'text-xs text-gray-400' }, r[0]),
+                  h('p', { className: 'text-base font-bold text-gray-800' }, (Math.round(r[1]*10)/10) + r[3]),
+                  h('p', { className: 'text-xs font-semibold ' + (neutral ? 'text-gray-400' : good ? 'text-green-600' : 'text-red-500') },
+                    (diff > 0 ? '▲ +' : diff < 0 ? '▼ ' : '■ ') + (Math.round(diff*10)/10) + ' vs baslinje ' + (Math.round(r[2]*10)/10))
+                );
+              })
+            )
+          ) : null
         )
       ),
       // ── Trender & rekord ──
@@ -2425,7 +2608,56 @@ function WeightStepTracker() {
         if (wks <= 200) { var fd = new Date(); fd.setDate(fd.getDate() + wks*7); forecast = { weeks: wks, date: fd }; }
       }
       if (!perStep.some(function(s){ return s.rate != null; }) && pace == null) return null;
-      return { perStep: perStep, forecast: forecast, pace: pace != null ? parseFloat(pace.toFixed(2)) : null, lastW: lastW };
+      // Procentuell viktminskning + milstolpar
+      var startW = respEntries[0].weight;
+      var pctLoss = (startW - lastW) / startW * 100;
+      var milestones = [5, 10, 15, 20].map(function(m){
+        return { pct: m, kg: parseFloat((startW * m / 100).toFixed(1)), reached: pctLoss >= m };
+      });
+      var nextMs = milestones.find(function(m){ return !m.reached; }) || null;
+      // Biverkningar per dosnivå
+      var seByDose = {};
+      dosesAsc.forEach(function(d){
+        var k = d.dose;
+        if (!seByDose[k]) seByDose[k] = { dose: k, total: 0, withSE: 0, effects: {} };
+        seByDose[k].total++;
+        if (d.side_effects && d.side_effects.trim()) { seByDose[k].withSE++; seByDose[k].effects[d.side_effects.trim().toLowerCase()] = true; }
+      });
+      var seRows = Object.values(seByDose).sort(function(a,b){ return a.dose - b.dose; });
+      var anySE = seRows.some(function(r){ return r.withSE > 0; });
+      // Typisk respons i kliniska studier (STEP 1, semaglutid 2.4 mg): interpolerad %-kurva
+      var stepCurve = [[0,0],[4,2],[8,4],[12,6],[16,7.5],[20,9],[28,10.8],[36,12.4],[44,13.8],[52,14.5],[60,15],[68,15.3]];
+      var typicalPct = null;
+      var wk = getWeeksOn(wegovyProtocol);
+      if (wk > 0) {
+        var capped = Math.min(wk, 68);
+        for (var si = 1; si < stepCurve.length; si++) {
+          if (capped <= stepCurve[si][0]) {
+            var a0 = stepCurve[si-1], a1 = stepCurve[si];
+            typicalPct = a0[1] + (a1[1]-a0[1]) * (capped - a0[0]) / (a1[0]-a0[0]);
+            break;
+          }
+        }
+        if (typicalPct == null) typicalPct = 15.3;
+      }
+      // Prognosgraf: historik + trendlinje till mål
+      var chart = null;
+      if (pace != null && pace < -0.02) {
+        var fWeeks = Math.min(30, forecast ? forecast.weeks : 30);
+        chart = respEntries.map(function(e, i){
+          return { datum: new Date(e.date).toLocaleDateString('sv-SE',{month:'short',day:'numeric'}), vikt: e.weight, prognos: i === respEntries.length-1 ? e.weight : null, mål: goalWeight };
+        });
+        var lastD = new Date(respEntries[respEntries.length-1].date);
+        for (var fk = 1; fk <= fWeeks; fk++) {
+          var fD = new Date(lastD); fD.setDate(lastD.getDate() + fk*7);
+          var fV = Math.max(goalWeight, lastW + pace*fk);
+          chart.push({ datum: fD.toLocaleDateString('sv-SE',{month:'short',day:'numeric'}), vikt: null, prognos: parseFloat(fV.toFixed(1)), mål: goalWeight });
+          if (fV <= goalWeight) break;
+        }
+      }
+      return { perStep: perStep, forecast: forecast, pace: pace != null ? parseFloat(pace.toFixed(2)) : null, lastW: lastW,
+        startW: startW, pctLoss: parseFloat(pctLoss.toFixed(1)), milestones: milestones, nextMs: nextMs,
+        seRows: seRows, anySE: anySE, typicalPct: typicalPct != null ? parseFloat(typicalPct.toFixed(1)) : null, weeksOn: wk, chart: chart };
     })();
     return h('div', null,
       h('div', { className: 'bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600 rounded-2xl shadow-xl mb-5 p-6 text-white' },
@@ -2535,7 +2767,76 @@ function WeightStepTracker() {
             : doseResponse.pace != null && doseResponse.pace >= -0.05
               ? h('p', { className: 'text-sm text-amber-600' }, 'Vikten står still eller ökar just nu — prognos visas när trenden pekar nedåt igen.')
               : null,
+          doseResponse.chart ? h('div', { className: 'mt-3' },
+            h('p', { className: 'text-xs font-semibold text-gray-500 mb-1' }, 'Din väg till målet (streckad linje = prognos)'),
+            h(SvgLineChart, { data: doseResponse.chart, height: 230, lines: [
+              { key: 'vikt', color: '#db2777', width: 2.5, name: 'Vikt (kg)' },
+              { key: 'prognos', color: '#a855f7', width: 2, name: 'Prognos', dashed: true },
+              { key: 'mål', color: '#10b981', width: 1.5, name: 'Målvikt', dashed: true }
+            ]})
+          ) : null,
           h('p', { className: 'text-xs text-gray-400 mt-2' }, 'Prognosen är en enkel trendframskrivning — viktresan är sällan linjär.')
+        )
+      ) : null,
+      // ── Milstolpar & studiejämförelse ──
+      doseResponse ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-emerald-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, '🏁 Milstolpar'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Från ' + doseResponse.startW + ' kg vid start → ' + doseResponse.lastW + ' kg nu')
+          ),
+          h('div', { className: 'ml-auto text-right' },
+            h('p', { className: 'text-2xl font-black ' + (doseResponse.pctLoss > 0 ? 'text-emerald-600' : 'text-red-500') }, (doseResponse.pctLoss > 0 ? '−' : '+') + Math.abs(doseResponse.pctLoss) + '%'),
+            h('p', { className: 'text-xs text-gray-400' }, 'total viktminskning')
+          )
+        ),
+        h('div', { className: 'p-5' },
+          h('div', { className: 'grid grid-cols-4 gap-2 mb-4' },
+            doseResponse.milestones.map(function(m, i) {
+              return h('div', { key: i, className: 'rounded-xl px-2 py-3 text-center border-2 ' + (m.reached ? 'border-emerald-300 bg-emerald-50' : 'border-gray-100 bg-gray-50') },
+                h('p', { className: 'text-xl' }, m.reached ? '🏅' : '🔒'),
+                h('p', { className: 'text-sm font-black ' + (m.reached ? 'text-emerald-700' : 'text-gray-400') }, '−' + m.pct + '%'),
+                h('p', { className: 'text-xs ' + (m.reached ? 'text-emerald-500' : 'text-gray-400') }, m.kg + ' kg')
+              );
+            })
+          ),
+          doseResponse.nextMs ? (function(){
+            var prev = doseResponse.milestones.filter(function(m){ return m.reached; }).length ? doseResponse.milestones.filter(function(m){ return m.reached; }).slice(-1)[0].pct : 0;
+            var span = doseResponse.nextMs.pct - prev;
+            var prog = Math.max(0, Math.min(100, (doseResponse.pctLoss - prev) / span * 100));
+            var kgLeft = (doseResponse.nextMs.kg - (doseResponse.startW - doseResponse.lastW)).toFixed(1);
+            return h('div', { className: 'mb-4' },
+              h('div', { className: 'flex justify-between text-xs text-gray-500 mb-1' },
+                h('span', null, 'Nästa milstolpe: −' + doseResponse.nextMs.pct + '%'),
+                h('span', { className: 'font-semibold' }, kgLeft + ' kg kvar')
+              ),
+              h('div', { className: 'h-3 bg-gray-100 rounded-full overflow-hidden' },
+                h('div', { className: 'h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-400', style: { width: prog + '%' } })
+              )
+            );
+          })() : h('p', { className: 'text-sm text-emerald-600 font-semibold mb-4' }, '🏆 Alla milstolpar uppnådda!'),
+          doseResponse.typicalPct != null ? h('div', { className: 'rounded-xl px-4 py-3 border-l-4 ' + (doseResponse.pctLoss >= doseResponse.typicalPct ? 'border-emerald-400 bg-emerald-50' : 'border-blue-300 bg-blue-50') },
+            h('p', { className: 'text-sm text-gray-700' },
+              'Typisk respons i kliniska studier (STEP 1) efter ' + Math.min(doseResponse.weeksOn, 68) + ' veckor är ca −' + doseResponse.typicalPct + '%. Du ligger på −' + doseResponse.pctLoss + '% — ' +
+              (doseResponse.pctLoss >= doseResponse.typicalPct ? 'före den typiska kurvan. 💪' : 'något efter, vilket är vanligt vid lägre doser i upptrappningen.')
+            ),
+            h('p', { className: 'text-xs text-gray-400 mt-1' }, 'Studiedata gäller 2,4 mg-dosen med stor individuell spridning — din kurva är din egen.')
+          ) : null,
+          doseResponse.seRows.length && doseResponse.anySE ? h('div', { className: 'mt-4' },
+            h('p', { className: 'text-xs font-semibold text-gray-500 mb-2' }, 'Biverkningar per dosnivå'),
+            doseResponse.seRows.map(function(r, i) {
+              var pct = r.total ? Math.round(r.withSE / r.total * 100) : 0;
+              return h('div', { key: i, className: 'flex items-center gap-3 mb-1.5' },
+                h('span', { className: 'text-xs font-bold text-gray-600 w-14' }, r.dose + ' mg'),
+                h('div', { className: 'flex-1 h-3 bg-gray-100 rounded-full overflow-hidden' },
+                  h('div', { className: 'h-full rounded-full ' + (pct >= 50 ? 'bg-red-400' : pct > 0 ? 'bg-amber-400' : 'bg-green-300'), style: { width: Math.max(pct, 2) + '%' } })
+                ),
+                h('span', { className: 'text-xs text-gray-500 w-28 text-right' }, r.withSE + ' av ' + r.total + ' doser (' + pct + '%)')
+              );
+            }),
+            h('p', { className: 'text-xs text-gray-400 mt-1' }, 'Andel doser där du noterat någon biverkning. Ökar det tydligt vid en dosnivå — ta upp det med din läkare.')
+          ) : null
         )
       ) : null,
       h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
