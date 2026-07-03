@@ -721,6 +721,24 @@ function WeightStepTracker() {
       bestDow: bestDow, bestDowAvg: bestDowAvg, worstDow: worstDow, worstDowAvg: worstDowAvg,
       workoutMood: avgM(wd), restMood: avgM(rd), nWorkout: wd.length, nRest: rd.length, n: moodEntries.length };
   };
+  // ── ALGORITHM: Monthly table (senaste 6 månaderna) ──────────────────────────
+  const getMonthlyTable = function() {
+    if (!entries.length && !ouraData.length) return null;
+    var byMonth = {};
+    var ensure = function(m){ return byMonth[m] = byMonth[m] || { m: m, weights: [], mood: [], steps: [], passes: 0, min: 0, sleep: [], hrv: [] }; };
+    entries.forEach(function(e){ var o = ensure(e.date.slice(0,7)); o.weights.push(e.weight); if (e.mood) o.mood.push(e.mood); });
+    workouts.forEach(function(w){ var o = ensure(w.date.slice(0,7)); o.passes++; o.min += w.duration; });
+    ouraData.forEach(function(d){ var o = ensure(d.date.slice(0,7)); if (d.steps != null) o.steps.push(d.steps); if (d.sleep_score != null) o.sleep.push(d.sleep_score); if (d.hrv_avg != null) o.hrv.push(d.hrv_avg); });
+    var avg = function(a){ return a.length ? a.reduce(function(x,y){ return x+y; },0)/a.length : null; };
+    var months = Object.keys(byMonth).sort().slice(-6);
+    if (months.length < 2) return null;
+    var rows = months.map(function(m){
+      var o = byMonth[m];
+      return { m: m, avgW: avg(o.weights), dW: null, mood: avg(o.mood), steps: avg(o.steps), passes: o.passes, min: o.min, sleep: avg(o.sleep), hrv: avg(o.hrv) };
+    });
+    for (var i = 1; i < rows.length; i++) { if (rows[i].avgW != null && rows[i-1].avgW != null) rows[i].dW = rows[i].avgW - rows[i-1].avgW; }
+    return rows.reverse();
+  };
   // ── ALGORITHM: Week comparison (this week vs 4 weeks ago) ───────────────────
   const getWeekComparison = function() {
     var today = new Date(); today.setHours(0,0,0,0);
@@ -1817,7 +1835,44 @@ function WeightStepTracker() {
   }
   function renderHistory() {
     const sortedEntries = entries.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);});
-    return h('div', { className: 'bg-white rounded-xl shadow-md overflow-hidden' },
+    var monthlyTable = getMonthlyTable();
+    var MONTH_NAMES = ['januari','februari','mars','april','maj','juni','juli','augusti','september','oktober','november','december'];
+    var monthCard = monthlyTable ? h('div', { className: 'bg-white rounded-xl shadow-md overflow-hidden mb-6' },
+      h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+        h('div', { className: 'w-1 h-8 rounded-full bg-violet-500' }),
+        h('div', null,
+          h('h2', { className: 'font-bold text-gray-800' }, '📅 Månad för månad'),
+          h('p', { className: 'text-xs text-gray-400' }, 'Senaste ' + monthlyTable.length + ' månaderna · nyast överst')
+        )
+      ),
+      h('div', { className: 'overflow-x-auto' },
+        h('table', { className: 'w-full text-sm' },
+          h('thead', null, h('tr', { className: 'bg-gray-50' },
+            ['Månad','Snittvikt','Δ vikt','Pass','Timmar','Steg/dag','Sömn','HRV','Humör'].map(function(hh, i) {
+              return h('th', { key: i, className: (i === 0 ? 'text-left px-6' : 'text-right px-3') + ' py-2 text-xs font-bold uppercase tracking-wide text-gray-400' }, hh);
+            })
+          )),
+          h('tbody', null,
+            monthlyTable.map(function(r, ri) {
+              var mn = MONTH_NAMES[parseInt(r.m.slice(5,7))-1] + ' ' + r.m.slice(2,4);
+              var fmt = function(v, dec, unit){ return v == null ? '–' : (dec ? v.toFixed(dec) : Math.round(v).toLocaleString('sv-SE')) + (unit||''); };
+              return h('tr', { key: ri, className: (ri % 2 ? 'bg-gray-50/50' : 'bg-white') },
+                h('td', { className: 'px-6 py-2.5 font-semibold text-gray-700 capitalize' }, mn),
+                h('td', { className: 'px-3 py-2.5 text-right font-bold text-gray-800' }, fmt(r.avgW, 1, ' kg')),
+                h('td', { className: 'px-3 py-2.5 text-right font-bold ' + (r.dW == null ? 'text-gray-300' : r.dW <= 0 ? 'text-green-600' : 'text-red-500') }, r.dW == null ? '–' : (r.dW > 0 ? '+' : '') + r.dW.toFixed(1)),
+                h('td', { className: 'px-3 py-2.5 text-right text-gray-600' }, r.passes),
+                h('td', { className: 'px-3 py-2.5 text-right text-gray-600' }, Math.round(r.min/60) + 'h'),
+                h('td', { className: 'px-3 py-2.5 text-right text-gray-600' }, fmt(r.steps, 0)),
+                h('td', { className: 'px-3 py-2.5 text-right text-gray-600' }, fmt(r.sleep, 0)),
+                h('td', { className: 'px-3 py-2.5 text-right text-gray-600' }, fmt(r.hrv, 0)),
+                h('td', { className: 'px-3 py-2.5 text-right text-gray-600' }, r.mood != null ? r.mood.toFixed(1) : '–')
+              );
+            })
+          )
+        )
+      )
+    ) : null;
+    return h('div', null, monthCard, h('div', { className: 'bg-white rounded-xl shadow-md overflow-hidden' },
       h('div', { className: 'flex items-center justify-between px-6 py-4 border-b border-gray-100' },
         h('div', null,
           h('h2', { className: 'text-xl font-bold text-gray-800' }, '📋 Mätningshistorik'),
@@ -1861,7 +1916,7 @@ function WeightStepTracker() {
           )
         )
       )
-    );
+    ));
   }
   function renderSettings() {
     return h('div', { className: 'max-w-lg mx-auto space-y-4' },
@@ -2087,6 +2142,65 @@ function WeightStepTracker() {
     var topCorr = corr[0] || null;
     var scatterPoints = topCorr ? topCorr.pairs.map(function(p){return {x:p[0], y:p[1]};}) : [];
     var corrTxt = function(r){ var a=Math.abs(r); return a>=0.5?'starkt':a>=0.3?'måttligt':a>=0.15?'svagt':'mycket svagt'; };
+    // ── Lag-korrelationsmatris: vad idag påverkar vad imorgon ──
+    var lagMatrix = (function(){
+      var mSleep={}, mHrv={}, mSteps={}, mStress={}, mTrain={}, mMood={};
+      ouraData.forEach(function(d){
+        if(d.sleep_score!=null) mSleep[d.date]=d.sleep_score;
+        if(d.hrv_avg!=null) mHrv[d.date]=d.hrv_avg;
+        if(d.steps!=null) mSteps[d.date]=d.steps;
+        if(d.stress_high_min!=null) mStress[d.date]=d.stress_high_min;
+        mTrain[d.date]=0;
+      });
+      workouts.forEach(function(w){ mTrain[w.date]=(mTrain[w.date]||0)+w.duration; });
+      entries.forEach(function(e){ if(e.mood) mMood[e.date]=e.mood; });
+      var drivers=[['🌙 Sömn',mSleep],['💗 HRV',mHrv],['👟 Steg',mSteps],['🔥 Stress',mStress],['💪 Träning',mTrain],['😊 Humör',mMood]];
+      var outcomes=[['Humör',mMood],['Sömn',mSleep],['HRV',mHrv],['ViktΔ',null]];
+      var cells=drivers.map(function(dr){
+        return outcomes.map(function(oc){
+          var pairs=[];
+          Object.keys(dr[1]).forEach(function(ds){
+            var nd=addDays(ds,1), y;
+            if(oc[1]===null){ if(wByDate[ds]==null||wByDate[nd]==null) return; y=wByDate[nd]-wByDate[ds]; }
+            else { y=oc[1][nd]; if(y==null) return; }
+            pairs.push([dr[1][ds], y]);
+          });
+          return { r: pairs.length>=8 ? pearson(pairs) : null, n: pairs.length };
+        });
+      });
+      var any=cells.some(function(row){ return row.some(function(c){ return c.r!=null; }); });
+      return any ? { drivers: drivers.map(function(d){return d[0];}), outcomes: outcomes.map(function(o){return o[0];}), cells: cells } : null;
+    })();
+    // ── Sömnregularitet & social jetlag (30 nätter) ──
+    var sleepReg = (function(){
+      var nights = ouraData.slice(0,30).filter(function(d){ return d.total_sleep_min != null; });
+      if (nights.length < 10) return null;
+      var mins = nights.map(function(d){ return d.total_sleep_min; });
+      var mu = mins.reduce(function(a,b){ return a+b; },0)/mins.length;
+      var sd = Math.sqrt(mins.reduce(function(s,v){ return s+Math.pow(v-mu,2); },0)/mins.length);
+      var isWkend = function(d){ var dow = new Date(d.date).getDay(); return dow===0 || dow===6; };
+      var we = nights.filter(isWkend), wd = nights.filter(function(d){ return !isWkend(d); });
+      var avgT = function(a){ return a.length ? a.reduce(function(x,y){ return x+y.total_sleep_min; },0)/a.length : null; };
+      var weA = avgT(we), wdA = avgT(wd);
+      var jetlag = (weA != null && wdA != null && we.length >= 4) ? Math.round(weA - wdA) : null;
+      var grade = sd < 30 ? ['Utmärkt','text-green-600'] : sd < 45 ? ['Bra','text-green-500'] : sd < 60 ? ['Okej','text-amber-500'] : ['Ojämn','text-red-500'];
+      return { sd: Math.round(sd), mu: mu, jetlag: jetlag, grade: grade, n: nights.length };
+    })();
+    // ── Ovanlig natt: percentilrank mot hela historiken ──
+    var unusual = (function(){
+      if (!ouraLatest || ouraData.length < 30) return [];
+      var res = [];
+      [['sleep_score','Sömnpoängen','high'],['hrv_avg','HRV:n','high'],['resting_hr','Vilopulsen','low'],['total_sleep_min','Sömntiden','high']].forEach(function(m){
+        var vals = ouraData.map(function(d){ return d[m[0]]; }).filter(function(v){ return v != null; });
+        var v = ouraLatest[m[0]];
+        if (v == null || vals.length < 30) return;
+        var below = vals.filter(function(x){ return x < v; }).length;
+        var pct = below / vals.length * 100;
+        if (pct >= 92) res.push({ t: m[1] + ' i natt var bland dina ' + Math.max(1, Math.round(100-pct)) + '% högsta någonsin', good: m[2] === 'high' });
+        else if (pct <= 8) res.push({ t: m[1] + ' i natt var bland dina ' + Math.max(1, Math.round(pct)) + '% lägsta någonsin', good: m[2] === 'low' });
+      });
+      return res;
+    })();
     // Normaliserad överlagring (senaste 90 dagar)
     var ovRaw = ouraData.slice(0,90).reverse();
     var mkNorm = function(getter){ var vals=ovRaw.map(getter).filter(function(v){return v!=null;}); if(vals.length<2) return null; var mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals),r=(mx-mn)||1; return function(v){return v==null?null:Math.round((v-mn)/r*100);}; };
@@ -2234,9 +2348,87 @@ function WeightStepTracker() {
               h('p', { className:'text-lg font-bold text-emerald-800' }, d ? (d[r[2]].toLocaleString('sv-SE') + r[3]) : '–'),
               h('p', { className:'text-xs text-emerald-500' }, fmtD(d))
             ); })
-          )
+          ),
+          unusual.length ? h('div', { className: 'mt-3 space-y-1.5' },
+            unusual.map(function(u, i) {
+              return h('div', { key: i, className: 'flex items-center gap-2 rounded-lg px-3 py-2 text-sm ' + (u.good ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-800') },
+                h('span', null, u.good ? '✨' : '👀'),
+                h('span', null, u.t)
+              );
+            })
+          ) : null
         )
       ),
+      // ── Sömnregularitet ──
+      sleepReg ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-sky-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, '🛌 Sömnregularitet'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Hur jämn din sömn är · senaste ' + sleepReg.n + ' nätterna')
+          ),
+          h('p', { className: 'ml-auto text-lg font-black ' + sleepReg.grade[1] }, sleepReg.grade[0])
+        ),
+        h('div', { className: 'p-5' },
+          h('div', { className: 'grid grid-cols-3 gap-2 mb-3' },
+            h('div', { className: 'bg-gray-50 rounded-lg px-3 py-2 text-center' },
+              h('p', { className: 'text-xs text-gray-400' }, 'Snitt sömntid'),
+              h('p', { className: 'text-lg font-black text-gray-800' }, Math.floor(sleepReg.mu/60) + 'h ' + Math.round(sleepReg.mu%60) + 'm')
+            ),
+            h('div', { className: 'bg-gray-50 rounded-lg px-3 py-2 text-center' },
+              h('p', { className: 'text-xs text-gray-400' }, 'Variation (±1 std)'),
+              h('p', { className: 'text-lg font-black ' + sleepReg.grade[1] }, '± ' + sleepReg.sd + ' min')
+            ),
+            h('div', { className: 'bg-gray-50 rounded-lg px-3 py-2 text-center' },
+              h('p', { className: 'text-xs text-gray-400' }, 'Helg vs vardag'),
+              h('p', { className: 'text-lg font-black text-gray-800' }, sleepReg.jetlag != null ? (sleepReg.jetlag > 0 ? '+' : '') + sleepReg.jetlag + ' min' : '–')
+            )
+          ),
+          h('p', { className: 'text-xs text-gray-500' },
+            'Jämn sömn (låg variation) är starkt kopplad till bättre HRV och dagsform. ' +
+            (sleepReg.jetlag != null && Math.abs(sleepReg.jetlag) > 45
+              ? 'Din helgsömn avviker ' + Math.abs(sleepReg.jetlag) + ' min från vardagarna ("social jetlag") — försök hålla samma tider även på helgen.'
+              : 'Din helgrytm ligger nära vardagsrytmen — bra!')
+          )
+        )
+      ) : null,
+      // ── Lag-korrelationsmatris ──
+      lagMatrix ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-indigo-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, '🔀 Vad påverkar vad — nästa dag'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Korrelation: raden idag → kolumnen imorgon. Blå = följs åt, röd = motverkar.')
+          )
+        ),
+        h('div', { className: 'p-4 overflow-x-auto' },
+          h('table', { className: 'w-full text-sm' },
+            h('thead', null, h('tr', null,
+              h('th', { className: 'text-left px-2 py-1.5 text-xs font-bold text-gray-400' }, 'Idag ↓ / Imorgon →'),
+              lagMatrix.outcomes.map(function(o, i) {
+                return h('th', { key: i, className: 'text-center px-2 py-1.5 text-xs font-bold text-gray-500' }, o);
+              })
+            )),
+            h('tbody', null,
+              lagMatrix.drivers.map(function(d, di) {
+                return h('tr', { key: di },
+                  h('td', { className: 'px-2 py-1 text-xs font-semibold text-gray-600 whitespace-nowrap' }, d),
+                  lagMatrix.cells[di].map(function(c, ci) {
+                    if (c.r == null) return h('td', { key: ci, className: 'text-center px-1 py-1' }, h('div', { className: 'rounded-lg py-2 text-xs text-gray-300 bg-gray-50' }, '–'));
+                    var a = Math.abs(c.r);
+                    var bg = c.r > 0 ? 'rgba(99,102,241,' + Math.min(0.85, a).toFixed(2) + ')' : 'rgba(244,63,94,' + Math.min(0.85, a).toFixed(2) + ')';
+                    return h('td', { key: ci, className: 'text-center px-1 py-1' },
+                      h('div', { className: 'rounded-lg py-2 text-xs font-bold', style: { backgroundColor: bg, color: a > 0.35 ? 'white' : '#374151' }, title: 'n=' + c.n },
+                        (c.r > 0 ? '+' : '') + c.r.toFixed(2))
+                    );
+                  })
+                );
+              })
+            )
+          ),
+          h('p', { className: 'text-xs text-gray-400 mt-2' }, 'Diagonalen (t.ex. Sömn → Sömn) visar hur mycket en bra dag "smittar av sig" på nästa. Celler kräver minst 8 datapar. Korrelation ≠ orsak.')
+        )
+      ) : null,
       // ── Samband Oura <-> vikt ──
       h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
@@ -2659,6 +2851,35 @@ function WeightStepTracker() {
         startW: startW, pctLoss: parseFloat(pctLoss.toFixed(1)), milestones: milestones, nextMs: nextMs,
         seRows: seRows, anySE: anySE, typicalPct: typicalPct != null ? parseFloat(typicalPct.toFixed(1)) : null, weeksOn: wk, chart: chart };
     })();
+    // ── Takt över tid + signal vs brus ──
+    var taktData = (function(){
+      if (respEntries.length < 10) return null;
+      var wkMap = {};
+      respEntries.forEach(function(e){ var wk = getWeekNumber(e.date); (wkMap[wk] = wkMap[wk] || []).push(e.weight); });
+      var wks = Object.keys(wkMap).sort();
+      var bars = null;
+      if (wks.length >= 3) {
+        var avgs = wks.map(function(k){ var a = wkMap[k]; return a.reduce(function(x,y){ return x+y; },0)/a.length; });
+        bars = [];
+        for (var i = 1; i < wks.length; i++) {
+          bars.push({ label: getISOWeekNumber(wks[i]), takt: parseFloat((avgs[i]-avgs[i-1]).toFixed(2)) });
+        }
+        bars = bars.slice(-16);
+      }
+      var diffs = [];
+      for (var j = 1; j < respEntries.length; j++) {
+        var dd = (new Date(respEntries[j].date) - new Date(respEntries[j-1].date)) / 86400000;
+        if (dd === 1) diffs.push(respEntries[j].weight - respEntries[j-1].weight);
+      }
+      var noise = null;
+      if (diffs.length >= 10) {
+        var mu = diffs.reduce(function(a,b){ return a+b; },0)/diffs.length;
+        var sd = Math.sqrt(diffs.reduce(function(s,v){ return s+Math.pow(v-mu,2); },0)/diffs.length);
+        var within = diffs.filter(function(v){ return Math.abs(v - mu) <= sd; }).length;
+        noise = { sd: parseFloat(sd.toFixed(2)), muWeek: parseFloat((mu*7).toFixed(2)), n: diffs.length, withinPct: Math.round(within/diffs.length*100) };
+      }
+      return (bars || noise) ? { bars: bars, noise: noise } : null;
+    })();
     return h('div', null,
       h('div', { className: 'bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600 rounded-2xl shadow-xl mb-5 p-6 text-white' },
         h('div', { className: 'flex items-start justify-between mb-4' },
@@ -2836,6 +3057,43 @@ function WeightStepTracker() {
               );
             }),
             h('p', { className: 'text-xs text-gray-400 mt-1' }, 'Andel doser där du noterat någon biverkning. Ökar det tydligt vid en dosnivå — ta upp det med din läkare.')
+          ) : null
+        )
+      ) : null,
+      // ── Takt över tid + signal vs brus ──
+      taktData ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-blue-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, '📉 Din takt, vecka för vecka'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Förändring i veckosnitt · grönt = nedåt')
+          )
+        ),
+        h('div', { className: 'p-5' },
+          taktData.bars ? h('div', { className: 'space-y-1 mb-4' },
+            (function(){
+              var maxA = Math.max.apply(null, taktData.bars.map(function(b){ return Math.abs(b.takt); }).concat([0.1]));
+              return taktData.bars.map(function(b, i) {
+                var pct = Math.abs(b.takt) / maxA * 50;
+                var neg = b.takt <= 0;
+                return h('div', { key: i, className: 'flex items-center gap-2' },
+                  h('span', { className: 'text-xs text-gray-400 w-9 shrink-0' }, b.label),
+                  h('div', { className: 'flex-1 flex h-4' },
+                    h('div', { className: 'w-1/2 flex justify-end' }, neg ? h('div', { className: 'h-4 rounded-l bg-green-400', style: { width: pct*2 + '%' } }) : null),
+                    h('div', { className: 'w-px bg-gray-300' }),
+                    h('div', { className: 'w-1/2' }, !neg ? h('div', { className: 'h-4 rounded-r bg-red-400', style: { width: pct*2 + '%' } }) : null)
+                  ),
+                  h('span', { className: 'text-xs font-bold w-14 text-right ' + (neg ? 'text-green-600' : 'text-red-500') }, (b.takt > 0 ? '+' : '') + b.takt)
+                );
+              });
+            })()
+          ) : null,
+          taktData.noise ? h('div', { className: 'rounded-xl px-4 py-3 bg-blue-50 border-l-4 border-blue-300' },
+            h('p', { className: 'text-sm text-gray-700 font-semibold mb-0.5' }, '🔬 Signal vs brus'),
+            h('p', { className: 'text-sm text-gray-600' },
+              'Din vikt fluktuerar ±' + taktData.noise.sd + ' kg från dag till dag (1 std, ' + taktData.noise.n + ' dygnspar) — det är vätska, maginnehåll och salt, inte fett. Den verkliga trenden under Wegovy är ' +
+              (taktData.noise.muWeek > 0 ? '+' : '') + taktData.noise.muWeek + ' kg/vecka. Enskilda dagssiffror inom ±' + taktData.noise.sd + ' kg säger nästan ingenting — veckosnittet är sanningen.'
+            )
           ) : null
         )
       ) : null,
