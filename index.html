@@ -206,6 +206,8 @@ function WeightStepTracker() {
   const [selectedDay, setSelectedDay] = useState(null);
   const [compareWeeks, setCompareWeeks] = useState(4);
   const WEEKDAY_NAMES = ['söndag','måndag','tisdag','onsdag','torsdag','fredag','lördag'];
+  const MOOD_EMOJIS = ['😞','😕','😐','🙂','😄'];
+  const MOOD_LABELS = ['Tungt','Sådär','Ok','Bra','Toppen'];
   const calcPearson = function(pairs) {
     var n = pairs.length; if (n < 3) return null;
     var sx=0,sy=0,sxy=0,sxx=0,syy=0;
@@ -1561,7 +1563,7 @@ function WeightStepTracker() {
                 ),
             monthlySummary.avgMood
               ? h('div', { className: 'bg-white px-4 py-3 text-center' },
-                  h('p', { className: 'text-2xl font-black text-pink-500' }, ['😴','😔','😐','😊','🤩'][Math.round(monthlySummary.avgMood)-1] + ' ' + monthlySummary.avgMood),
+                  h('p', { className: 'text-2xl font-black text-pink-500' }, MOOD_EMOJIS[Math.round(monthlySummary.avgMood)-1] + ' ' + monthlySummary.avgMood),
                   h('p', { className: 'text-xs text-gray-400 mt-0.5' }, 'snitt humör / 5')
                 )
               : h('div', { className: 'bg-white px-4 py-3 text-center' },
@@ -1680,8 +1682,8 @@ function WeightStepTracker() {
               h('table', { className: 'w-full text-sm' },
                 h('thead', null, h('tr', { className: 'bg-gray-50' },
                   h('th', { className: 'text-left px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-gray-400' }, ''),
-                  h('th', { className: 'text-right px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-green-600' }, '🤩 Toppdagar (' + moodAnalysis.profile.good.n + ')'),
-                  h('th', { className: 'text-right px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-gray-400' }, '😔 Bottendagar (' + moodAnalysis.profile.bad.n + ')')
+                  h('th', { className: 'text-right px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-green-600' }, '😄 Toppdagar (' + moodAnalysis.profile.good.n + ')'),
+                  h('th', { className: 'text-right px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-gray-400' }, '😞 Bottendagar (' + moodAnalysis.profile.bad.n + ')')
                 )),
                 h('tbody', null,
                   [
@@ -1874,7 +1876,7 @@ function WeightStepTracker() {
           h('div', { className: 'w-1 h-8 rounded-full bg-pink-400' }),
           h('div', null,
             h('h2', { className: 'font-bold text-gray-800' }, 'Energi & humör'),
-            h('p', { className: 'text-xs text-gray-400' }, '😴 1 = trött · 🤩 5 = toppen')
+            h('p', { className: 'text-xs text-gray-400' }, '😞 1 = tungt · 😄 5 = toppen')
           )
         ),
         h('div', { className: 'px-4 py-4' },
@@ -1918,9 +1920,9 @@ function WeightStepTracker() {
           h('div', null,
             h('p', { className: 'text-sm font-semibold text-gray-600 mb-2' }, 'Hur mår du idag?'),
             h('div', { className: 'grid grid-cols-5 gap-2' },
-              ['😴','😔','😐','😊','🤩'].map(function(emoji, i) {
+              MOOD_EMOJIS.map(function(emoji, i) {
                 var val = String(i+1);
-                var labels = ['Trött','Dålig','Ok','Bra','Toppen!'];
+                var labels = MOOD_LABELS;
                 return h('button', {
                   key: val,
                   onClick: function(){ setNewEntry(Object.assign({},newEntry,{mood: newEntry.mood===val ? '' : val})); },
@@ -2325,7 +2327,7 @@ function WeightStepTracker() {
                       (diffNum > 0 ? '▲ +' : '▼ ') + diff)
                   : null),
                 h('td', { className: 'px-3 py-3 text-sm text-gray-500' }, entry.steps ? '👟 ' + entry.steps.toLocaleString() : '–'),
-                h('td', { className: 'px-3 py-3 text-xs text-gray-400 max-w-xs truncate' }, entry.mood ? ['😴','😔','😐','😊','🤩'][entry.mood-1] + ' ' : '', entry.comment || ''),
+                h('td', { className: 'px-3 py-3 text-xs text-gray-400 max-w-xs truncate' }, entry.mood ? MOOD_EMOJIS[entry.mood-1] + ' ' : '', entry.comment || ''),
                 h('td', { className: 'px-3 py-3 whitespace-nowrap' }, h('button', { onClick: function(ev){ev.stopPropagation();editEntry(entry);}, className:'text-gray-300 hover:text-indigo-500 transition-colors mr-3', title:'Redigera vikt' }, '✎'), h('button', { onClick: function(ev){ev.stopPropagation();deleteEntry(entry.id);}, className:'text-gray-300 hover:text-red-500 transition-colors' }, '✕'))
               );
             })
@@ -4029,7 +4031,7 @@ function WeightStepTracker() {
         Section('⚖️ Dagbok', [
           Row('Vikt', e ? e.weight + ' kg' : null),
           Row('Steg (manuellt)', e && e.steps ? e.steps.toLocaleString('sv-SE') : null),
-          Row('Humör', e && e.mood ? ['😴 Trött','😔 Dålig','😐 Ok','😊 Bra','🤩 Toppen'][e.mood-1] : null),
+          Row('Humör', e && e.mood ? MOOD_EMOJIS[e.mood-1] + ' ' + MOOD_LABELS[e.mood-1] : null),
           Row('Kommentar', e && e.comment ? e.comment : null)
         ]),
         Section('💪 Träning', ws.length ? ws.map(function(w, i) {
