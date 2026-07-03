@@ -2211,6 +2211,59 @@ function WeightStepTracker() {
       });
       return res;
     })();
+    // ── Läggtid & kronotyp ──
+    var bedtimeAnalysis = (function(){
+      var nights = ouraData.filter(function(d){ return d.bedtime_start; }).slice(0, 90);
+      if (nights.length < 7) return null;
+      // Minuter sedan midnatt, +24h om före kl 12 (så 23:30=1410, 00:30=1470)
+      var toMin = function(iso){ var dt = new Date(iso); var m = dt.getHours()*60 + dt.getMinutes(); return m < 720 ? m + 1440 : m; };
+      var fmtT = function(m){ m = Math.round(m) % 1440; return String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0'); };
+      var beds = nights.map(function(d){ return { min: toMin(d.bedtime_start), sleep: d.sleep_score, date: d.date }; });
+      var mins = beds.map(function(b){ return b.min; });
+      var mu = mins.reduce(function(a,b){ return a+b; },0)/mins.length;
+      var sd = Math.sqrt(mins.reduce(function(s,v){ return s+Math.pow(v-mu,2); },0)/mins.length);
+      var wakes = nights.filter(function(d){ return d.bedtime_end; }).map(function(d){ var dt = new Date(d.bedtime_end); return dt.getHours()*60 + dt.getMinutes(); });
+      var wakeMu = wakes.length ? wakes.reduce(function(a,b){ return a+b; },0)/wakes.length : null;
+      // Helg vs vardag läggtid (kväll före: fre+lör kväll = helgkväll)
+      var isWkendEve = function(iso){ var dow = new Date(iso).getDay(); return dow === 5 || dow === 6; };
+      var weB = beds.filter(function(b,i){ return nights[i].bedtime_start && isWkendEve(nights[i].bedtime_start); });
+      var wdB = beds.filter(function(b,i){ return nights[i].bedtime_start && !isWkendEve(nights[i].bedtime_start); });
+      var avgB = function(a){ return a.length ? a.reduce(function(x,y){ return x+y.min; },0)/a.length : null; };
+      var shift = (weB.length >= 3 && wdB.length >= 5) ? Math.round(avgB(weB) - avgB(wdB)) : null;
+      // Optimal läggtid: 30-minutersfack, minst 5 nätter, ranka på sömnpoäng
+      var buckets = {};
+      beds.forEach(function(b){ if (b.sleep == null) return; var k = Math.floor(b.min/30)*30; (buckets[k] = buckets[k] || []).push(b.sleep); });
+      var bRows = Object.keys(buckets).filter(function(k){ return buckets[k].length >= 5; }).map(function(k){
+        return { from: fmtT(parseInt(k)), to: fmtT(parseInt(k)+30), avg: buckets[k].reduce(function(a,b){ return a+b; },0)/buckets[k].length, n: buckets[k].length };
+      }).sort(function(a,b){ return b.avg - a.avg; });
+      return { n: nights.length, avgBed: fmtT(mu), sd: Math.round(sd), avgWake: wakeMu != null ? fmtT(wakeMu) : null,
+        midpoint: wakeMu != null ? fmtT((mu + (wakeMu + 1440))/2) : null, shift: shift,
+        best: bRows[0] || null, worst: bRows.length > 1 ? bRows[bRows.length-1] : null, buckets: bRows };
+    })();
+    // ── Aktivitetsbalans (30 dagar) ──
+    var activityBalance = (function(){
+      var days = ouraData.slice(0, 30).filter(function(d){ return d.sedentary_min != null; });
+      if (days.length < 7) return null;
+      var avg = function(key){ var v = days.map(function(d){ return d[key]; }).filter(function(x){ return x != null; }); return v.length ? v.reduce(function(a,b){ return a+b; },0)/v.length : null; };
+      var hi = avg('high_act_min'), me = avg('med_act_min'), lo = avg('low_act_min'), sed = avg('sedentary_min');
+      var alerts = avg('inactivity_alerts'), met = avg('met_min');
+      // Stillasittande vs samma natts sömn
+      var pairs = [];
+      ouraData.forEach(function(d){
+        if (d.sedentary_min == null) return;
+        var next = ouraData.find(function(x){ return x.date === (function(){ var dd = new Date(d.date); dd.setDate(dd.getDate()+1); return dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0'); })(); });
+        if (next && next.sleep_score != null) pairs.push([d.sedentary_min, next.sleep_score]);
+      });
+      var rSed = calcPearson(pairs);
+      return { n: days.length, hi: hi, me: me, lo: lo, sed: sed, alerts: alerts, met: met, rSed: rSed, nSed: pairs.length };
+    })();
+    // ── Långsiktiga mått (senaste värde) ──
+    var longTerm = (function(){
+      var latestOf = function(key){ var d = ouraData.find(function(x){ return x[key] != null; }); return d ? { v: d[key], date: d.date } : null; };
+      var res = { resilience: latestOf('resilience'), vo2: latestOf('vo2max'), cardio: latestOf('cardio_age') };
+      return (res.resilience || res.vo2 || res.cardio) ? res : null;
+    })();
+    var RESILIENCE_LABELS = { 'limited': 'Begränsad', 'adequate': 'Godkänd', 'solid': 'Stabil', 'strong': 'Stark', 'exceptional': 'Exceptionell' };
     // Normaliserad överlagring (senaste 90 dagar)
     var ovRaw = ouraData.slice(0,90).reverse();
     var mkNorm = function(getter){ var vals=ovRaw.map(getter).filter(function(v){return v!=null;}); if(vals.length<2) return null; var mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals),r=(mx-mn)||1; return function(v){return v==null?null:Math.round((v-mn)/r*100);}; };
@@ -2272,6 +2325,20 @@ function WeightStepTracker() {
             h('p', { className: 'text-3xl font-black' }, ouraLatest.temp_dev != null ? ((ouraLatest.temp_dev>0?'+':'') + ouraLatest.temp_dev + '°') : '–')
           )
         ),
+        longTerm ? h('div', { className: 'grid grid-cols-3 gap-3 mt-3' },
+          h('div', { className: 'bg-white/15 rounded-xl p-3' },
+            h('p', { className: 'text-purple-200 text-xs' }, '🛡️ Resiliens'),
+            h('p', { className: 'text-xl font-black' }, longTerm.resilience ? (RESILIENCE_LABELS[longTerm.resilience.v] || longTerm.resilience.v) : '–')
+          ),
+          h('div', { className: 'bg-white/15 rounded-xl p-3' },
+            h('p', { className: 'text-purple-200 text-xs' }, '🫀 VO2max'),
+            h('p', { className: 'text-xl font-black' }, longTerm.vo2 ? longTerm.vo2.v : '–')
+          ),
+          h('div', { className: 'bg-white/15 rounded-xl p-3' },
+            h('p', { className: 'text-purple-200 text-xs' }, '🩺 Kärlålder'),
+            h('p', { className: 'text-xl font-black' }, longTerm.cardio ? longTerm.cardio.v + ' år' : '–')
+          )
+        ) : null,
         // Sleep stages
         h('div', { className: 'mt-4 bg-white/10 rounded-xl p-3' },
           h('div', { className: 'flex justify-between text-xs text-purple-200 mb-1.5' },
@@ -2400,6 +2467,87 @@ function WeightStepTracker() {
               ? 'Din helgsömn avviker ' + Math.abs(sleepReg.jetlag) + ' min från vardagarna ("social jetlag") — försök hålla samma tider även på helgen.'
               : 'Din helgrytm ligger nära vardagsrytmen — bra!')
           )
+        )
+      ) : null,
+      // ── Läggtid & kronotyp ──
+      bedtimeAnalysis ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-violet-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, '🕐 Läggtid & kronotyp'),
+            h('p', { className: 'text-xs text-gray-400' }, 'När du sover — och när du sover bäst · ' + bedtimeAnalysis.n + ' nätter')
+          )
+        ),
+        h('div', { className: 'p-5' },
+          h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-2 mb-4' },
+            [['🌙 Snitt läggtid', bedtimeAnalysis.avgBed], ['☀️ Snitt uppvaknande', bedtimeAnalysis.avgWake || '–'],
+             ['🎯 Regelbundenhet', '± ' + bedtimeAnalysis.sd + ' min'], ['🧭 Sömnmittpunkt', bedtimeAnalysis.midpoint || '–']].map(function(s, i) {
+              return h('div', { key: i, className: 'bg-gray-50 rounded-lg px-3 py-2 text-center' },
+                h('p', { className: 'text-xs text-gray-400' }, s[0]),
+                h('p', { className: 'text-lg font-black text-gray-800' }, s[1])
+              );
+            })
+          ),
+          bedtimeAnalysis.best ? h('div', { className: 'rounded-xl px-4 py-3 bg-violet-50 border-l-4 border-violet-400 mb-2' },
+            h('p', { className: 'text-sm text-gray-700' },
+              'Din bästa sömn kommer när du lägger dig ', h('span', { className: 'font-bold text-violet-700' }, bedtimeAnalysis.best.from + '–' + bedtimeAnalysis.best.to),
+              ' (snittpoäng ' + Math.round(bedtimeAnalysis.best.avg) + ' på ' + bedtimeAnalysis.best.n + ' nätter)' +
+              (bedtimeAnalysis.worst && Math.round(bedtimeAnalysis.worst.avg) < Math.round(bedtimeAnalysis.best.avg) ? '. Sämst: ' + bedtimeAnalysis.worst.from + '–' + bedtimeAnalysis.worst.to + ' (' + Math.round(bedtimeAnalysis.worst.avg) + ').' : '.')
+            )
+          ) : h('p', { className: 'text-xs text-gray-400 mb-2' }, 'Optimal läggtid visas när minst ett 30-minutersfönster har 5+ nätter.'),
+          bedtimeAnalysis.shift != null ? h('p', { className: 'text-xs text-gray-500' },
+            'Helgkvällar lägger du dig ' + (bedtimeAnalysis.shift >= 0 ? Math.abs(bedtimeAnalysis.shift) + ' min senare' : Math.abs(bedtimeAnalysis.shift) + ' min tidigare') + ' än vardagar' +
+            (Math.abs(bedtimeAnalysis.shift) > 60 ? ' — stor förskjutning som ofta märks som måndagströtthet.' : ' — helt rimlig nivå.')
+          ) : null
+        )
+      ) : null,
+      // ── Aktivitetsbalans ──
+      activityBalance ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-orange-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, '🪑 Aktivitetsbalans'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Hur en genomsnittlig dag fördelas · ' + activityBalance.n + ' dagar')
+          )
+        ),
+        h('div', { className: 'p-5' },
+          (function(){
+            var parts = [
+              ['Stillasittande', activityBalance.sed, '#cbd5e1'],
+              ['Låg aktivitet', activityBalance.lo, '#86efac'],
+              ['Medel', activityBalance.me, '#4ade80'],
+              ['Hög', activityBalance.hi, '#16a34a']
+            ].filter(function(p){ return p[1] != null; });
+            var tot = parts.reduce(function(s,p){ return s+p[1]; },0);
+            if (!tot) return null;
+            return h('div', { className: 'mb-4' },
+              h('div', { className: 'flex h-6 rounded-full overflow-hidden mb-2' },
+                parts.map(function(p, i){ return h('div', { key: i, style: { width: (p[1]/tot*100) + '%', backgroundColor: p[2] }, title: p[0] }); })
+              ),
+              h('div', { className: 'flex flex-wrap gap-x-4 gap-y-1' },
+                parts.map(function(p, i){
+                  return h('span', { key: i, className: 'text-xs text-gray-500 flex items-center gap-1.5' },
+                    h('span', { className: 'w-2.5 h-2.5 rounded-full inline-block', style: { backgroundColor: p[2] } }),
+                    p[0] + ' ' + Math.floor(p[1]/60) + 'h ' + Math.round(p[1]%60) + 'm'
+                  );
+                })
+              )
+            );
+          })(),
+          h('div', { className: 'grid grid-cols-2 gap-2 mb-3' },
+            activityBalance.alerts != null ? h('div', { className: 'bg-gray-50 rounded-lg px-3 py-2 text-center' },
+              h('p', { className: 'text-xs text-gray-400' }, '⏰ Inaktivitetslarm/dag'),
+              h('p', { className: 'text-lg font-black ' + (activityBalance.alerts > 2 ? 'text-amber-600' : 'text-gray-800') }, activityBalance.alerts.toFixed(1))
+            ) : null,
+            activityBalance.met != null ? h('div', { className: 'bg-gray-50 rounded-lg px-3 py-2 text-center' },
+              h('p', { className: 'text-xs text-gray-400' }, '⚡ MET-minuter/dag'),
+              h('p', { className: 'text-lg font-black text-gray-800' }, Math.round(activityBalance.met).toLocaleString('sv-SE'))
+            ) : null
+          ),
+          activityBalance.rSed != null && activityBalance.nSed >= 10 ? h('p', { className: 'text-xs text-gray-500' },
+            'Stillasittande vs nästa natts sömn: r = ' + (activityBalance.rSed > 0 ? '+' : '') + activityBalance.rSed.toFixed(2) +
+            (activityBalance.rSed < -0.2 ? ' — mer stillasittande verkar ge sämre sömn hos dig.' : ' — inget starkt samband ännu.')
+          ) : null
         )
       ) : null,
       // ── Lag-korrelationsmatris ──
@@ -3318,7 +3466,10 @@ function WeightStepTracker() {
         Section('💍 Oura', o ? [
           Row('Sömnpoäng', o.sleep_score),
           Row('Dagsform', o.dagsform_score),
+          Row('Läggtid → uppe', o.bedtime_start ? new Date(o.bedtime_start).toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'}) + ' → ' + (o.bedtime_end ? new Date(o.bedtime_end).toLocaleTimeString('sv-SE',{hour:'2-digit',minute:'2-digit'}) : '–') : null),
           Row('Sömntid', min2h(o.total_sleep_min)),
+          Row('Vaken tid i sängen', o.awake_min != null ? o.awake_min + ' min' : null),
+          Row('Stillasittande', o.sedentary_min != null ? min2h(o.sedentary_min) : null),
           Row('Djupsömn / REM', o.deep_sleep_min != null ? min2h(o.deep_sleep_min) + ' / ' + min2h(o.rem_sleep_min) : null),
           Row('Sömneffektivitet', o.sleep_efficiency != null ? o.sleep_efficiency + '%' : null),
           Row('HRV', o.hrv_avg != null ? o.hrv_avg + ' ms' : null),
