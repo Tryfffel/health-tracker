@@ -176,6 +176,17 @@ function WeightStepTracker() {
   const [showImport, setShowImport] = useState(false);
   const [toast, setToast]           = useState(null);
   const [loading, setLoading]       = useState(true);
+  const [lastBackup, setLastBackup] = useState(null);
+  const [appSettings, setAppSettings] = useState({ injectionDay: 2, stepGoal: 8000, stepTarget: 12000 });
+  const [selectedDay, setSelectedDay] = useState(null);
+  const WEEKDAY_NAMES = ['söndag','måndag','tisdag','onsdag','torsdag','fredag','lördag'];
+  const calcPearson = function(pairs) {
+    var n = pairs.length; if (n < 3) return null;
+    var sx=0,sy=0,sxy=0,sxx=0,syy=0;
+    pairs.forEach(function(p){sx+=p[0];sy+=p[1];sxy+=p[0]*p[1];sxx+=p[0]*p[0];syy+=p[1]*p[1];});
+    var den = Math.sqrt((n*sxx-sx*sx)*(n*syy-sy*sy));
+    return den===0 ? null : (n*sxy-sx*sy)/den;
+  };
   const showToast = (msg, type) => {
     setToast({ msg, type: type || 'success' });
     setTimeout(() => setToast(null), 3000);
@@ -261,7 +272,7 @@ function WeightStepTracker() {
   })();
 
   useEffect(() => { loadData(); }, []);
-  useEffect(() => { if (!loading) saveData(); }, [entries, workouts, goalWeight, targetRate, yearlyGoal, height, loading]);
+  useEffect(() => { if (!loading) saveData(); }, [entries, workouts, goalWeight, targetRate, yearlyGoal, height, appSettings, loading]);
 
   // ─── WEGOVY STATE ────────────────────────────────────────────────────────
   const WEGOVY_DEFAULT_PROTOCOL = {
@@ -302,6 +313,8 @@ function WeightStepTracker() {
         window.storage.get('yearly-goal'),
         window.storage.get('user-height'),
         window.storage.get('target-rate'),
+        window.storage.get('last-backup'),
+        window.storage.get('app-settings'),
       ]);
       if (results[0] && results[0].value) setEntries(JSON.parse(results[0].value));
       if (results[1] && results[1].value) setWorkouts(JSON.parse(results[1].value));
@@ -309,6 +322,8 @@ function WeightStepTracker() {
       if (results[3] && results[3].value) setYearlyGoal(JSON.parse(results[3].value));
       if (results[4] && results[4].value) setHeight(parseFloat(results[4].value));
       if (results[5] && results[5].value) setTargetRate(parseFloat(results[5].value));
+      if (results[6] && results[6].value) setLastBackup(results[6].value);
+      if (results[7] && results[7].value) setAppSettings(Object.assign({ injectionDay: 2, stepGoal: 8000, stepTarget: 12000 }, JSON.parse(results[7].value)));
     } catch (err) {
       console.log('Ingen sparad data', err);
     } finally {
@@ -324,15 +339,18 @@ function WeightStepTracker() {
         window.storage.set('yearly-goal',    JSON.stringify(yearlyGoal)),
         window.storage.set('user-height',    height.toString()),
         window.storage.set('target-rate',    targetRate.toString()),
+        window.storage.set('app-settings',   JSON.stringify(appSettings)),
       ]);
     } catch (err) { console.error(err); }
   };
 
   const addEntry = () => {
     if (!newEntry.weight) return;
+    var wVal = parseFloat(String(newEntry.weight).replace(',', '.'));
+    if (isNaN(wVal) || wVal < 30 || wVal > 300) { showToast('Vikten verkar orimlig — ange 30–300 kg', 'error'); return; }
     const entry = {
       date: newEntry.date,
-      weight: parseFloat(newEntry.weight),
+      weight: wVal,
       steps: newEntry.steps ? parseInt(newEntry.steps) : null,
       mood: newEntry.mood ? parseInt(newEntry.mood) : null,
       comment: newEntry.comment,
@@ -371,7 +389,7 @@ function WeightStepTracker() {
     var nw = window.prompt('Ny vikt (kg):', entry.weight);
     if (nw === null) return;
     var v = parseFloat(String(nw).replace(',', '.'));
-    if (isNaN(v)) { showToast('Ogiltig vikt', 'error'); return; }
+    if (isNaN(v) || v < 30 || v > 300) { showToast('Ogiltig vikt — ange 30–300 kg', 'error'); return; }
     setEntries(function(prev){ return prev.map(function(e){ return e.id === entry.id ? Object.assign({}, e, { weight: v }) : e; }); });
     showToast('✓ Vikt uppdaterad');
   };
@@ -386,6 +404,9 @@ function WeightStepTracker() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    var nowIso = new Date().toISOString();
+    window.storage.set('last-backup', nowIso);
+    setLastBackup(nowIso);
     showToast('💾 Backup nedladdad!');
   };
   const importFromFile = function(event) {
@@ -639,6 +660,66 @@ function WeightStepTracker() {
       weeksAnalyzed: n
     };
   };
+  // ── ALGORITHM: Mood correlations ─────────────────────────────────────────────
+  const getMoodAnalysis = function() {
+    var moodEntries = entries.filter(function(e){ return e.mood; });
+    if (moodEntries.length < 5) return null;
+    var ouraByDate = {}; ouraData.forEach(function(d){ ouraByDate[d.date] = d; });
+    var wByDate = {}; entries.forEach(function(e){ wByDate[e.date] = e.weight; });
+    var addD = function(ds,n){ var dd=new Date(ds); dd.setDate(dd.getDate()+n); return dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0'); };
+    var sleepPairs=[], hrvPairs=[], stressPairs=[], wtPairs=[];
+    moodEntries.forEach(function(e){
+      var o = ouraByDate[e.date];
+      if (o) {
+        if (o.sleep_score != null) sleepPairs.push([o.sleep_score, e.mood]);
+        if (o.hrv_avg != null) hrvPairs.push([o.hrv_avg, e.mood]);
+        if (o.stress_high_min != null) stressPairs.push([o.stress_high_min, e.mood]);
+      }
+      var w1 = wByDate[addD(e.date,1)];
+      if (w1 != null) wtPairs.push([e.mood, parseFloat((w1 - e.weight).toFixed(2))]);
+    });
+    var workoutDates = {}; workouts.forEach(function(w){ workoutDates[w.date] = true; });
+    var wd = moodEntries.filter(function(e){ return workoutDates[e.date]; });
+    var rd = moodEntries.filter(function(e){ return !workoutDates[e.date]; });
+    var avgM = function(a){ return a.length ? a.reduce(function(s,e){ return s+e.mood; },0)/a.length : null; };
+    var rows = [
+      { name:'Nattens sömnpoäng → humör', r: calcPearson(sleepPairs), n: sleepPairs.length, posMeans:'bättre sömn → bättre humör' },
+      { name:'Nattens HRV → humör', r: calcPearson(hrvPairs), n: hrvPairs.length, posMeans:'högre HRV → bättre humör' },
+      { name:'Dagens stress → humör', r: calcPearson(stressPairs), n: stressPairs.length, posMeans:'mer stress → bättre humör' },
+      { name:'Humör → nästa dags viktändring', r: calcPearson(wtPairs), n: wtPairs.length, posMeans:'bättre humör → vikt upp' }
+    ].filter(function(x){ return x.r != null; });
+    if (!rows.length && (wd.length < 3 || rd.length < 3)) return null;
+    return { rows: rows, workoutMood: avgM(wd), restMood: avgM(rd), nWorkout: wd.length, nRest: rd.length, n: moodEntries.length };
+  };
+  // ── ALGORITHM: Week comparison (this week vs 4 weeks ago) ───────────────────
+  const getWeekComparison = function() {
+    var today = new Date(); today.setHours(0,0,0,0);
+    var dow = today.getDay();
+    var mon = new Date(today); mon.setDate(today.getDate() - (dow===0?6:dow-1));
+    var mkWeek = function(monday) {
+      var end = new Date(monday); end.setDate(monday.getDate()+6); end.setHours(23,59,59,0);
+      var inR = function(ds){ var d = new Date(ds); return d >= monday && d <= end; };
+      var we = entries.filter(function(e){ return inR(e.date); });
+      var ww = workouts.filter(function(w){ return inR(w.date); });
+      var wo = ouraData.filter(function(d){ return inR(d.date); });
+      var avg = function(arr, get){ var v = arr.map(get).filter(function(x){ return x != null; }); return v.length ? v.reduce(function(a,b){ return a+b; },0)/v.length : null; };
+      var steps = avg(wo, function(d){ return d.steps; });
+      if (steps == null) steps = avg(we, function(e){ return e.steps; });
+      return {
+        label: monday.toLocaleDateString('sv-SE',{day:'numeric',month:'short'}) + '–' + end.toLocaleDateString('sv-SE',{day:'numeric',month:'short'}),
+        avgWeight: avg(we, function(e){ return e.weight; }),
+        sleep: avg(wo, function(d){ return d.sleep_score; }),
+        hrv: avg(wo, function(d){ return d.hrv_avg; }),
+        steps: steps,
+        passes: ww.length,
+        minutes: ww.reduce(function(s,w){ return s+w.duration; },0)
+      };
+    };
+    var monPrev = new Date(mon); monPrev.setDate(mon.getDate()-28);
+    var a = mkWeek(mon), b = mkWeek(monPrev);
+    if ((a.avgWeight == null && a.sleep == null) || (b.avgWeight == null && b.sleep == null)) return null;
+    return { now: a, then: b };
+  };
   const getChartData = function() {
     const sorted = entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
     return sorted.map(function(entry, idx) {
@@ -716,13 +797,14 @@ function WeightStepTracker() {
     // Steps vs weight correlation
     var stepsEntries = sorted.filter(function(e){return e.steps && e.steps > 0;});
     if (stepsEntries.length >= 5) {
-      var highSteps = stepsEntries.filter(function(e){return e.steps >= 8000;});
-      var lowSteps  = stepsEntries.filter(function(e){return e.steps < 8000;});
+      var stepG = appSettings.stepGoal;
+      var highSteps = stepsEntries.filter(function(e){return e.steps >= stepG;});
+      var lowSteps  = stepsEntries.filter(function(e){return e.steps < stepG;});
       if (highSteps.length >= 3 && lowSteps.length >= 3) {
         var avgHigh = highSteps.reduce(function(s,e){return s+e.weight;},0)/highSteps.length;
         var avgLow  = lowSteps.reduce(function(s,e){return s+e.weight;},0)/lowSteps.length;
         if (avgHigh < avgLow - 0.3) {
-          insights.push({ icon:'👟', text: 'Dagar med 8000+ steg: snitt ' + avgHigh.toFixed(1) + ' kg. Under 8000: ' + avgLow.toFixed(1) + ' kg' });
+          insights.push({ icon:'👟', text: 'Dagar med ' + stepG.toLocaleString('sv-SE') + '+ steg: snitt ' + avgHigh.toFixed(1) + ' kg. Under ' + stepG.toLocaleString('sv-SE') + ': ' + avgLow.toFixed(1) + ' kg' });
         }
       }
     }
@@ -800,6 +882,8 @@ function WeightStepTracker() {
   const monthlySummary = getMonthlySummary();
   const plateau = getPlateauDetection();
   const workoutCorr = getWorkoutCorrelation();
+  const moodAnalysis = getMoodAnalysis();
+  const weekCompare = getWeekComparison();
   const NavButton = function(props) {
     return h('button', {
       onClick: function() { setView(props.id); },
@@ -851,11 +935,13 @@ function WeightStepTracker() {
     });
     var todayDS = todayD3.getFullYear()+'-'+String(todayD3.getMonth()+1).padStart(2,'0')+'-'+String(todayD3.getDate()).padStart(2,'0');
     var reminders = [];
-    if (todayD3.getDay() === 2 && wegovyDoses && !wegovyDoses.some(function(d){return d.date===todayDS;})) reminders.push({icon:'💉', text:'Dags för Wegovy-dos idag (tisdag).'});
+    if (todayD3.getDay() === appSettings.injectionDay && wegovyDoses && !wegovyDoses.some(function(d){return d.date===todayDS;})) reminders.push({icon:'💉', text:'Dags för Wegovy-dos idag (' + WEEKDAY_NAMES[appSettings.injectionDay] + ').'});
     if (!entries.some(function(e){return e.date===todayDS;})) reminders.push({icon:'⚖️', text:'Du har inte loggat din vikt idag.'});
+    var backupDue = entries.length >= 5 && (!lastBackup || (Date.now() - new Date(lastBackup).getTime()) > 7*86400000);
+    if (backupDue) reminders.push({icon:'💾', text: lastBackup ? 'Över en vecka sedan senaste backup — din data finns bara i den här webbläsaren.' : 'Du har aldrig tagit en backup — din data finns bara i den här webbläsaren.', action: exportData, actionLabel: 'Ladda ner backup'});
     var sc7 = ouraData.slice(0,7);
     var scAvg = function(key){ var v=sc7.map(function(d){return d[key];}).filter(function(x){return x!=null;}); return v.length?v.reduce(function(a,b){return a+b;},0)/v.length:null; };
-    var aktSc = scAvg('steps')!=null ? Math.min(100, scAvg('steps')/12000*100) : null;
+    var aktSc = scAvg('steps')!=null ? Math.min(100, scAvg('steps')/appSettings.stepTarget*100) : null;
     var stressSc = scAvg('stress_high_min')!=null ? Math.max(0, 100 - scAvg('stress_high_min')/2) : null;
     var recent7 = entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}).filter(function(e){ return (todayD3 - new Date(e.date)) <= 7*86400000; });
     var viktChange = recent7.length>=2 ? recent7[recent7.length-1].weight - recent7[0].weight : null;
@@ -866,9 +952,10 @@ function WeightStepTracker() {
     return h('div', null,
       // Reminders
       reminders.length ? h('div', { className: 'space-y-2 mb-4' },
-        reminders.map(function(r,i){ return h('div', { key:i, className: 'flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3' },
+        reminders.map(function(r,i){ return h('div', { key:i, className: 'flex items-center gap-3 rounded-xl px-4 py-3 border ' + (r.action ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200') },
           h('span', { className:'text-2xl' }, r.icon),
-          h('p', { className:'text-sm font-medium text-blue-800' }, r.text)
+          h('p', { className:'text-sm font-medium flex-1 ' + (r.action ? 'text-amber-800' : 'text-blue-800') }, r.text),
+          r.action ? h('button', { onClick: r.action, className:'bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap' }, r.actionLabel) : null
         ); })
       ) : null,
       // Plateau warning banner
@@ -1003,6 +1090,48 @@ function WeightStepTracker() {
             h('div', null, h('p', {className:'text-xs text-gray-500'}, 'Träning'), h('p', {className:'text-xl font-bold text-gray-700'}, currentWeek.lastWeek.workoutCount + ' pass'), h('p', {className:'text-xs text-gray-400'}, currentWeek.lastWeek.totalMinutes + ' min'))
           )
         ) : null
+      ) : null,
+      // ── Jämförelse: denna vecka vs 4 veckor sedan ──
+      weekCompare ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-6 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-cyan-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, '⏳ Denna vecka vs för 4 veckor sedan'),
+            h('p', { className: 'text-xs text-gray-400' }, weekCompare.then.label + ' → ' + weekCompare.now.label)
+          )
+        ),
+        h('div', { className: 'overflow-x-auto' },
+          h('table', { className: 'w-full text-sm' },
+            h('thead', null, h('tr', { className: 'bg-gray-50' },
+              h('th', { className: 'text-left px-6 py-2 text-xs font-bold uppercase tracking-wide text-gray-400' }, ''),
+              h('th', { className: 'text-right px-3 py-2 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'För 4 v sedan'),
+              h('th', { className: 'text-right px-3 py-2 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Denna vecka'),
+              h('th', { className: 'text-right px-6 py-2 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Skillnad')
+            )),
+            h('tbody', null,
+              [
+                ['⚖️ Snitt vikt', weekCompare.then.avgWeight, weekCompare.now.avgWeight, 'kg', 1, 'down'],
+                ['🌙 Sömnpoäng', weekCompare.then.sleep, weekCompare.now.sleep, '', 0, 'up'],
+                ['💗 HRV', weekCompare.then.hrv, weekCompare.now.hrv, 'ms', 0, 'up'],
+                ['👟 Steg/dag', weekCompare.then.steps, weekCompare.now.steps, '', 0, 'up'],
+                ['💪 Träningspass', weekCompare.then.passes, weekCompare.now.passes, 'st', 0, 'up'],
+                ['⏱ Träningsminuter', weekCompare.then.minutes, weekCompare.now.minutes, 'min', 0, 'up']
+              ].map(function(row, ri) {
+                var thenV = row[1], nowV = row[2], unit = row[3], dec = row[4], better = row[5];
+                var fmt = function(v){ return v == null ? '–' : (dec ? v.toFixed(dec) : Math.round(v).toLocaleString('sv-SE')) + (unit ? ' ' + unit : ''); };
+                var diff = (thenV != null && nowV != null) ? nowV - thenV : null;
+                var good = diff == null ? null : (better === 'up' ? diff > 0 : diff < 0);
+                var diffTxt = diff == null ? '–' : (diff > 0 ? '+' : '') + (dec ? diff.toFixed(dec) : Math.round(diff).toLocaleString('sv-SE'));
+                return h('tr', { key: ri, className: ri % 2 ? 'bg-gray-50/50' : 'bg-white' },
+                  h('td', { className: 'px-6 py-2.5 font-medium text-gray-700' }, row[0]),
+                  h('td', { className: 'px-3 py-2.5 text-right text-gray-500' }, fmt(thenV)),
+                  h('td', { className: 'px-3 py-2.5 text-right font-bold text-gray-800' }, fmt(nowV)),
+                  h('td', { className: 'px-6 py-2.5 text-right font-bold ' + (diff == null || Math.abs(diff) < 0.001 ? 'text-gray-400' : good ? 'text-green-600' : 'text-red-500') }, diffTxt)
+                );
+              })
+            )
+          )
+        )
       ) : null,
       // Prediction + Monthly summary row
       h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-6' },
@@ -1156,6 +1285,53 @@ function WeightStepTracker() {
           })
         ),
         insights.length > 4 ? h('button', { onClick: function(){ setShowAllInsights(!showAllInsights); }, className: 'mt-3 text-sm text-indigo-600 font-medium hover:underline' }, showAllInsights ? 'Visa färre' : 'Visa fler (' + (insights.length-4) + ')') : null
+      ) : null,
+      // ── Humör & samband ──
+      moodAnalysis ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-6 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-pink-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, '😊 Humör & samband'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Vad hänger ihop med hur du mår · ' + moodAnalysis.n + ' loggade humördagar')
+          )
+        ),
+        h('div', { className: 'p-5' },
+          moodAnalysis.workoutMood != null && moodAnalysis.restMood != null && moodAnalysis.nWorkout >= 3 && moodAnalysis.nRest >= 3 ? h('div', { className: 'mb-4' },
+            h('p', { className: 'text-xs font-semibold text-gray-500 mb-2' }, 'Träningsdagar vs vilodagar'),
+            [
+              { label:'💪 Dagar med träning', val: moodAnalysis.workoutMood, n: moodAnalysis.nWorkout },
+              { label:'🛋️ Dagar utan träning', val: moodAnalysis.restMood, n: moodAnalysis.nRest }
+            ].map(function(bar, bi) {
+              var pct = bar.val / 5 * 100;
+              return h('div', { key: bi, className: 'mb-2' },
+                h('div', { className: 'flex items-baseline justify-between mb-1' },
+                  h('span', { className: 'text-sm font-medium text-gray-700' }, bar.label, h('span', { className: 'text-xs text-gray-400 ml-1.5' }, '(' + bar.n + ' dagar)')),
+                  h('span', { className: 'text-base font-black text-pink-600' }, bar.val.toFixed(1) + ' / 5')
+                ),
+                h('div', { className: 'h-3 bg-gray-100 rounded-full overflow-hidden' },
+                  h('div', { className: 'h-full rounded-full bg-gradient-to-r from-pink-400 to-rose-400', style: { width: pct + '%' } })
+                )
+              );
+            }),
+            (moodAnalysis.workoutMood - moodAnalysis.restMood) >= 0.3 ? h('p', { className: 'text-xs text-green-600 mt-1' }, '✓ Du mår tydligt bättre de dagar du tränar.') : null
+          ) : null,
+          moodAnalysis.rows.length ? h('div', null,
+            h('p', { className: 'text-xs font-semibold text-gray-500 mb-2' }, 'Korrelationer'),
+            h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-2' },
+              moodAnalysis.rows.map(function(c, i) {
+                var strong = Math.abs(c.r) >= 0.3;
+                return h('div', { key: i, className: 'flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2' },
+                  h('div', null,
+                    h('p', { className: 'text-sm font-semibold text-gray-700' }, c.name),
+                    h('p', { className: 'text-xs text-gray-400' }, 'n=' + c.n + (strong ? ' · ' + c.posMeans : ''))
+                  ),
+                  h('p', { className: 'text-lg font-black ' + (strong ? 'text-pink-600' : 'text-gray-400') }, (c.r > 0 ? '+' : '') + c.r.toFixed(2))
+                );
+              })
+            ),
+            h('p', { className: 'text-xs text-gray-400 mt-2' }, 'Samband = inte nödvändigtvis orsak. Värden nära 0 = inget tydligt mönster.')
+          ) : null
+        )
       ) : null,
       h('h2', { className: 'text-sm font-bold text-gray-400 uppercase tracking-wider mt-6 mb-2 px-1' }, 'Grafer'),
       // Weight chart
@@ -1359,7 +1535,7 @@ function WeightStepTracker() {
       h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
         h('div', { className: 'flex items-center justify-between mb-5' },
           h('h2', { className: 'text-lg font-bold text-gray-800' }, '🎯 Årsmål ' + new Date().getFullYear()),
-          h('button', { onClick: function(){setView('goals');}, className:'text-xs text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-full hover:bg-blue-100' }, 'Ändra →')
+          h('button', { onClick: function(){setView('settings');}, className:'text-xs text-blue-600 font-medium bg-blue-50 px-3 py-1 rounded-full hover:bg-blue-100' }, 'Ändra →')
         ),
         h('div', { className: 'space-y-5' },
           h('div', null,
@@ -1512,50 +1688,6 @@ function WeightStepTracker() {
       ) : null
     );
   }
-  function renderGoals() {
-    return h('div', { className: 'max-w-lg mx-auto' },
-      h('div', { className: 'bg-white rounded-xl p-6 shadow-md' },
-        h('h2', { className: 'text-xl font-bold mb-5 text-gray-800' }, 'Mål & inställningar'),
-        h('div', { className: 'space-y-5' },
-          h('div', null,
-            h('label', { className: 'text-sm font-medium text-gray-700 block mb-1' }, 'Målvikt (kg)'),
-            h('input', { type:'number', step:'0.5', value:goalWeight, onChange:function(e){setGoalWeight(parseFloat(e.target.value)||0);}, className:'w-full px-4 py-3 border rounded-lg outline-none' })
-          ),
-          h('div', null,
-            h('label', { className: 'text-sm font-medium text-gray-700 block mb-1' }, 'Önskat tempo (kg/vecka)'),
-            h('div', { className: 'flex gap-2 flex-wrap' },
-              [0.25, 0.5, 0.75, 1.0].map(function(rate) {
-                return h('button', {
-                  key: rate,
-                  onClick: function(){ setTargetRate(rate); },
-                  className: 'px-4 py-2 rounded-lg text-sm font-medium border-2 ' + (targetRate === rate ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-300')
-                }, rate + ' kg/v');
-              })
-            ),
-            h('p', { className: 'text-xs text-gray-400 mt-1' }, 'Rekommenderat: 0,5 kg/vecka')
-          ),
-          h('div', null,
-            h('label', { className: 'text-sm font-medium text-gray-700 block mb-1' }, 'Din längd (cm) – för BMI'),
-            h('input', { type:'number', value:height, onChange:function(e){setHeight(parseFloat(e.target.value)||0);}, className:'w-full px-4 py-3 border rounded-lg outline-none' })
-          ),
-          h('div', { className: 'border-t pt-5' },
-            h('p', { className: 'text-sm font-semibold text-gray-700 mb-3' }, 'Årsmål ' + new Date().getFullYear()),
-            h('div', { className: 'grid grid-cols-2 gap-3' },
-              h('div', null,
-                h('label', { className: 'text-xs text-gray-500' }, 'Träningspass'),
-                h('input', { type:'number', value:yearlyGoal.sessions, onChange:function(e){setYearlyGoal(Object.assign({},yearlyGoal,{sessions:parseInt(e.target.value)||0}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1' })
-              ),
-              h('div', null,
-                h('label', { className: 'text-xs text-gray-500' }, 'Total tid (minuter)'),
-                h('input', { type:'number', value:yearlyGoal.minutes, onChange:function(e){setYearlyGoal(Object.assign({},yearlyGoal,{minutes:parseInt(e.target.value)||0}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1' })
-              )
-            )
-          ),
-          h('button', { onClick:function(){setView('workouts');}, className:'w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 font-medium' }, '✓ Spara')
-        )
-      )
-    );
-  }
   function renderHistory() {
     const sortedEntries = entries.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);});
     return h('div', { className: 'bg-white rounded-xl shadow-md overflow-hidden' },
@@ -1587,7 +1719,7 @@ function WeightStepTracker() {
               const diff = prev ? (entry.weight - prev.weight).toFixed(1) : null;
               const diffNum = diff !== null ? parseFloat(diff) : 0;
               const isEven = idx % 2 === 0;
-              return h('tr', { key: entry.id, className: (isEven ? 'bg-white' : 'bg-gray-50/50') + ' hover:bg-blue-50 transition-colors' },
+              return h('tr', { key: entry.id, onClick: function(){ setSelectedDay(entry.date); }, className: (isEven ? 'bg-white' : 'bg-gray-50/50') + ' hover:bg-blue-50 transition-colors cursor-pointer' },
                 h('td', { className: 'px-6 py-3 text-sm font-medium text-gray-700' }, new Date(entry.date).toLocaleDateString('sv-SE', { weekday:'short', day:'numeric', month:'short' })),
                 h('td', { className: 'px-3 py-3 font-bold text-gray-800' }, entry.weight + ' kg'),
                 h('td', { className: 'px-3 py-3 text-sm' }, diff !== null
@@ -1596,7 +1728,7 @@ function WeightStepTracker() {
                   : null),
                 h('td', { className: 'px-3 py-3 text-sm text-gray-500' }, entry.steps ? '👟 ' + entry.steps.toLocaleString() : '–'),
                 h('td', { className: 'px-3 py-3 text-xs text-gray-400 max-w-xs truncate' }, entry.mood ? ['😴','😔','😐','😊','🤩'][entry.mood-1] + ' ' : '', entry.comment || ''),
-                h('td', { className: 'px-3 py-3 whitespace-nowrap' }, h('button', { onClick: function(){editEntry(entry);}, className:'text-gray-300 hover:text-indigo-500 transition-colors mr-3', title:'Redigera vikt' }, '✎'), h('button', { onClick: function(){deleteEntry(entry.id);}, className:'text-gray-300 hover:text-red-500 transition-colors' }, '✕'))
+                h('td', { className: 'px-3 py-3 whitespace-nowrap' }, h('button', { onClick: function(ev){ev.stopPropagation();editEntry(entry);}, className:'text-gray-300 hover:text-indigo-500 transition-colors mr-3', title:'Redigera vikt' }, '✎'), h('button', { onClick: function(ev){ev.stopPropagation();deleteEntry(entry.id);}, className:'text-gray-300 hover:text-red-500 transition-colors' }, '✕'))
               );
             })
           )
@@ -1640,6 +1772,28 @@ function WeightStepTracker() {
                 h('label', { className: 'text-xs text-gray-500' }, 'Total tid (minuter)'),
                 h('input', { type:'number', value:yearlyGoal.minutes, onChange:function(e){setYearlyGoal(Object.assign({},yearlyGoal,{minutes:parseInt(e.target.value)||0}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1' })
               )
+            )
+          ),
+          h('div', { className: 'border-t pt-5' },
+            h('p', { className: 'text-sm font-semibold text-gray-700 mb-3' }, 'Appen'),
+            h('div', { className: 'space-y-4' },
+              h('div', null,
+                h('label', { className: 'text-sm font-medium text-gray-700 block mb-1' }, '💉 Wegovy-injektionsdag'),
+                h('select', { value: appSettings.injectionDay, onChange:function(e){setAppSettings(Object.assign({},appSettings,{injectionDay:parseInt(e.target.value)}));}, className:'w-full px-4 py-3 border rounded-lg outline-none' },
+                  [1,2,3,4,5,6,0].map(function(d){ return h('option',{key:d,value:d}, WEEKDAY_NAMES[d].charAt(0).toUpperCase()+WEEKDAY_NAMES[d].slice(1)); })
+                )
+              ),
+              h('div', { className: 'grid grid-cols-2 gap-3' },
+                h('div', null,
+                  h('label', { className: 'text-xs text-gray-500' }, '👟 Dagligt stegmål'),
+                  h('input', { type:'number', step:'500', value:appSettings.stepGoal, onChange:function(e){setAppSettings(Object.assign({},appSettings,{stepGoal:parseInt(e.target.value)||8000}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1' })
+                ),
+                h('div', null,
+                  h('label', { className: 'text-xs text-gray-500' }, '🏅 Steg för full poäng'),
+                  h('input', { type:'number', step:'500', value:appSettings.stepTarget, onChange:function(e){setAppSettings(Object.assign({},appSettings,{stepTarget:parseInt(e.target.value)||12000}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1' })
+                )
+              ),
+              h('p', { className: 'text-xs text-gray-400' }, 'Stegmålet används i insikter och coach. "Full poäng" är nivån som ger 100 i veckoscorens aktivitetsdel.')
             )
           )
         )
@@ -1707,6 +1861,12 @@ function WeightStepTracker() {
     if(lowSpo2) flags.push({lvl:'info',icon:'🫁',text:'Låg syresättning en natt ('+lowSpo2.spo2_avg+'%).'});
     var poorSleep = ouraData.slice(0,5).filter(function(d){return d.sleep_score!=null && d.sleep_score<70;});
     if(poorSleep.length>=3) flags.push({lvl:'info',icon:'😴',text:poorSleep.length+' av senaste 5 nätterna under sömnpoäng 70.'});
+    var br7=oAvg(last7,'breath_avg'), brBase=oAvg(prior30,'breath_avg');
+    if(br7!=null && brBase!=null && br7 > brBase+1.5) flags.push({lvl:'warn',icon:'🫁',text:'Andningsfrekvensen i sömn är förhöjd ('+br7.toFixed(1)+' vs '+brBase.toFixed(1)+' andetag/min) — kan tyda på stress eller begynnande infektion.'});
+    var shr7=oAvg(last7,'avg_hr_sleep'), shrBase=oAvg(prior30,'avg_hr_sleep');
+    if(shr7!=null && shrBase!=null && shr7 > shrBase+4) flags.push({lvl:'warn',icon:'💓',text:'Sömnpulsen ligger högre än vanligt ('+Math.round(shr7)+' vs '+Math.round(shrBase)+' slag/min i snitt).'});
+    var eff7=oAvg(last7,'sleep_efficiency');
+    if(eff7!=null && eff7 < 80) flags.push({lvl:'info',icon:'🛏️',text:'Sömneffektiviteten har varit låg ('+Math.round(eff7)+'%) — mycket vaken tid i sängen.'});
     var trendMetrics = [{key:'sleep_score',name:'Sömnpoäng',better:'up'},{key:'hrv_avg',name:'HRV',better:'up'},{key:'resting_hr',name:'Vilopuls',better:'down'},{key:'steps',name:'Steg',better:'up'}];
     var trends = trendMetrics.map(function(m){ var a=oAvg(last7,m.key), b=oAvg(prev7,m.key); if(a==null||b==null) return null; return {name:m.name, now:Math.round(a), diff:a-b, better:m.better}; }).filter(function(x){return x;});
     var maxBy=function(key){ var a=ouraData.filter(function(d){return d[key]!=null;}); return a.length?a.reduce(function(p,c){return c[key]>p[key]?c:p;}):null; };
@@ -1731,7 +1891,7 @@ function WeightStepTracker() {
         else if(hrvNow > hrvPrev*1.1){ parts.push('Återhämtningen ser stark ut — HRV har stigit.'); if(tone!=='tough') tone='good'; }
       }
       if(stepsNow!=null){
-        if(stepsNow<7000){ parts.push('Aktiviteten har varit låg (' + Math.round(stepsNow).toLocaleString('sv-SE') + ' steg/dag).'); tips.push('Lägg till en extra 20-minuterspromenad om dagen.'); }
+        if(stepsNow<appSettings.stepGoal*0.875){ parts.push('Aktiviteten har varit låg (' + Math.round(stepsNow).toLocaleString('sv-SE') + ' steg/dag).'); tips.push('Lägg till en extra 20-minuterspromenad om dagen.'); }
         else if(stepsNow>=10000) parts.push('Bra aktivitetsnivå (' + Math.round(stepsNow).toLocaleString('sv-SE') + ' steg/dag).');
       }
       if(viktChange!=null){
@@ -1986,13 +2146,14 @@ function WeightStepTracker() {
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
           h('div', { className: 'w-1 h-8 rounded-full bg-red-500' }),
           h('div', null,
-            h('h2', { className: 'font-bold text-gray-800' }, 'Vilopuls'),
-            h('p', { className: 'text-xs text-gray-400' }, 'Lägre = bättre kondition')
+            h('h2', { className: 'font-bold text-gray-800' }, 'Vilopuls & sömnpuls'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Lägsta puls vs snittpuls under sömn · lägre = bättre kondition')
           )
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: chartData, height: 180, lines: [
-            { key: 'vilohjärtfrekvens', color: '#ef4444', width: 2, name: 'Vilopuls (slag/min)' }
+            { key: 'vilohjärtfrekvens', color: '#ef4444', width: 2, name: 'Vilopuls (slag/min)' },
+            { key: 'sömnpuls', color: '#f97316', width: 1.5, name: 'Sömnpuls snitt (slag/min)' }
           ]})
         )
       ),
@@ -2121,7 +2282,7 @@ function WeightStepTracker() {
       // Sync info footer
       h('div', { className: 'text-center text-xs text-gray-400 mt-4' },
         ouraLastSync ? 'Senast synkad: ' + new Date(ouraLastSync).toLocaleString('sv-SE') : 'Aldrig synkad',
-        ' · Auto-sync varje natt 07:00'
+        ' · Auto-sync flera gånger varje morgon'
       )
     );
   }
@@ -2139,9 +2300,9 @@ function WeightStepTracker() {
       return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
     }
     function getNextTuesdayStr(fromDate) {
+      var target = appSettings.injectionDay;
       var d = new Date(fromDate || Date.now());
-      var day = d.getDay();
-      var diff = (day <= 2) ? (2 - day) : (9 - day);
+      var diff = (target - d.getDay() + 7) % 7;
       if (diff === 0) diff = 7;
       d.setDate(d.getDate() + diff);
       return toDateStr(d);
@@ -2165,8 +2326,8 @@ function WeightStepTracker() {
       if (!doses || !doses.length) return 0;
       var streak = 0;
       var d = new Date(); d.setHours(0,0,0,0);
-      var dow = d.getDay();
-      d.setDate(d.getDate() - ((dow >= 2) ? dow - 2 : dow + 5));
+      var back = (d.getDay() - appSettings.injectionDay + 7) % 7;
+      d.setDate(d.getDate() - back);
       for (var i = 0; i < 52; i++) {
         var ds = toDateStr(d);
         if (doses.find(function(x){ return x.date === ds; })) { streak++; d.setDate(d.getDate()-7); }
@@ -2229,6 +2390,43 @@ function WeightStepTracker() {
     var dosesAsc = wegovyDoses.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
     var escMarkers = []; var prevDoseVal = null;
     dosesAsc.forEach(function(d){ if(prevDoseVal!=null && d.dose>prevDoseVal){ var idx=-1; for(var i=0;i<respEntries.length;i++){ if(respEntries[i].date>=d.date){idx=i;break;} } if(idx>=0) escMarkers.push({i:idx, label:d.dose+'mg'}); } prevDoseVal=d.dose; });
+    // ── Respons per dossteg + prognos ──
+    var doseResponse = (function(){
+      if (!dosesAsc.length || respEntries.length < 2) return null;
+      var periods = []; var cur = null;
+      dosesAsc.forEach(function(d){
+        if (!cur || d.dose !== cur.dose) {
+          if (cur) cur.end = d.date;
+          periods.push({ dose: d.dose, start: d.date, end: null });
+          cur = periods[periods.length-1];
+        }
+      });
+      var perStep = periods.map(function(p){
+        var es = respEntries.filter(function(e){ return e.date >= p.start && (!p.end || e.date < p.end); });
+        if (es.length < 2) return { dose: p.dose, rate: null, weeks: null };
+        var days = (new Date(es[es.length-1].date) - new Date(es[0].date)) / 86400000;
+        if (days < 3) return { dose: p.dose, rate: null, weeks: null };
+        var rate = (es[es.length-1].weight - es[0].weight) / (days/7);
+        return { dose: p.dose, rate: parseFloat(rate.toFixed(2)), weeks: Math.round(days/7 * 10) / 10 };
+      });
+      var recent = respEntries.filter(function(e){ return (new Date() - new Date(e.date)) <= 28*86400000; });
+      var pace = null;
+      if (recent.length >= 4) {
+        var n = recent.length, sx=0, sy=0, sxy=0, sxx=0;
+        var t0 = new Date(recent[0].date).getTime();
+        recent.forEach(function(e){ var x = (new Date(e.date).getTime()-t0)/86400000; sx+=x; sy+=e.weight; sxy+=x*e.weight; sxx+=x*x; });
+        var sl = (n*sxy - sx*sy) / ((n*sxx - sx*sx) || 1);
+        pace = sl * 7;
+      }
+      var lastW = respEntries[respEntries.length-1].weight;
+      var forecast = null;
+      if (pace != null && pace < -0.05 && lastW > goalWeight) {
+        var wks = Math.round((lastW - goalWeight) / Math.abs(pace));
+        if (wks <= 200) { var fd = new Date(); fd.setDate(fd.getDate() + wks*7); forecast = { weeks: wks, date: fd }; }
+      }
+      if (!perStep.some(function(s){ return s.rate != null; }) && pace == null) return null;
+      return { perStep: perStep, forecast: forecast, pace: pace != null ? parseFloat(pace.toFixed(2)) : null, lastW: lastW };
+    })();
     return h('div', null,
       h('div', { className: 'bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600 rounded-2xl shadow-xl mb-5 p-6 text-white' },
         h('div', { className: 'flex items-start justify-between mb-4' },
@@ -2253,7 +2451,7 @@ function WeightStepTracker() {
           h('div', { className: 'bg-white/15 rounded-xl p-3' },
             h('p', { className: 'text-pink-200 text-xs' }, 'Streak'),
             h('p', { className: 'text-xl font-black' }, streak + ' 💉'),
-            h('p', { className: 'text-xs text-pink-200' }, streak === 1 ? 'tisdag i rad' : 'tisdagar i rad')
+            h('p', { className: 'text-xs text-pink-200' }, WEEKDAY_NAMES[appSettings.injectionDay] + (streak === 1 ? ' i rad' : 'ar i rad'))
           ),
           h('div', { className: 'bg-white/15 rounded-xl p-3' },
             h('p', { className: 'text-pink-200 text-xs' }, 'Viktändring'),
@@ -2304,6 +2502,40 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: respData, height: 230, lines: [ { key:'vikt', color:'#db2777', width:2.5, name:'Vikt (kg)' } ], markers: escMarkers })
+        )
+      ) : null,
+      // ── Respons per dossteg + prognos ──
+      doseResponse ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-fuchsia-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, '🔮 Respons & prognos'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Viktförändring per dossteg + prognos med nuvarande takt')
+          )
+        ),
+        h('div', { className: 'p-5' },
+          h('div', { className: 'flex gap-2 overflow-x-auto pb-2 mb-3' },
+            doseResponse.perStep.map(function(s, i) {
+              var good = s.rate != null && s.rate < 0;
+              return h('div', { key: i, className: 'flex-shrink-0 rounded-xl px-4 py-3 text-center border-2 min-w-[100px] ' + (s.rate == null ? 'border-gray-100 bg-gray-50' : good ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50') },
+                h('p', { className: 'text-sm font-black text-gray-800' }, s.dose + ' mg'),
+                h('p', { className: 'text-lg font-black ' + (s.rate == null ? 'text-gray-400' : good ? 'text-green-600' : 'text-red-500') }, s.rate == null ? '–' : (s.rate > 0 ? '+' : '') + s.rate + ' kg/v'),
+                s.weeks ? h('p', { className: 'text-xs text-gray-400' }, s.weeks + ' veckor') : null
+              );
+            })
+          ),
+          doseResponse.pace != null ? h('p', { className: 'text-sm text-gray-600 mb-1' },
+            'Nuvarande takt (senaste 4 veckorna): ',
+            h('span', { className: 'font-bold ' + (doseResponse.pace < 0 ? 'text-green-600' : 'text-red-500') }, (doseResponse.pace > 0 ? '+' : '') + doseResponse.pace + ' kg/vecka')
+          ) : null,
+          doseResponse.forecast
+            ? h('p', { className: 'text-sm text-gray-600' }, 'Med den takten når du ', h('span', { className: 'font-bold' }, goalWeight + ' kg'), ' om ca ',
+                h('span', { className: 'font-bold text-fuchsia-600' }, doseResponse.forecast.weeks + ' veckor'),
+                ' (' + doseResponse.forecast.date.toLocaleDateString('sv-SE', { day:'numeric', month:'long', year:'numeric' }) + ').')
+            : doseResponse.pace != null && doseResponse.pace >= -0.05
+              ? h('p', { className: 'text-sm text-amber-600' }, 'Vikten står still eller ökar just nu — prognos visas när trenden pekar nedåt igen.')
+              : null,
+          h('p', { className: 'text-xs text-gray-400 mt-2' }, 'Prognosen är en enkel trendframskrivning — viktresan är sällan linjär.')
         )
       ) : null,
       h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
@@ -2399,6 +2631,73 @@ function WeightStepTracker() {
     );
   }
 
+  // ── Dag-drilldown modal ─────────────────────────────────────────────────────
+  function renderDayModal() {
+    if (!selectedDay) return null;
+    var e = entries.find(function(x){ return x.date === selectedDay; });
+    var ws = workouts.filter(function(w){ return w.date === selectedDay; });
+    var o = ouraData.find(function(d){ return d.date === selectedDay; });
+    var dose = (wegovyDoses || []).find(function(d){ return d.date === selectedDay; });
+    var fmtDate = new Date(selectedDay).toLocaleDateString('sv-SE', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+    var Row = function(label, val) {
+      if (val == null || val === '') return null;
+      return h('div', { className: 'flex justify-between py-1.5 border-b border-gray-50 text-sm' },
+        h('span', { className: 'text-gray-500' }, label),
+        h('span', { className: 'font-semibold text-gray-800 text-right' }, val)
+      );
+    };
+    var Section = function(title, children) {
+      var kids = children.filter(function(x){ return x; });
+      if (!kids.length) return null;
+      return h('div', { className: 'mb-4' },
+        h('p', { className: 'text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5' }, title),
+        ...kids
+      );
+    };
+    var min2h = function(m){ return m == null ? null : Math.floor(m/60) + 'h ' + (m%60) + 'm'; };
+    return h('div', { className: 'fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4', onClick: function(){ setSelectedDay(null); } },
+      h('div', { className: 'bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6', onClick: function(ev){ ev.stopPropagation(); } },
+        h('div', { className: 'flex items-start justify-between mb-4' },
+          h('div', null,
+            h('h2', { className: 'text-lg font-bold text-gray-800 capitalize' }, fmtDate),
+            h('p', { className: 'text-xs text-gray-400' }, 'Allt loggat den här dagen')
+          ),
+          h('button', { onClick: function(){ setSelectedDay(null); }, className: 'text-gray-400 hover:text-gray-600 text-2xl leading-none' }, '×')
+        ),
+        Section('⚖️ Dagbok', [
+          Row('Vikt', e ? e.weight + ' kg' : null),
+          Row('Steg (manuellt)', e && e.steps ? e.steps.toLocaleString('sv-SE') : null),
+          Row('Humör', e && e.mood ? ['😴 Trött','😔 Dålig','😐 Ok','😊 Bra','🤩 Toppen'][e.mood-1] : null),
+          Row('Kommentar', e && e.comment ? e.comment : null)
+        ]),
+        Section('💪 Träning', ws.length ? ws.map(function(w, i) {
+          return Row(w.type + ' (' + '⭐'.repeat(w.intensity||3) + ')', w.duration + ' min' + (w.comment ? ' · ' + w.comment : ''));
+        }) : []),
+        Section('💍 Oura', o ? [
+          Row('Sömnpoäng', o.sleep_score),
+          Row('Dagsform', o.dagsform_score),
+          Row('Sömntid', min2h(o.total_sleep_min)),
+          Row('Djupsömn / REM', o.deep_sleep_min != null ? min2h(o.deep_sleep_min) + ' / ' + min2h(o.rem_sleep_min) : null),
+          Row('Sömneffektivitet', o.sleep_efficiency != null ? o.sleep_efficiency + '%' : null),
+          Row('HRV', o.hrv_avg != null ? o.hrv_avg + ' ms' : null),
+          Row('Vilopuls / sömnpuls', o.resting_hr != null ? o.resting_hr + (o.avg_hr_sleep != null ? ' / ' + o.avg_hr_sleep : '') + ' slag/min' : null),
+          Row('Steg', o.steps != null ? o.steps.toLocaleString('sv-SE') : null),
+          Row('Kalorier (tot/aktiva)', o.total_cal != null ? o.total_cal + ' / ' + (o.active_cal != null ? o.active_cal : '–') : null),
+          Row('Stress (hög)', o.stress_high_min != null ? Math.round(o.stress_high_min) + ' min' : null),
+          Row('Temp-avvikelse', o.temp_dev != null ? (o.temp_dev > 0 ? '+' : '') + o.temp_dev + '°' : null),
+          Row('SpO2', o.spo2_avg != null ? o.spo2_avg + '%' : null),
+          Row('Andning', o.breath_avg != null ? o.breath_avg + ' andetag/min' : null)
+        ] : []),
+        Section('💉 Wegovy', dose ? [
+          Row('Dos', dose.dose + ' mg'),
+          Row('Biverkningar', dose.side_effects || null),
+          Row('Vikt vid dos', dose.weight_at_dose ? dose.weight_at_dose + ' kg' : null),
+          Row('Anteckning', dose.notes || null)
+        ] : []),
+        (!e && !ws.length && !o && !dose) ? h('p', { className: 'text-sm text-gray-400 text-center py-4' }, 'Inget loggat den här dagen.') : null
+      )
+    );
+  }
   // Main render
   var allNav = [
     { id:'overview', label:'📊 Översikt', group:'h' },
@@ -2432,6 +2731,7 @@ function WeightStepTracker() {
   ) : null;
   return h('div', { className: 'min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100' },
     h(Toast, { toast: toast, onClose: function(){ setToast(null); } }),
+    renderDayModal(),
     h('div', { className: 'md:hidden bg-white shadow-sm px-4 pt-4 pb-2' },
       h('h1', { className: 'text-xl font-bold text-gray-800 mb-2' }, 'Hälsodagbok'),
       h('div', { className: 'flex gap-2 overflow-x-auto pb-2' },
@@ -2478,7 +2778,6 @@ function WeightStepTracker() {
           view === 'overview' ? renderOverview()  : null,
           view === 'add'      ? renderAdd()       : null,
           view === 'workouts' ? renderWorkouts()  : null,
-          view === 'goals'    ? renderGoals()     : null,
           view === 'history'  ? renderHistory()   : null,
           view === 'settings' ? renderSettings()  : null,
           view === 'oura'     ? renderOura()      : null,

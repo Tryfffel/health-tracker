@@ -1,4 +1,4 @@
-const CACHE = 'halsa-v1';
+const CACHE = 'halsa-v2';
 const ASSETS = [
   './', './index.html', './manifest.json', './icon-192.png', './icon-512.png',
   'https://unpkg.com/react@18/umd/react.production.min.js',
