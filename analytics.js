@@ -454,9 +454,10 @@
       };
     };
     var monPrev = new Date(mon); monPrev.setDate(mon.getDate()-compareWeeks*7);
+    var monLast = new Date(mon); monLast.setDate(mon.getDate()-7);
     var a = mkWeek(mon), b = mkWeek(monPrev);
     if ((a.avgWeight == null && a.sleep == null) || (b.avgWeight == null && b.sleep == null)) return null;
-    return { now: a, then: b };
+    return { now: a, then: b, prev: mkWeek(monLast) };
   };
   A.getChartData = function(entries, goalWeight, height) {
     const sorted = entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
