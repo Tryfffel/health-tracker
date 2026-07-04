@@ -596,7 +596,6 @@ function WeightStepTracker() {
 
   const weeklyReport = getWeeklyReport();
   const insights = getInsights();
-  const monthlySummary = getMonthlySummary();
   const plateau = getPlateauDetection();
   const workoutCorr = getWorkoutCorrelation();
   const moodAnalysis = getMoodAnalysis();
@@ -1076,46 +1075,7 @@ function WeightStepTracker() {
                       : null
             );
           })() : h('p', { className: 'text-gray-400 text-sm' }, 'Lägg till mätningar för att se prognos')
-        ),
-        monthlySummary ? h('div', { className: 'bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl overflow-hidden' },
-          h('div', { className: 'flex items-center gap-2 px-5 py-3 border-b border-purple-100' },
-            h('span', { className: 'text-xl' }, '📋'),
-            h('h3', { className: 'font-bold text-gray-800 text-sm' }, 'Sammanfattning ' + monthlySummary.monthName),
-            monthlySummary.weightChange < 0
-              ? h('span', { className: 'ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold' }, '↓ ' + Math.abs(monthlySummary.weightChange) + ' kg')
-              : h('span', { className: 'ml-auto text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-semibold' }, '↑ ' + monthlySummary.weightChange + ' kg')
-          ),
-          h('div', { className: 'grid grid-cols-2 gap-px bg-purple-100' },
-            h('div', { className: 'bg-white px-4 py-3 text-center' },
-              h('p', { className: 'text-2xl font-black ' + (monthlySummary.weightChange <= 0 ? 'text-green-600' : 'text-red-500') },
-                (monthlySummary.weightChange > 0 ? '+' : '') + monthlySummary.weightChange + ' kg'),
-              h('p', { className: 'text-xs text-gray-400 mt-0.5' }, 'viktförändring')
-            ),
-            h('div', { className: 'bg-white px-4 py-3 text-center' },
-              h('p', { className: 'text-2xl font-black text-indigo-600' }, monthlySummary.workoutCount + ' 💪'),
-              h('p', { className: 'text-xs text-gray-400 mt-0.5' }, monthlySummary.totalMinutes + ' min träning')
-            ),
-            monthlySummary.avgSteps
-              ? h('div', { className: 'bg-white px-4 py-3 text-center' },
-                  h('p', { className: 'text-2xl font-black text-teal-600' },
-                    monthlySummary.avgSteps >= 1000 ? (monthlySummary.avgSteps/1000).toFixed(1)+'k' : monthlySummary.avgSteps),
-                  h('p', { className: 'text-xs text-gray-400 mt-0.5' }, 'snitt steg/dag')
-                )
-              : h('div', { className: 'bg-white px-4 py-3 text-center' },
-                  h('p', { className: 'text-2xl font-black text-purple-600' }, monthlySummary.logCount),
-                  h('p', { className: 'text-xs text-gray-400 mt-0.5' }, 'loggade dagar')
-                ),
-            monthlySummary.avgMood
-              ? h('div', { className: 'bg-white px-4 py-3 text-center' },
-                  h('p', { className: 'text-2xl font-black text-pink-500' }, MOOD_EMOJIS[Math.round(monthlySummary.avgMood)-1] + ' ' + monthlySummary.avgMood),
-                  h('p', { className: 'text-xs text-gray-400 mt-0.5' }, 'snitt humör / 5')
-                )
-              : h('div', { className: 'bg-white px-4 py-3 text-center' },
-                  h('p', { className: 'text-2xl font-black text-purple-400' }, monthlySummary.logCount),
-                  h('p', { className: 'text-xs text-gray-400 mt-0.5' }, 'loggade dagar')
-                )
-          )
-        ) : null
+        )
       ),
       // Workout Correlation card
       workoutCorr ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
