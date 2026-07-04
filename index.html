@@ -185,19 +185,56 @@ function WeightStepTracker() {
   const [checkupForm, setCheckupForm] = useState({});
   const [showCheckupForm, setShowCheckupForm] = useState(false);
   const CHECKUP_FIELDS = [
+    { key: 'heartage', label: 'Hjärtålder', unit: 'år', dec: 0, better: 'down', ref: null },
     { key: 'sys', label: 'Blodtryck systoliskt', unit: 'mmHg', dec: 0, better: 'down', ref: function(v){ return v < 120 ? 'good' : v < 140 ? 'warn' : 'bad'; } },
     { key: 'dia', label: 'Blodtryck diastoliskt', unit: 'mmHg', dec: 0, better: 'down', ref: function(v){ return v < 80 ? 'good' : v < 90 ? 'warn' : 'bad'; } },
-    { key: 'pulse', label: 'Vilopuls (mätt)', unit: 'slag/min', dec: 0, better: 'down', ref: function(v){ return v < 70 ? 'good' : v < 80 ? 'warn' : 'bad'; } },
-    { key: 'totchol', label: 'Totalkolesterol', unit: 'mmol/L', dec: 1, better: 'down', ref: function(v){ return v < 5.0 ? 'good' : v < 6.2 ? 'warn' : 'bad'; } },
-    { key: 'ldl', label: 'LDL', unit: 'mmol/L', dec: 1, better: 'down', ref: function(v){ return v < 3.0 ? 'good' : v < 4.1 ? 'warn' : 'bad'; } },
-    { key: 'hdl', label: 'HDL', unit: 'mmol/L', dec: 1, better: 'up', ref: function(v){ return v >= 1.2 ? 'good' : v >= 1.0 ? 'warn' : 'bad'; } },
-    { key: 'tg', label: 'Triglycerider', unit: 'mmol/L', dec: 1, better: 'down', ref: function(v){ return v < 1.7 ? 'good' : v < 2.3 ? 'warn' : 'bad'; } },
+    { key: 'ankle', label: 'Ankeltryck', unit: 'mmHg', dec: 0, better: 'down', ref: null },
+    { key: 'abi', label: 'ABI', unit: 'ratio', dec: 2, better: 'up', ref: function(v){ return (v >= 0.9 && v <= 1.4) ? 'good' : 'warn'; } },
+    { key: 'spo2', label: 'Syremättnad', unit: '%', dec: 0, better: 'up', ref: function(v){ return v >= 95 ? 'good' : v >= 92 ? 'warn' : 'bad'; } },
+    { key: 'pulse', label: 'Puls (vila, mätt)', unit: 'slag/min', dec: 0, better: 'down', ref: function(v){ return v < 70 ? 'good' : v < 80 ? 'warn' : 'bad'; } },
+    { key: 'ekg_pr', label: 'EKG överledningstid (PR)', unit: 'ms', dec: 0, better: 'down', ref: function(v){ return (v >= 120 && v <= 200) ? 'good' : v <= 220 ? 'warn' : 'bad'; } },
+    { key: 'ekg_qrs', label: 'EKG kammaraktivering (QRS)', unit: 'ms', dec: 0, better: 'down', ref: function(v){ return v < 110 ? 'good' : v <= 120 ? 'warn' : 'bad'; } },
+    { key: 'ekg_qtc', label: 'EKG återhämtning (QTc)', unit: 'ms', dec: 0, better: 'down', ref: function(v){ return v < 450 ? 'good' : v < 470 ? 'warn' : 'bad'; } },
+    { key: 'totchol', label: 'Totalkolesterol', unit: 'mmol/L', dec: 2, better: 'down', ref: function(v){ return v < 5.0 ? 'good' : v < 6.2 ? 'warn' : 'bad'; } },
+    { key: 'ldl', label: 'LDL', unit: 'mmol/L', dec: 2, better: 'down', ref: function(v){ return v < 3.0 ? 'good' : v < 4.1 ? 'warn' : 'bad'; } },
+    { key: 'hdl', label: 'HDL', unit: 'mmol/L', dec: 2, better: 'up', ref: function(v){ return v >= 1.2 ? 'good' : v >= 1.0 ? 'warn' : 'bad'; } },
+    { key: 'nonhdl', label: 'Non-HDL', unit: 'mmol/L', dec: 2, better: 'down', ref: function(v){ return v < 3.4 ? 'good' : v < 4.1 ? 'warn' : 'bad'; } },
+    { key: 'tg', label: 'Triglycerider', unit: 'mmol/L', dec: 2, better: 'down', ref: function(v){ return v < 1.7 ? 'good' : v < 2.3 ? 'warn' : 'bad'; } },
     { key: 'hba1c', label: 'HbA1c', unit: 'mmol/mol', dec: 0, better: 'down', ref: function(v){ return v < 42 ? 'good' : v < 48 ? 'warn' : 'bad'; } },
-    { key: 'glucose', label: 'Glukos (fastande)', unit: 'mmol/L', dec: 1, better: 'down', ref: function(v){ return v < 6.1 ? 'good' : v < 7.0 ? 'warn' : 'bad'; } },
+    { key: 'glucose', label: 'Glukos', unit: 'mmol/L', dec: 1, better: 'down', ref: function(v){ return v < 6.1 ? 'good' : v < 7.0 ? 'warn' : 'bad'; } },
     { key: 'crp', label: 'hsCRP', unit: 'mg/L', dec: 1, better: 'down', ref: function(v){ return v < 1 ? 'good' : v < 3 ? 'warn' : 'bad'; } },
+    { key: 'lpk', label: 'Vita blodkroppar', unit: 'x10⁹/L', dec: 1, better: 'down', ref: function(v){ return (v >= 3.5 && v <= 8.8) ? 'good' : 'warn'; } },
+    { key: 'neutro', label: 'Neutrofiler', unit: 'x10⁹/L', dec: 1, better: 'down', ref: function(v){ return (v >= 1.6 && v <= 5.9) ? 'good' : 'warn'; } },
+    { key: 'lymf', label: 'Lymfocyter', unit: 'x10⁹/L', dec: 1, better: 'down', ref: function(v){ return (v >= 1.1 && v <= 3.5) ? 'good' : 'warn'; } },
+    { key: 'hb', label: 'Hemoglobin', unit: 'g/L', dec: 0, better: 'up', ref: function(v){ return (v >= 130 && v <= 170) ? 'good' : 'warn'; } },
+    { key: 'eye', label: 'Ögontryck', unit: 'mmHg', dec: 1, better: 'down', ref: function(v){ return (v >= 8 && v <= 21) ? 'good' : 'warn'; } },
+    { key: 'weight', label: 'Vikt (vid mätning)', unit: 'kg', dec: 1, better: 'down', ref: null },
     { key: 'waist', label: 'Midjemått', unit: 'cm', dec: 0, better: 'down', ref: function(v){ return v < 94 ? 'good' : v < 102 ? 'warn' : 'bad'; } },
     { key: 'grip', label: 'Greppstyrka', unit: 'kg', dec: 0, better: 'up', ref: function(v){ return v >= 40 ? 'good' : v >= 30 ? 'warn' : 'bad'; } }
   ];
+  const parseNekoText = function(text) {
+    var t = text.replace(/\[|\]|\(https?:[^)]*\)/g, ' ').replace(/\s+/g, ' ').toLowerCase();
+    var out = {};
+    var mn = { januari:1, februari:2, mars:3, april:4, maj:5, juni:6, juli:7, augusti:8, september:9, oktober:10, november:11, december:12 };
+    var dm = t.match(/(\d{1,2}) (januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december) (\d{4})/);
+    if (dm) out.date = dm[3] + '-' + String(mn[dm[2]]).padStart(2,'0') + '-' + String(parseInt(dm[1])).padStart(2,'0');
+    var grab = function(labelRe) {
+      var m = t.match(new RegExp(labelRe + '[^0-9]{0,60}(-?\\d+(?:[.,]\\d+)?)', 'i'));
+      return m ? m[1].replace(',', '.') : null;
+    };
+    var bp = t.match(/blodtryck[^0-9]{0,60}(\d{2,3})[^0-9]{0,20}\/\s*(\d{2,3})/);
+    if (bp) { out.sys = bp[1]; out.dia = bp[2]; }
+    var map = [
+      ['hjärtålder', 'heartage'], ['ankeltryck', 'ankle'], ['\\babi\\b', 'abi'], ['syremättnad', 'spo2'],
+      ['\\bpuls\\b', 'pulse'], ['överledningstid', 'ekg_pr'], ['kammaraktiveringstid', 'ekg_qrs'], ['återhämtningstid', 'ekg_qtc'],
+      ['totalt kolesterol', 'totchol'], ['\\bhdl\\b', 'hdl'], ['non-hdl', 'nonhdl'], ['\\bldl\\b', 'ldl'], ['triglycerider', 'tg'],
+      ['hba1c', 'hba1c'], ['glukos', 'glucose'], ['hs-?crp', 'crp'],
+      ['vita blodkroppar', 'lpk'], ['neutrofiler', 'neutro'], ['lymfocyter', 'lymf'], ['hemoglobin', 'hb'],
+      ['ögontryck', 'eye'], ['\\bvikt\\b', 'weight'], ['midjemått', 'waist'], ['greppstyrka', 'grip']
+    ];
+    map.forEach(function(m) { var v = grab(m[0]); if (v != null) out[m[1]] = v; });
+    return out;
+  };
   const saveCheckups = function(list) {
     setCheckups(list);
     window.storage.set('checkups', JSON.stringify(list));
@@ -4058,6 +4095,21 @@ function WeightStepTracker() {
           h('h2', { className: 'font-bold text-gray-800 text-lg' }, 'Registrera provsvar'),
           h('button', { onClick: function(){ setShowCheckupForm(false); }, className: 'text-gray-400 hover:text-gray-600 text-2xl leading-none' }, '×')
         ),
+        h('div', { className: 'mb-4 rounded-xl border-2 border-dashed border-teal-200 bg-teal-50/50 p-4' },
+          h('p', { className: 'text-sm font-semibold text-gray-700 mb-1' }, '✨ Klistra in från Neko Health'),
+          h('p', { className: 'text-xs text-gray-500 mb-2' }, 'Markera allt på "Scan Data"-sidan i Neko-appen (webben), kopiera, klistra in här — jag fyller i fälten åt dig.'),
+          h('textarea', { value: checkupForm._paste || '', rows: 3, placeholder: 'Klistra in Neko-texten här…', onChange: function(e){ setCheckupForm(Object.assign({}, checkupForm, { _paste: e.target.value })); }, className: 'w-full px-3 py-2 border rounded-lg text-xs font-mono outline-none mb-2' }),
+          h('button', { onClick: function(){
+            if (!checkupForm._paste || !checkupForm._paste.trim()) { showToast('Klistra in texten först', 'error'); return; }
+            var parsed = parseNekoText(checkupForm._paste);
+            var n = Object.keys(parsed).filter(function(k){ return k !== 'date'; }).length;
+            if (!n) { showToast('Hittade inga värden i texten', 'error'); return; }
+            var next = Object.assign({}, checkupForm, parsed, { _paste: '', source: checkupForm.source || 'Neko Health' });
+            if (!parsed.date) next.date = checkupForm.date || todayStr();
+            setCheckupForm(next);
+            showToast('✨ Tolkade ' + n + ' värden — kontrollera och spara!');
+          }, className: 'bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-bold' }, 'Tolka texten')
+        ),
         h('div', { className: 'grid grid-cols-2 gap-3 mb-3' },
           h('div', null,
             h('label', { className: 'text-xs text-gray-500 block mb-1' }, 'Datum'),
@@ -4109,9 +4161,9 @@ function WeightStepTracker() {
                     var prev = sorted.slice(ci+1).find(function(x){ return x.values[f.key] != null; });
                     var diff = prev ? v - prev.values[f.key] : null;
                     var good = diff == null ? null : (f.better === 'up' ? diff > 0 : diff < 0);
-                    var status = f.ref(v);
-                    return h('td', { key: ci, className: 'px-3 py-2 text-right ' + refBg[status] },
-                      h('span', { className: 'font-bold ' + refCls[status] }, v.toFixed(f.dec)),
+                    var status = f.ref ? f.ref(v) : null;
+                    return h('td', { key: ci, className: 'px-3 py-2 text-right ' + (status ? refBg[status] : '') },
+                      h('span', { className: 'font-bold ' + (status ? refCls[status] : 'text-gray-800') }, v.toFixed(f.dec)),
                       diff != null && Math.abs(diff) >= Math.pow(10, -f.dec)/2 ? h('span', { className: 'text-xs ml-1 ' + (good ? 'text-green-500' : 'text-red-400') }, (diff > 0 ? '▲' : '▼') + Math.abs(diff).toFixed(f.dec)) : null
                     );
                   })
