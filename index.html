@@ -1495,20 +1495,22 @@ function WeightStepTracker() {
         (function(){
           var sel = bbDay ? bb.days.find(function(d){ return d.date === bbDay; }) : null;
           if (!sel || !sel.parts) return null;
+          var NAMN = { 'Bas': 'Grundnivå', '🌙 Sömn': '🌙 Sömnen', '💗 HRV': '💗 Återhämtningen', '❤️ Vilopuls': '❤️ Vilopulsen', '🔥 Stress': '🔥 Stressen', '💪 Träning': '💪 Träningen', '🍷 Alkohol': '🍷 Alkoholen', '🤒 Sjuk': '🤒 Sjukdomen' };
+          var synliga = sel.parts.filter(function(p){ return p.n !== 'Bas' && Math.round(p.v) !== 0; });
           return h('div', { className: 'mt-4 pt-3 border-t border-gray-50' },
-            h('p', { className: 'text-xs font-semibold text-gray-500 mb-2' }, new Date(sel.date).toLocaleDateString('sv-SE', { weekday:'long', day:'numeric', month:'long' }) + ' — så byggdes ' + sel.v + '%'),
-            sel.parts.map(function(p, i) {
-              var pct = Math.round(Math.abs(p.v) / p.max * 100);
-              var pos = p.v >= 0;
-              return h('div', { key: i, className: 'flex items-center gap-2 mb-1.5' },
-                h('span', { className: 'text-xs text-gray-500 w-24 shrink-0' }, p.n),
-                h('div', { className: 'flex-1 h-3 bg-gray-100 rounded-full overflow-hidden' },
-                  h('div', { className: 'h-full rounded-full ' + (pos ? 'bg-emerald-400' : 'bg-rose-400'), style: { width: Math.min(100, Math.max(pct, p.v !== 0 ? 3 : 0)) + '%' } })
-                ),
-                h('span', { className: 'text-xs font-bold w-28 text-right ' + (p.v > 0 ? 'text-emerald-600' : p.v < 0 ? 'text-rose-600' : 'text-gray-400') },
-                  (p.v > 0 ? '+' : '') + Math.round(p.v) + ' av ' + (p.n === 'Bas' || p.n === '🌙 Sömn' || p.n === '💗 HRV' || p.n === '❤️ Vilopuls' ? '+' : '−') + p.max + ' (' + pct + '%)')
+            h('p', { className: 'text-sm font-semibold text-gray-700 mb-2' }, new Date(sel.date).toLocaleDateString('sv-SE', { weekday:'long', day:'numeric', month:'long' })),
+            h('p', { className: 'text-sm text-gray-500 mb-2' }, 'Alla börjar dagen på 50. Sen hände det här:'),
+            synliga.length ? synliga.map(function(p, i) {
+              var pos = p.v > 0;
+              return h('div', { key: i, className: 'flex items-center justify-between rounded-lg px-3 py-2 mb-1.5 ' + (pos ? 'bg-emerald-50' : 'bg-rose-50') },
+                h('span', { className: 'text-sm text-gray-700' }, NAMN[p.n] || p.n, h('span', { className: 'text-gray-400' }, pos ? ' laddade upp dig' : ' drog ner dig')),
+                h('span', { className: 'text-base font-black ' + (pos ? 'text-emerald-600' : 'text-rose-600') }, (pos ? '+' : '−') + Math.abs(Math.round(p.v)))
               );
-            })
+            }) : h('p', { className: 'text-sm text-gray-400 mb-1.5' }, 'En helt neutral dag — inget stack ut åt något håll.'),
+            h('div', { className: 'flex items-center justify-between rounded-lg px-3 py-2 bg-gray-100 mt-1' },
+              h('span', { className: 'text-sm font-semibold text-gray-700' }, 'Summa'),
+              h('span', { className: 'text-base font-black text-gray-800' }, sel.v + ' %')
+            )
           );
         })()
       );
