@@ -753,31 +753,13 @@ function WeightStepTracker() {
     // SVG ring params
     var ringR = 36, ringC = parseFloat((2 * Math.PI * ringR).toFixed(2));
     var ringOffset = parseFloat((ringC * (1 - progressPct / 100)).toFixed(2));
-    // Day dots for this week
     var todayD3 = new Date(); todayD3.setHours(0,0,0,0);
-    var dow3 = todayD3.getDay();
-    var monD3 = new Date(todayD3); monD3.setDate(todayD3.getDate() - (dow3===0?6:dow3-1));
-    var weekDayDots = ['M','T','O','T','F','L','S'].map(function(name, idx) {
-      var dd = new Date(monD3); dd.setDate(monD3.getDate()+idx);
-      var ds = dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0');
-      return { name: name, hasEntry: entries.some(function(e){return e.date===ds;}), hasWorkout: workouts.some(function(w){return w.date===ds;}), isToday: ds === (todayD3.getFullYear()+'-'+String(todayD3.getMonth()+1).padStart(2,'0')+'-'+String(todayD3.getDate()).padStart(2,'0')) };
-    });
     var todayDS = todayD3.getFullYear()+'-'+String(todayD3.getMonth()+1).padStart(2,'0')+'-'+String(todayD3.getDate()).padStart(2,'0');
     var reminders = [];
     if (todayD3.getDay() === appSettings.injectionDay && wegovyDoses && !wegovyDoses.some(function(d){return d.date===todayDS;})) reminders.push({icon:'💉', text:'Dags för Wegovy-dos idag (' + WEEKDAY_NAMES[appSettings.injectionDay] + ').'});
     if (!entries.some(function(e){return e.date===todayDS;})) reminders.push({icon:'⚖️', text:'Du har inte loggat din vikt idag.'});
     var backupDue = entries.length >= 5 && (!lastBackup || (Date.now() - new Date(lastBackup).getTime()) > 7*86400000);
     if (backupDue) reminders.push({icon:'💾', text: lastBackup ? 'Över en vecka sedan senaste backup — din data finns bara i den här webbläsaren.' : 'Du har aldrig tagit en backup — din data finns bara i den här webbläsaren.', action: exportData, actionLabel: 'Ladda ner backup'});
-    var sc7 = ouraData.slice(0,7);
-    var scAvg = function(key){ var v=sc7.map(function(d){return d[key];}).filter(function(x){return x!=null;}); return v.length?v.reduce(function(a,b){return a+b;},0)/v.length:null; };
-    var aktSc = scAvg('steps')!=null ? Math.min(100, scAvg('steps')/appSettings.stepTarget*100) : null;
-    var stressSc = scAvg('stress_high_min')!=null ? Math.max(0, 100 - scAvg('stress_high_min')/2) : null;
-    var recent7 = entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}).filter(function(e){ return (todayD3 - new Date(e.date)) <= 7*86400000; });
-    var viktChange = recent7.length>=2 ? recent7[recent7.length-1].weight - recent7[0].weight : null;
-    var viktSc = viktChange!=null ? Math.max(0, Math.min(100, 50 - viktChange*100)) : null;
-    var scParts = [['Sömn',scAvg('sleep_score')],['Återhämtning',scAvg('dagsform_score')],['Aktivitet',aktSc],['Lugn (låg stress)',stressSc],['Vikttrend',viktSc]].filter(function(p){return p[1]!=null;});
-    var scOverall = scParts.length ? Math.round(scParts.reduce(function(a,b){return a+b[1];},0)/scParts.length) : null;
-    var scGrade = scOverall==null?'–':scOverall>=85?'A':scOverall>=70?'B':scOverall>=55?'C':scOverall>=40?'D':'E';
     // ── Dagens form: träningsrekommendation från nattens data ──
     var dagensForm = (function(){
       if (!ouraLatest || ouraLatest.dagsform_score == null) return null;
@@ -833,38 +815,6 @@ function WeightStepTracker() {
         )
       ) : null,
       batteryCard,
-      // ── Tvillingdagar ──
-      twinDays ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
-        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
-          h('div', { className: 'w-1 h-8 rounded-full bg-teal-500' }),
-          h('div', null,
-            h('h2', { className: 'font-bold text-gray-800' }, '🪞 Dagar som idag'),
-            h('p', { className: 'text-xs text-gray-400' }, 'De 5 mest lika dagarna i din historik (' + twinDays.feats + ' mått jämförda) · klicka för detaljer')
-          )
-        ),
-        h('div', { className: 'p-5' },
-          h('div', { className: 'flex flex-wrap gap-2 mb-3' },
-            twinDays.days.map(function(x, i) {
-              return h('button', { key: i, onClick: function(){ setSelectedDay(x.d.date); },
-                className: 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-100' },
-                new Date(x.d.date).toLocaleDateString('sv-SE', { day:'numeric', month:'short' }) + ' · likhet ' + Math.max(0, Math.round((1 - x.dist/2) * 100)) + '%');
-            })
-          ),
-          h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-2' },
-            [twinDays.avgMood != null ? ['😊 Humör såna dagar', twinDays.avgMood.toFixed(1) + ' / 5'] : null,
-             twinDays.avgDw != null ? ['⚖️ Viktändring dagen efter', (twinDays.avgDw > 0 ? '+' : '') + twinDays.avgDw.toFixed(2) + ' kg'] : null,
-             twinDays.avgNextSleep != null ? ['🌙 Nästa natts sömn', Math.round(twinDays.avgNextSleep)] : null,
-             twinDays.avgSteps != null ? ['👟 Steg såna dagar', Math.round(twinDays.avgSteps).toLocaleString('sv-SE')] : null
-            ].filter(function(x){ return x; }).map(function(s, i) {
-              return h('div', { key: i, className: 'bg-gray-50 rounded-lg px-3 py-2 text-center' },
-                h('p', { className: 'text-xs text-gray-400' }, s[0]),
-                h('p', { className: 'text-base font-black text-gray-800' }, s[1])
-              );
-            })
-          ),
-          h('p', { className: 'text-xs text-gray-400 mt-2' }, 'Kroppen har mönster. Så här brukar dagar med den här sömn/HRV/stress-profilen utvecklas.')
-        )
-      ) : null,
       // Plateau warning banner
       plateau ? h('div', { className: 'bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl p-5 mb-4 shadow-sm' },
         h('div', { className: 'flex items-start gap-3' },
@@ -936,6 +886,74 @@ function WeightStepTracker() {
           )
         )
       ),
+      null
+    );
+  }
+  function renderInsights() {
+    if (!stats) {
+      return h('div', { className: 'bg-white rounded-xl p-12 text-center shadow-md' },
+        h('div', { className: 'text-5xl mb-4' }, '💡'),
+        h('p', { className: 'text-gray-600 text-lg mb-2' }, 'Inga insikter än'),
+        h('p', { className: 'text-gray-400 text-sm' }, 'Lägg till mätningar så börjar analyserna jobba')
+      );
+    }
+    var sortedE = entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+    var startWeight = sortedE.length ? sortedE[0].weight : stats.latest.weight;
+    var totalToLose = startWeight - goalWeight;
+    var lostSoFar = startWeight - stats.latest.weight;
+    var progressPct = totalToLose > 0 ? Math.max(0, Math.min(100, lostSoFar / totalToLose * 100)) : 0;
+    var progressRounded = Math.round(progressPct);
+    var todayD3 = new Date(); todayD3.setHours(0,0,0,0);
+    var dow3 = todayD3.getDay();
+    var monD3 = new Date(todayD3); monD3.setDate(todayD3.getDate() - (dow3===0?6:dow3-1));
+    var weekDayDots = ['M','T','O','T','F','L','S'].map(function(name, idx) {
+      var dd = new Date(monD3); dd.setDate(monD3.getDate()+idx);
+      var ds = dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0');
+      return { name: name, hasEntry: entries.some(function(e){return e.date===ds;}), hasWorkout: workouts.some(function(w){return w.date===ds;}), isToday: ds === (todayD3.getFullYear()+'-'+String(todayD3.getMonth()+1).padStart(2,'0')+'-'+String(todayD3.getDate()).padStart(2,'0')) };
+    });
+    var sc7 = ouraData.slice(0,7);
+    var scAvg = function(key){ var v=sc7.map(function(d){return d[key];}).filter(function(x){return x!=null;}); return v.length?v.reduce(function(a,b){return a+b;},0)/v.length:null; };
+    var aktSc = scAvg('steps')!=null ? Math.min(100, scAvg('steps')/appSettings.stepTarget*100) : null;
+    var stressSc = scAvg('stress_high_min')!=null ? Math.max(0, 100 - scAvg('stress_high_min')/2) : null;
+    var recent7 = entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}).filter(function(e){ return (todayD3 - new Date(e.date)) <= 7*86400000; });
+    var viktChange = recent7.length>=2 ? recent7[recent7.length-1].weight - recent7[0].weight : null;
+    var viktSc = viktChange!=null ? Math.max(0, Math.min(100, 50 - viktChange*100)) : null;
+    var scParts = [['Sömn',scAvg('sleep_score')],['Återhämtning',scAvg('dagsform_score')],['Aktivitet',aktSc],['Lugn (låg stress)',stressSc],['Vikttrend',viktSc]].filter(function(p){return p[1]!=null;});
+    var scOverall = scParts.length ? Math.round(scParts.reduce(function(a,b){return a+b[1];},0)/scParts.length) : null;
+    var scGrade = scOverall==null?'–':scOverall>=85?'A':scOverall>=70?'B':scOverall>=55?'C':scOverall>=40?'D':'E';
+    return h('div', null,
+      // ── Tvillingdagar ──
+      twinDays ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-teal-500' }),
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, '🪞 Dagar som idag'),
+            h('p', { className: 'text-xs text-gray-400' }, 'De 5 mest lika dagarna i din historik (' + twinDays.feats + ' mått jämförda) · klicka för detaljer')
+          )
+        ),
+        h('div', { className: 'p-5' },
+          h('div', { className: 'flex flex-wrap gap-2 mb-3' },
+            twinDays.days.map(function(x, i) {
+              return h('button', { key: i, onClick: function(){ setSelectedDay(x.d.date); },
+                className: 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-100' },
+                new Date(x.d.date).toLocaleDateString('sv-SE', { day:'numeric', month:'short' }) + ' · likhet ' + Math.max(0, Math.round((1 - x.dist/2) * 100)) + '%');
+            })
+          ),
+          h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-2' },
+            [twinDays.avgMood != null ? ['😊 Humör såna dagar', twinDays.avgMood.toFixed(1) + ' / 5'] : null,
+             twinDays.avgDw != null ? ['⚖️ Viktändring dagen efter', (twinDays.avgDw > 0 ? '+' : '') + twinDays.avgDw.toFixed(2) + ' kg'] : null,
+             twinDays.avgNextSleep != null ? ['🌙 Nästa natts sömn', Math.round(twinDays.avgNextSleep)] : null,
+             twinDays.avgSteps != null ? ['👟 Steg såna dagar', Math.round(twinDays.avgSteps).toLocaleString('sv-SE')] : null
+            ].filter(function(x){ return x; }).map(function(s, i) {
+              return h('div', { key: i, className: 'bg-gray-50 rounded-lg px-3 py-2 text-center' },
+                h('p', { className: 'text-xs text-gray-400' }, s[0]),
+                h('p', { className: 'text-base font-black text-gray-800' }, s[1])
+              );
+            })
+          ),
+          h('p', { className: 'text-xs text-gray-400 mt-2' }, 'Kroppen har mönster. Så här brukar dagar med den här sömn/HRV/stress-profilen utvecklas.')
+        )
+      ) : null,
       // Veckoscorecard
       scOverall != null ? h('div', { className: 'bg-gradient-to-br from-sky-400 via-indigo-400 to-violet-400 rounded-2xl shadow-xl mb-4 p-6 text-white' },
         h('div', { className: 'flex items-center justify-between mb-4' },
@@ -1126,7 +1144,6 @@ function WeightStepTracker() {
           )
         ) : null
       ),
-      h('h2', { className: 'text-sm font-bold text-gray-400 uppercase tracking-wider mt-6 mb-2 px-1' }, 'Insikter'),
       // Workout Correlation card
       workoutCorr ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
@@ -3761,7 +3778,8 @@ function WeightStepTracker() {
   }
   // Main render
   var allNav = [
-    { id:'overview', label:'📊 Översikt', group:'h' },
+    { id:'overview', label:'📊 Idag', group:'h' },
+    { id:'insights', label:'💡 Insikter', group:'h' },
     { id:'add', label:'➕ Lägg till vikt', group:'h' },
     { id:'workouts', label:'💪 Träning', group:'h' },
     { id:'history', label:'📋 Historik', group:'h' },
@@ -3846,6 +3864,7 @@ function WeightStepTracker() {
         h('div', { className: 'max-w-screen-2xl mx-auto' },
           backupPanel,
           view === 'overview' ? renderOverview()  : null,
+          view === 'insights' ? renderInsights()  : null,
           view === 'add'      ? renderAdd()       : null,
           view === 'workouts' ? renderWorkouts()  : null,
           view === 'history'  ? renderHistory()   : null,
