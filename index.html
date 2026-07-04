@@ -593,6 +593,34 @@ function WeightStepTracker() {
   };
   const deleteEntry   = function(id) { setEntries(function(prev) { return prev.filter(function(e) { return e.id !== id; }); }); };
   const deleteWorkout = function(id) { setWorkouts(function(prev) { return prev.filter(function(w) { return w.id !== id; }); }); };
+  const editWorkout = function(w) {
+    var nd = window.prompt('Minuter:', w.duration);
+    if (nd === null) return;
+    var v = parseInt(nd);
+    if (isNaN(v) || v <= 0 || v > 600) { showToast('Ogiltig längd', 'error'); return; }
+    setWorkouts(function(prev){ return prev.map(function(x){ return x.id === w.id ? Object.assign({}, x, { duration: v }) : x; }); });
+    showToast('✓ Pass uppdaterat');
+  };
+  const getBodyBattery = function() {
+    if (ouraData.length < 10) return null;
+    var base = function(key){ var v = ouraData.slice(0,30).map(function(d){ return d[key]; }).filter(function(x){ return x != null; }); return v.length ? v.reduce(function(a,b){ return a+b; },0)/v.length : null; };
+    var hrvB = base('hrv_avg'), rhrB = base('resting_hr');
+    var trainByDate = {}; workouts.forEach(function(w){ trainByDate[w.date] = (trainByDate[w.date]||0) + w.duration; });
+    var clamp = function(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); };
+    var days = ouraData.slice(0,14).map(function(d){
+      if (d.sleep_score == null) return { date: d.date, v: null };
+      var v = 50 + (d.sleep_score - 70) * 0.8;
+      if (d.hrv_avg != null && hrvB) v += clamp((d.hrv_avg - hrvB)/hrvB*60, -15, 15);
+      if (d.resting_hr != null && rhrB) v -= clamp((d.resting_hr - rhrB)*2, -10, 10);
+      if (d.stress_high_min != null) v -= clamp(d.stress_high_min*0.1, 0, 20);
+      v -= clamp((trainByDate[d.date]||0)*0.08, 0, 10);
+      var dl = dayLogs[d.date];
+      if (dl) { if (dl.alkohol) v -= clamp(dl.alkohol*5, 0, 20); if (dl.sjuk) v -= 15; }
+      return { date: d.date, v: Math.round(clamp(v, 0, 100)) };
+    }).reverse();
+    var today = days[days.length-1];
+    return { days: days, today: today && today.v != null ? today.v : null };
+  };
   const editEntry = function(entry) {
     var nw = window.prompt('Ny vikt (kg):', entry.weight);
     if (nw === null) return;
@@ -1437,8 +1465,30 @@ function WeightStepTracker() {
         ) : null
       );
     })();
+    var batteryCard = (function(){
+      var bb = getBodyBattery();
+      if (!bb || bb.today == null) return null;
+      var col = function(v){ return v >= 70 ? '#22c55e' : v >= 45 ? '#f59e0b' : '#ef4444'; };
+      return h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 p-5' },
+        h('div', { className: 'flex items-center gap-4 flex-wrap' },
+          h('div', { className: 'text-center' },
+            h('p', { className: 'text-xs text-gray-400 mb-0.5' }, '🔋 Kroppsbatteriet'),
+            h('p', { className: 'text-4xl font-black', style: { color: col(bb.today) } }, bb.today + '%')
+          ),
+          h('div', { className: 'flex-1 min-w-[200px]' },
+            h('div', { className: 'flex items-end gap-1 h-14' },
+              bb.days.map(function(d, i) {
+                return h('div', { key: i, className: 'flex-1 rounded-t', title: d.date + (d.v != null ? ': ' + d.v + '%' : ''),
+                  style: { height: (d.v != null ? Math.max(d.v, 4) : 4) + '%', backgroundColor: d.v != null ? col(d.v) : '#e5e7eb', opacity: i === bb.days.length-1 ? 1 : 0.65 } });
+              })
+            ),
+            h('p', { className: 'text-xs text-gray-400 mt-1' }, '14 dagar · laddas av sömn & HRV, dräneras av stress, träning, alkohol & sjukdom — öppen formel, ingen magi')
+          )
+        )
+      );
+    })();
     if (!stats) {
-      return h('div', null, tagCard, h('div', { className: 'bg-white rounded-xl p-12 text-center shadow-md' },
+      return h('div', null, tagCard, batteryCard, h('div', { className: 'bg-white rounded-xl p-12 text-center shadow-md' },
         h('div', { className: 'text-5xl mb-4' }, '📊'),
         h('p', { className: 'text-gray-600 text-lg mb-2' }, 'Ingen data än'),
         h('p', { className: 'text-gray-400 text-sm mb-6' }, 'Lägg till din första vikt eller importera historik'),
@@ -1539,6 +1589,7 @@ function WeightStepTracker() {
         )
       ) : null,
       tagCard,
+      batteryCard,
       // ── Tvillingdagar ──
       twinDays ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
@@ -2446,6 +2497,7 @@ function WeightStepTracker() {
                   h('p', { className:'font-bold text-gray-800' }, w.duration+' min'),
                   h('p', { className:'text-xs text-blue-400 font-medium' }, '🔥 '+getCalories(w.type,w.duration,currentWeight)+' kcal')
                 ),
+                h('button', { onClick:function(){editWorkout(w);}, className:'text-gray-200 hover:text-indigo-400 text-lg transition-colors mr-2', title:'Redigera minuter' }, '✎'),
                 h('button', { onClick:function(){deleteWorkout(w.id);}, className:'text-gray-200 hover:text-red-400 text-lg transition-colors' }, '✕')
               )
             );
@@ -4262,7 +4314,10 @@ function WeightStepTracker() {
                       dose.notes ? h('p', { className: 'text-xs text-gray-400 italic' }, dose.notes) : null
                     )
                   ),
-                  h('button', { onClick: function(){ setWegovyDoses(function(prev){ var n=prev.filter(function(x){return x.id!==dose.id;}); window.storage.set('wegovy-doses',JSON.stringify(n)); return n; }); }, className: 'text-gray-300 hover:text-red-500 text-lg transition-colors' }, '✕')
+                  h('div', null,
+                    h('button', { onClick: function(){ var nd = window.prompt('Dos (mg):', dose.dose); if (nd === null) return; var v = parseFloat(String(nd).replace(',','.')); if (isNaN(v) || v <= 0 || v > 5) { showToast('Ogiltig dos', 'error'); return; } setWegovyDoses(function(prev){ var n = prev.map(function(x){ return x.id === dose.id ? Object.assign({}, x, { dose: v }) : x; }); window.storage.set('wegovy-doses', JSON.stringify(n)); return n; }); }, className: 'text-gray-300 hover:text-indigo-500 text-lg transition-colors mr-2', title:'Redigera dos' }, '✎'),
+                    h('button', { onClick: function(){ setWegovyDoses(function(prev){ var n=prev.filter(function(x){return x.id!==dose.id;}); window.storage.set('wegovy-doses',JSON.stringify(n)); return n; }); }, className: 'text-gray-300 hover:text-red-500 text-lg transition-colors' }, '✕')
+                  )
                 );
               })
             )
