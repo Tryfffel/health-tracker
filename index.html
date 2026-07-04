@@ -2226,19 +2226,7 @@ function WeightStepTracker() {
           ]})
         )
       ) : null,
-      // Steps chart
-      h('div', { className: 'bg-white rounded-2xl shadow-md overflow-hidden' },
-        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
-          h('div', { className: 'w-1 h-8 rounded-full bg-orange-400' }),
-          h('div', null,
-            h('h2', { className: 'font-bold text-gray-800' }, 'Steg per dag'),
-            h('p', { className: 'text-xs text-gray-400' }, '👟 Dagliga steg')
-          )
-        ),
-        h('div', { className: 'px-4 py-4' },
-          h(SvgBarChart, { data: chartData, dataKey: 'steg', color: '#fb923c', height: 180 })
-        )
-      )
+      null
     );
   }
   function renderAdd() {
