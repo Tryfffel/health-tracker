@@ -1741,11 +1741,8 @@ function WeightStepTracker() {
         )
       ) : null,
       // Stats row (merged)
-      h('div', { className: 'grid grid-cols-2 md:grid-cols-3 gap-4 mb-6' },
+      h('div', { className: 'grid grid-cols-2 gap-4 mb-6' },
         h(StatCard, { emoji:'🔥', label:'Total förändring', value: (lostSoFar >= 0 ? '-' : '+') + Math.abs(parseFloat(stats.totalLoss)) + ' kg', sub: entries.length + ' mätningar', subColor: lostSoFar >= 0 ? 'text-green-600' : 'text-red-500', accent: lostSoFar >= 0 ? 'border-orange-400' : 'border-red-400', bg: lostSoFar >= 0 ? 'bg-orange-400' : 'bg-red-400' }),
-        stats.bmi
-          ? h(StatCard, { emoji:'⚖️', label:'BMI', value: stats.bmi, sub: stats.bmiCat ? stats.bmiCat.label : '', subColor: stats.bmiCat ? stats.bmiCat.color : '', accent: 'border-purple-400', bg: 'bg-purple-500' })
-          : null,
         h(StatCard, { emoji:'👟', label:'Snitt steg (7d)', value: stats.avgSteps.toLocaleString(), sub: 'senaste veckan', accent: 'border-teal-400', bg: 'bg-teal-500' })
       ),
       // This/last week
