@@ -686,28 +686,60 @@ function WeightStepTracker() {
     })();
   }
   function renderOverview() {
+    // ── Dagens form: träningsrekommendation från nattens data ──
+    var dagensForm = (function(){
+      if (!ouraLatest || ouraLatest.dagsform_score == null) return null;
+      var base = function(key){ var v = ouraData.slice(7,37).map(function(d){ return d[key]; }).filter(function(x){ return x != null; }); return v.length ? v.reduce(function(a,b){ return a+b; },0)/v.length : null; };
+      var hrvB = base('hrv_avg'), rhrB = base('resting_hr');
+      var score = ouraLatest.dagsform_score;
+      var hrvOk = (ouraLatest.hrv_avg == null || hrvB == null) ? true : ouraLatest.hrv_avg >= hrvB * 0.9;
+      var rhrOk = (ouraLatest.resting_hr == null || rhrB == null) ? true : ouraLatest.resting_hr <= rhrB + 3;
+      var sleepOk = ouraLatest.sleep_score == null || ouraLatest.sleep_score >= 70;
+      var level, headline, advice;
+      if (score >= 75 && hrvOk && rhrOk && sleepOk) {
+        level = 'green'; headline = 'Grönt ljus 🟢';
+        advice = 'Kroppen är återhämtad — bra dag för ett hårt pass eller att pusha lite extra.';
+      } else if (score >= 60 && (hrvOk || rhrOk)) {
+        level = 'yellow'; headline = 'Okej form 🟡';
+        advice = 'Normal träning funkar, men lyssna på kroppen — spara maxpasset till en bättre dag.';
+      } else {
+        level = 'red'; headline = 'Ta det lugnt 🔴';
+        advice = 'Kroppen signalerar att den behöver vila. En promenad eller lätt rörlighet räcker idag.';
+      }
+      return { level: level, headline: headline, advice: advice, score: score,
+        hrv: ouraLatest.hrv_avg, hrvB: hrvB, rhr: ouraLatest.resting_hr, rhrB: rhrB, sleep: ouraLatest.sleep_score };
+    })();
+    // ── Sammanslaget kort: kroppsbatteriet som siffra + formens rekommendation som text ──
     var batteryCard = (function(){
       var bb = getBodyBattery();
-      if (!bb || bb.today == null) return null;
+      var hasBb = bb && bb.today != null;
+      if (!hasBb && !dagensForm) return null;
       var col = function(v){ return v >= 70 ? '#22c55e' : v >= 45 ? '#f59e0b' : '#ef4444'; };
-      return h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 p-5' },
-        h('div', { className: 'flex items-center gap-4 flex-wrap' },
-          h('div', { className: 'text-center' },
+      var frame = dagensForm ? (dagensForm.level === 'green' ? 'bg-emerald-50 border-emerald-200' : dagensForm.level === 'yellow' ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200') : 'bg-white border-gray-100';
+      return h('div', { className: 'rounded-2xl shadow-md mb-4 p-5 border-2 ' + frame },
+        h('div', { className: 'flex items-center gap-5 flex-wrap' },
+          hasBb ? h('div', { className: 'text-center' },
             h('p', { className: 'text-xs text-gray-400 mb-0.5' }, '🔋 Kroppsbatteriet'),
             h('p', { className: 'text-4xl font-black', style: { color: col(bb.today) } }, bb.today + '%')
-          ),
-          h('div', { className: 'flex-1 min-w-[200px]' },
-            h('div', { className: 'flex items-end gap-1 h-14' },
+          ) : null,
+          dagensForm ? h('div', { className: 'flex-1 min-w-[220px]' },
+            h('p', { className: 'text-xs font-semibold uppercase tracking-widest mb-0.5 ' + (dagensForm.level === 'green' ? 'text-emerald-500' : dagensForm.level === 'yellow' ? 'text-amber-500' : 'text-rose-500') }, '⚡ Dagens form'),
+            h('h2', { className: 'text-xl font-black text-gray-800 mb-1' }, dagensForm.headline),
+            h('p', { className: 'text-sm text-gray-600' }, dagensForm.advice)
+          ) : null
+        ),
+        hasBb ? h('div', { className: 'mt-4' },
+          h('div', { className: 'flex items-end gap-1 h-14' },
               bb.days.map(function(d, i) {
                 return h('button', { key: i, onClick: d.v != null ? function(){ setBbDay(bbDay === d.date ? null : d.date); } : undefined,
                   className: 'flex-1 rounded-t' + (d.v != null ? ' cursor-pointer hover:opacity-100' : '') + (bbDay === d.date ? ' ring-2 ring-indigo-400' : ''),
                   title: d.date + (d.v != null ? ': ' + d.v + '%' : ''),
                   style: { height: (d.v != null ? Math.max(d.v, 4) : 4) + '%', backgroundColor: d.v != null ? col(d.v) : '#e5e7eb', opacity: (i === bb.days.length-1 || bbDay === d.date) ? 1 : 0.65 } });
               })
-            ),
-            h('p', { className: 'text-xs text-gray-400 mt-1' }, '14 dagar · klicka en stapel för att se exakt varifrån poängen kom — öppen formel, ingen magi')
-          )
-        ),
+          ),
+          h('p', { className: 'text-xs text-gray-400 mt-1' }, '14 dagar · klicka en stapel för att se exakt varifrån poängen kom — öppen formel, ingen magi')
+        ) : null,
+        hasBb ? 
         (function(){
           var sel = bbDay ? bb.days.find(function(d){ return d.date === bbDay; }) : null;
           if (!sel || !sel.parts) return null;
@@ -728,7 +760,7 @@ function WeightStepTracker() {
               h('span', { className: 'text-base font-black text-gray-800' }, sel.v + ' %')
             )
           );
-        })()
+        })() : null
       );
     })();
     if (!stats) {
@@ -760,29 +792,6 @@ function WeightStepTracker() {
     if (!entries.some(function(e){return e.date===todayDS;})) reminders.push({icon:'⚖️', text:'Du har inte loggat din vikt idag.'});
     var backupDue = entries.length >= 5 && (!lastBackup || (Date.now() - new Date(lastBackup).getTime()) > 7*86400000);
     if (backupDue) reminders.push({icon:'💾', text: lastBackup ? 'Över en vecka sedan senaste backup — din data finns bara i den här webbläsaren.' : 'Du har aldrig tagit en backup — din data finns bara i den här webbläsaren.', action: exportData, actionLabel: 'Ladda ner backup'});
-    // ── Dagens form: träningsrekommendation från nattens data ──
-    var dagensForm = (function(){
-      if (!ouraLatest || ouraLatest.dagsform_score == null) return null;
-      var base = function(key){ var v = ouraData.slice(7,37).map(function(d){ return d[key]; }).filter(function(x){ return x != null; }); return v.length ? v.reduce(function(a,b){ return a+b; },0)/v.length : null; };
-      var hrvB = base('hrv_avg'), rhrB = base('resting_hr');
-      var score = ouraLatest.dagsform_score;
-      var hrvOk = (ouraLatest.hrv_avg == null || hrvB == null) ? true : ouraLatest.hrv_avg >= hrvB * 0.9;
-      var rhrOk = (ouraLatest.resting_hr == null || rhrB == null) ? true : ouraLatest.resting_hr <= rhrB + 3;
-      var sleepOk = ouraLatest.sleep_score == null || ouraLatest.sleep_score >= 70;
-      var level, headline, advice;
-      if (score >= 75 && hrvOk && rhrOk && sleepOk) {
-        level = 'green'; headline = 'Grönt ljus 🟢';
-        advice = 'Kroppen är återhämtad — bra dag för ett hårt pass eller att pusha lite extra.';
-      } else if (score >= 60 && (hrvOk || rhrOk)) {
-        level = 'yellow'; headline = 'Okej form 🟡';
-        advice = 'Normal träning funkar, men lyssna på kroppen — spara maxpasset till en bättre dag.';
-      } else {
-        level = 'red'; headline = 'Ta det lugnt 🔴';
-        advice = 'Kroppen signalerar att den behöver vila. En promenad eller lätt rörlighet räcker idag.';
-      }
-      return { level: level, headline: headline, advice: advice, score: score,
-        hrv: ouraLatest.hrv_avg, hrvB: hrvB, rhr: ouraLatest.resting_hr, rhrB: rhrB, sleep: ouraLatest.sleep_score };
-    })();
     return h('div', null,
       // Reminders
       reminders.length ? h('div', { className: 'space-y-2 mb-4' },
@@ -791,28 +800,6 @@ function WeightStepTracker() {
           h('p', { className:'text-sm font-medium flex-1 ' + (r.action ? 'text-amber-800' : 'text-blue-800') }, r.text),
           r.action ? h('button', { onClick: r.action, className:'bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap' }, r.actionLabel) : null
         ); })
-      ) : null,
-      // ── Dagens form ──
-      dagensForm ? h('div', { className: 'rounded-2xl shadow-md mb-4 p-5 border-2 ' + (dagensForm.level === 'green' ? 'bg-emerald-50 border-emerald-200' : dagensForm.level === 'yellow' ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200') },
-        h('div', { className: 'flex items-start justify-between gap-4 flex-wrap' },
-          h('div', { className: 'flex-1 min-w-[220px]' },
-            h('p', { className: 'text-xs font-semibold uppercase tracking-widest mb-0.5 ' + (dagensForm.level === 'green' ? 'text-emerald-500' : dagensForm.level === 'yellow' ? 'text-amber-500' : 'text-rose-500') }, '⚡ Dagens form'),
-            h('h2', { className: 'text-xl font-black text-gray-800 mb-1' }, dagensForm.headline),
-            h('p', { className: 'text-sm text-gray-600' }, dagensForm.advice)
-          ),
-          h('div', { className: 'flex gap-2' },
-            [['Dagsform', dagensForm.score, ''],
-             ['Sömn', dagensForm.sleep, ''],
-             ['HRV', dagensForm.hrv, dagensForm.hrvB != null && dagensForm.hrv != null ? (dagensForm.hrv >= dagensForm.hrvB ? '▲' : '▼') : ''],
-             ['Vilopuls', dagensForm.rhr, dagensForm.rhrB != null && dagensForm.rhr != null ? (dagensForm.rhr <= dagensForm.rhrB ? '▼' : '▲') : '']
-            ].filter(function(s){ return s[1] != null; }).map(function(s, i) {
-              return h('div', { key: i, className: 'bg-white/70 rounded-xl px-3 py-2 text-center min-w-[64px]' },
-                h('p', { className: 'text-xs text-gray-400' }, s[0]),
-                h('p', { className: 'text-lg font-black text-gray-800' }, s[1] + (s[2] ? ' ' + s[2] : ''))
-              );
-            })
-          )
-        )
       ) : null,
       batteryCard,
       // Plateau warning banner
