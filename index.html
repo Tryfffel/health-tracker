@@ -346,6 +346,7 @@ function WeightStepTracker() {
   const mulberry32 = function(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; var t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; };
   const [selectedDay, setSelectedDay] = useState(null);
   const [compareWeeks, setCompareWeeks] = useState(4);
+  const [bbDay, setBbDay] = useState(null);
   const WEEKDAY_NAMES = ['söndag','måndag','tisdag','onsdag','torsdag','fredag','lördag'];
   const MOOD_EMOJIS = ['😞','😕','😐','🙂','😄'];
   const MOOD_LABELS = ['Tungt','Sådär','Ok','Bra','Toppen'];
@@ -609,14 +610,18 @@ function WeightStepTracker() {
     var clamp = function(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); };
     var days = ouraData.slice(0,14).map(function(d){
       if (d.sleep_score == null) return { date: d.date, v: null };
-      var v = 50 + (d.sleep_score - 70) * 0.8;
-      if (d.hrv_avg != null && hrvB) v += clamp((d.hrv_avg - hrvB)/hrvB*60, -15, 15);
-      if (d.resting_hr != null && rhrB) v -= clamp((d.resting_hr - rhrB)*2, -10, 10);
-      if (d.stress_high_min != null) v -= clamp(d.stress_high_min*0.1, 0, 20);
-      v -= clamp((trainByDate[d.date]||0)*0.08, 0, 10);
+      var parts = [{ n: 'Bas', v: 50, max: 50 }];
+      var pS = (d.sleep_score - 70) * 0.8;
+      parts.push({ n: '🌙 Sömn', v: pS, max: 24 });
+      var v = 50 + pS;
+      if (d.hrv_avg != null && hrvB) { var pH = clamp((d.hrv_avg - hrvB)/hrvB*60, -15, 15); v += pH; parts.push({ n: '💗 HRV', v: pH, max: 15 }); }
+      if (d.resting_hr != null && rhrB) { var pR = -clamp((d.resting_hr - rhrB)*2, -10, 10); v += pR; parts.push({ n: '❤️ Vilopuls', v: pR, max: 10 }); }
+      if (d.stress_high_min != null) { var pSt = -clamp(d.stress_high_min*0.1, 0, 20); v += pSt; parts.push({ n: '🔥 Stress', v: pSt, max: 20 }); }
+      var pT = -clamp((trainByDate[d.date]||0)*0.08, 0, 10); v += pT; parts.push({ n: '💪 Träning', v: pT, max: 10 });
       var dl = dayLogs[d.date];
-      if (dl) { if (dl.alkohol) v -= clamp(dl.alkohol*5, 0, 20); if (dl.sjuk) v -= 15; }
-      return { date: d.date, v: Math.round(clamp(v, 0, 100)) };
+      var pA = (dl && dl.alkohol) ? -clamp(dl.alkohol*5, 0, 20) : 0; v += pA; parts.push({ n: '🍷 Alkohol', v: pA, max: 20 });
+      if (dl && dl.sjuk) { v -= 15; parts.push({ n: '🤒 Sjuk', v: -15, max: 15 }); }
+      return { date: d.date, v: Math.round(clamp(v, 0, 100)), parts: parts };
     }).reverse();
     var today = days[days.length-1];
     return { days: days, today: today && today.v != null ? today.v : null };
@@ -1478,13 +1483,34 @@ function WeightStepTracker() {
           h('div', { className: 'flex-1 min-w-[200px]' },
             h('div', { className: 'flex items-end gap-1 h-14' },
               bb.days.map(function(d, i) {
-                return h('div', { key: i, className: 'flex-1 rounded-t', title: d.date + (d.v != null ? ': ' + d.v + '%' : ''),
-                  style: { height: (d.v != null ? Math.max(d.v, 4) : 4) + '%', backgroundColor: d.v != null ? col(d.v) : '#e5e7eb', opacity: i === bb.days.length-1 ? 1 : 0.65 } });
+                return h('button', { key: i, onClick: d.v != null ? function(){ setBbDay(bbDay === d.date ? null : d.date); } : undefined,
+                  className: 'flex-1 rounded-t' + (d.v != null ? ' cursor-pointer hover:opacity-100' : '') + (bbDay === d.date ? ' ring-2 ring-indigo-400' : ''),
+                  title: d.date + (d.v != null ? ': ' + d.v + '%' : ''),
+                  style: { height: (d.v != null ? Math.max(d.v, 4) : 4) + '%', backgroundColor: d.v != null ? col(d.v) : '#e5e7eb', opacity: (i === bb.days.length-1 || bbDay === d.date) ? 1 : 0.65 } });
               })
             ),
-            h('p', { className: 'text-xs text-gray-400 mt-1' }, '14 dagar · laddas av sömn & HRV, dräneras av stress, träning, alkohol & sjukdom — öppen formel, ingen magi')
+            h('p', { className: 'text-xs text-gray-400 mt-1' }, '14 dagar · klicka en stapel för att se exakt varifrån poängen kom — öppen formel, ingen magi')
           )
-        )
+        ),
+        (function(){
+          var sel = bbDay ? bb.days.find(function(d){ return d.date === bbDay; }) : null;
+          if (!sel || !sel.parts) return null;
+          return h('div', { className: 'mt-4 pt-3 border-t border-gray-50' },
+            h('p', { className: 'text-xs font-semibold text-gray-500 mb-2' }, new Date(sel.date).toLocaleDateString('sv-SE', { weekday:'long', day:'numeric', month:'long' }) + ' — så byggdes ' + sel.v + '%'),
+            sel.parts.map(function(p, i) {
+              var pct = Math.round(Math.abs(p.v) / p.max * 100);
+              var pos = p.v >= 0;
+              return h('div', { key: i, className: 'flex items-center gap-2 mb-1.5' },
+                h('span', { className: 'text-xs text-gray-500 w-24 shrink-0' }, p.n),
+                h('div', { className: 'flex-1 h-3 bg-gray-100 rounded-full overflow-hidden' },
+                  h('div', { className: 'h-full rounded-full ' + (pos ? 'bg-emerald-400' : 'bg-rose-400'), style: { width: Math.min(100, Math.max(pct, p.v !== 0 ? 3 : 0)) + '%' } })
+                ),
+                h('span', { className: 'text-xs font-bold w-28 text-right ' + (p.v > 0 ? 'text-emerald-600' : p.v < 0 ? 'text-rose-600' : 'text-gray-400') },
+                  (p.v > 0 ? '+' : '') + Math.round(p.v) + ' av ' + (p.n === 'Bas' || p.n === '🌙 Sömn' || p.n === '💗 HRV' || p.n === '❤️ Vilopuls' ? '+' : '−') + p.max + ' (' + pct + '%)')
+              );
+            })
+          );
+        })()
       );
     })();
     if (!stats) {
