@@ -1,41 +1,43 @@
 # Apple Health-bron — Watch-pass in i Hälsodagboken automatiskt
 
-Appen läser `apple-workouts.json` från repot och importerar nya pass automatiskt (dubbletter hoppas över via id). En iOS-genväg fyller på filen varje kväll.
+Flödet: iPhone-genvägen skickar dagens pass som textrader till GitHub (ETT anrop) → workflowen `apple-import.yml` normaliserar, mappar träningstyper, dedupar och committar `apple-workouts.json` → appen importerar automatiskt vid nästa öppning (märkta "⌚ Apple Watch").
 
-## Format som appen förväntar sig
+All krånglig logik (sha, base64, merge, typmappning engelska→svenska, sekunder→minuter) sköts av workflowen. Genvägen är avsiktligt dum.
 
-```json
-[
-  { "id": "ah-2026-07-04-styrka-45", "date": "2026-07-04", "type": "Styrketräning", "duration": 45, "intensity": 3, "comment": "⌚ Apple Watch" }
-]
-```
+## Bygg genvägen (iPhone, ~5 min)
 
-- `type` mappas mot appens typer: Styrketräning, Löpning, Promenad, Cykling, Simning, Yoga, Innebandy, Crossfit, Annat m.fl.
-- `duration` i minuter. `intensity` 1–5 (utelämnas → 3).
-- `id` måste vara unikt och stabilt (t.ex. `ah-` + datum + typ + minuter) — det är dubblettskyddet.
+Skapa ny genväg med dessa åtgärder i ordning:
 
-## Bygg genvägen (Genvägar-appen på iPhone, ~10 min)
+1. **Hitta träningspass** (Find Health Samples → typ: Träningspass) där *Startdatum* är *idag*.
+2. **Upprepa med varje** (objekt = passen):
+   - **Formatera datum**: Upprepningsobjektets *startdatum*, anpassat format `yyyy-MM-dd`
+   - **Text**: `[Formaterat datum]|[Upprepningsobjektets Träningstyp]|[Upprepningsobjektets Längd i minuter]`
+   - **Lägg till i variabel**: `Rader`
+3. **Kombinera text**: variabeln `Rader`, separator *Ny rad*.
+4. **Hämta innehåll från URL**:
+   - URL: `https://api.github.com/repos/Tryfffel/health-tracker/dispatches`
+   - Metod: **POST**
+   - Rubriker: `Authorization` = `Bearer DIN_TOKEN` · `Accept` = `application/vnd.github+json`
+   - Begärans innehåll (JSON):
+     ```json
+     { "event_type": "apple-workouts", "client_payload": { "text": "KOMBINERAD_TEXT_HÄR" } }
+     ```
+     (sätt in variabeln från steg 3 som värdet för `text`)
 
-1. Ny genväg → **"Hitta hälsourval"** (Find Health Samples): typ **Träningspass**, senaste 1 dagen.
-2. **Upprepa med varje** (Repeat with Each) → bygg text/ordlista per pass: datum (formaterat ÅÅÅÅ-MM-DD), träningstyp, längd i minuter.
-3. Bygg JSON-listan (Kombinera text / Ordlista → JSON).
-4. **Hämta innehåll från URL** (GET) `https://api.github.com/repos/Tryfffel/health-tracker/contents/apple-workouts.json` med header `Authorization: Bearer DIN_TOKEN` → plocka `sha` och befintligt innehåll (Base64-avkoda), slå ihop med dagens pass.
-5. **Hämta innehåll från URL** (PUT) samma URL, JSON-body: `{"message":"Watch-pass","content":"<Base64 av nya listan>","sha":"<sha>"}` med samma Authorization-header.
-6. Automation: Personlig automation → Tid på dagen → 21:30 varje dag → kör genvägen → stäng av "Fråga innan körning".
+Token: samma fine-grained PAT som molnbackupen (bara detta repo, **Contents: Read and write**).
 
-Token: samma fine-grained PAT som molnbackupen (Contents: Read and write, bara detta repo).
+## Automatisera
 
-Tips: gör steg 1–3 först och testa med "Snabbtitt" innan du kopplar på GitHub-stegen.
+Genvägar → Automation → **Tid på dagen** → 21:30, varje dag → kör genvägen → stäng av "Fråga innan körning". Klart — passen flyter in själva varje kväll.
 
-## Typmappning Apple → appen (förslag i steg 2)
+## Testa
 
-| Apple-typ | Appens typ |
-|---|---|
-| Traditional Strength Training / Functional Strength | Styrketräning |
-| Running | Löpning |
-| Walking | Promenad |
-| Cycling | Cykling |
-| Swimming | Simning |
-| Yoga | Yoga |
-| HIIT | Crossfit |
-| Övrigt | Annat |
+Kör genvägen manuellt en dag du tränat → kolla repo-fliken **Actions** att "Apple Health import" blir grön → öppna appen: toast "⌚ N pass importerade från Apple Watch".
+
+## Format & regler (referens)
+
+- Radformat: `2026-07-04|Running|45` (datum|typ|minuter). Även `client_payload.workouts` som JSON-array accepteras.
+- Längd > 300 tolkas som sekunder och konverteras till minuter.
+- Typmappning (Running→Löpning, Traditional Strength Training→Styrketräning, HIIT→Crossfit osv.) sker i workflowen; okända typer behålls som de är.
+- Dubblettskydd via stabilt id (`ah-datum-typ-minuter`) — det är säkert att skicka samma dag flera gånger.
+- Max 500 pass behålls i filen (äldst rensas).
