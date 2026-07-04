@@ -248,6 +248,22 @@ function WeightStepTracker() {
   const [lastCloudBackup, setLastCloudBackup] = useState(null);
   const [experiments, setExperiments] = useState([]);
   const [expForm, setExpForm] = useState({ date: '', label: '' });
+  const [dayLogs, setDayLogs] = useState({});
+  const saveDayLogs = function(obj) {
+    setDayLogs(obj);
+    window.storage.set('day-logs', JSON.stringify(obj));
+  };
+  const setDayTag = function(date, key, val) {
+    var next = Object.assign({}, dayLogs);
+    next[date] = Object.assign({}, next[date] || {});
+    if (val == null) delete next[date][key]; else next[date][key] = val;
+    saveDayLogs(next);
+  };
+  const bodyFatPct = function(waist, neck, heightCm) {
+    if (!waist || !neck || !heightCm || waist <= neck) return null;
+    var v = 495 / (1.0324 - 0.19077*Math.log10(waist - neck) + 0.15456*Math.log10(heightCm)) - 450;
+    return (v > 2 && v < 60) ? Math.round(v*10)/10 : null;
+  };
   const [checkups, setCheckups] = useState([]);
   const [checkupForm, setCheckupForm] = useState({});
   const [showCheckupForm, setShowCheckupForm] = useState(false);
@@ -396,6 +412,27 @@ function WeightStepTracker() {
       .finally(function() { setOuraSyncing(false); });
   };
 
+  // ── Apple Health-bron: auto-importera Watch-pass från apple-workouts.json ──
+  useEffect(function() {
+    if (loading) return;
+    fetch('apple-workouts.json?t=' + Date.now())
+      .then(function(r){ if (!r.ok) throw new Error('saknas'); return r.json(); })
+      .then(function(list) {
+        if (!Array.isArray(list) || !list.length) return;
+        setWorkouts(function(prev) {
+          var nya = list.filter(function(it){
+            return it && it.date && it.duration && !prev.some(function(w){ return w.id === it.id; });
+          }).map(function(it) {
+            return { id: it.id || ('ah-' + it.date + '-' + it.duration), date: it.date, type: it.type || 'Annat',
+              duration: Math.round(it.duration), intensity: it.intensity || 3, comment: (it.comment || '⌚ Apple Watch') };
+          });
+          if (!nya.length) return prev;
+          showToast('⌚ ' + nya.length + ' pass importerade från Apple Watch');
+          return prev.concat(nya).sort(function(a,b){ return new Date(a.date) - new Date(b.date); });
+        });
+      })
+      .catch(function(){});
+  }, [loading]);
   // Auto-fetch on load if data is stale (>2h)
   useEffect(function() {
     if (loading) return;
@@ -481,6 +518,7 @@ function WeightStepTracker() {
         window.storage.get('last-cloud-backup'),
         window.storage.get('experiments'),
         window.storage.get('checkups'),
+        window.storage.get('day-logs'),
       ]);
       if (results[0] && results[0].value) setEntries(JSON.parse(results[0].value));
       if (results[1] && results[1].value) setWorkouts(JSON.parse(results[1].value));
@@ -493,6 +531,7 @@ function WeightStepTracker() {
       if (results[8] && results[8].value) setLastCloudBackup(results[8].value);
       if (results[9] && results[9].value) setExperiments(JSON.parse(results[9].value));
       if (results[10] && results[10].value) setCheckups(JSON.parse(results[10].value));
+      if (results[11] && results[11].value) setDayLogs(JSON.parse(results[11].value));
     } catch (err) {
       console.log('Ingen sparad data', err);
     } finally {
@@ -579,7 +618,7 @@ function WeightStepTracker() {
     showToast('💾 Backup nedladdad!');
   };
   const buildBackupObj = function() {
-    return { entries: entries, workouts: workouts, goalWeight: goalWeight, height: height, yearlyGoal: yearlyGoal, targetRate: targetRate, wegovyDoses: wegovyDoses, wegovyProtocol: wegovyProtocol, experiments: experiments, checkups: checkups, exportDate: new Date().toISOString() };
+    return { entries: entries, workouts: workouts, goalWeight: goalWeight, height: height, yearlyGoal: yearlyGoal, targetRate: targetRate, wegovyDoses: wegovyDoses, wegovyProtocol: wegovyProtocol, experiments: experiments, checkups: checkups, dayLogs: dayLogs, exportDate: new Date().toISOString() };
   };
   const exportEncrypted = async function() {
     var p = appSettings.backupPassword || window.prompt('Lösenord för krypteringen:');
@@ -613,6 +652,7 @@ function WeightStepTracker() {
         if (data.wegovyProtocol) { setWegovyProtocol(data.wegovyProtocol); window.storage.set('wegovy-protocol', JSON.stringify(data.wegovyProtocol)); }
         if (data.experiments) { setExperiments(data.experiments); window.storage.set('experiments', JSON.stringify(data.experiments)); }
         if (data.checkups) { setCheckups(data.checkups); window.storage.set('checkups', JSON.stringify(data.checkups)); }
+        if (data.dayLogs) { setDayLogs(data.dayLogs); window.storage.set('day-logs', JSON.stringify(data.dayLogs)); }
         showToast('✓ Krypterad backup återställd!');
         setShowImport(false); setView('overview');
       } catch(err) { showToast('Fel lösenord eller trasig fil', 'error'); }
@@ -637,6 +677,7 @@ function WeightStepTracker() {
       if (data.wegovyProtocol) { setWegovyProtocol(data.wegovyProtocol); window.storage.set('wegovy-protocol', JSON.stringify(data.wegovyProtocol)); }
       if (data.experiments) { setExperiments(data.experiments); window.storage.set('experiments', JSON.stringify(data.experiments)); }
       if (data.checkups) { setCheckups(data.checkups); window.storage.set('checkups', JSON.stringify(data.checkups)); }
+      if (data.dayLogs) { setDayLogs(data.dayLogs); window.storage.set('day-logs', JSON.stringify(data.dayLogs)); }
       showToast('☁️ Återställt från molnbackup (' + (data.exportDate ? new Date(data.exportDate).toLocaleDateString('sv-SE') : '?') + ')!');
       setShowImport(false); setView('overview');
     } catch(e) { showToast('Fel lösenord eller trasig molnbackup', 'error'); }
@@ -687,6 +728,7 @@ function WeightStepTracker() {
         if (data.wegovyProtocol) { setWegovyProtocol(data.wegovyProtocol); window.storage.set('wegovy-protocol', JSON.stringify(data.wegovyProtocol)); }
         if (data.experiments) { setExperiments(data.experiments); window.storage.set('experiments', JSON.stringify(data.experiments)); }
         if (data.checkups) { setCheckups(data.checkups); window.storage.set('checkups', JSON.stringify(data.checkups)); }
+        if (data.dayLogs) { setDayLogs(data.dayLogs); window.storage.set('day-logs', JSON.stringify(data.dayLogs)); }
         showToast('✓ Data importerad!');
         setShowImport(false);
         setView('overview');
@@ -1008,6 +1050,10 @@ function WeightStepTracker() {
       ['👟 Steg', ouraData, 'steps', 'up', 0],
       ['😊 Humör', entries, 'mood', 'up', 1]
     ];
+    var dlArr = Object.keys(dayLogs).map(function(k){ return Object.assign({ date: k }, dayLogs[k]); });
+    if (dlArr.some(function(d){ return d.aptit != null; })) metrics.push(['🍽️ Aptit', dlArr, 'aptit', 'down', 1]);
+    if (dlArr.some(function(d){ return d.alkohol != null; })) metrics.push(['🍷 Alkohol', dlArr, 'alkohol', 'down', 1]);
+    if (dlArr.some(function(d){ return d.illamaende != null; })) metrics.push(['🤢 Illamående', dlArr, 'illamaende', 'down', 1]);
     var rows = metrics.map(function(m) {
       var b = calc(m[1].filter(function(x){ return inBefore(x.date); }).map(function(x){ return x[m[2]]; }));
       var a = calc(m[1].filter(function(x){ return inAfter(x.date); }).map(function(x){ return x[m[2]]; }));
@@ -1328,8 +1374,71 @@ function WeightStepTracker() {
   }
   // ─── View rendering helpers ─────────────────────────────────────────────────
   function renderOverview() {
+    var tagCard = (function(){
+      var tds = todayStr();
+      var todayDate = new Date();
+      var dl = dayLogs[tds] || {};
+      var chip = function(active, label, onClick, cls) {
+        return h('button', { key: label, onClick: onClick,
+          className: 'px-3 py-2 rounded-lg text-sm font-semibold transition-colors ' + (active ? (cls || 'bg-indigo-600 text-white') : 'bg-gray-100 text-gray-600 hover:bg-gray-200') }, label);
+      };
+      var isSunday = todayDate.getDay() === 0;
+      var fat = bodyFatPct(dl.midja, dl.hals, height);
+      var senasteMatt = (function(){
+        var ds = Object.keys(dayLogs).filter(function(k){ return dayLogs[k].midja && dayLogs[k].hals; }).sort();
+        if (!ds.length) return null;
+        var k = ds[ds.length-1];
+        return { date: k, fat: bodyFatPct(dayLogs[k].midja, dayLogs[k].hals, height) };
+      })();
+      return h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 p-5' },
+        h('div', { className: 'flex items-center justify-between mb-3' },
+          h('h2', { className: 'font-bold text-gray-800' }, '🏷️ Dagens taggar'),
+          h('p', { className: 'text-xs text-gray-400' }, 'Två sekunder — flödar in i alla analyser')
+        ),
+        h('div', { className: 'flex flex-wrap items-center gap-x-5 gap-y-3' },
+          h('div', null,
+            h('p', { className: 'text-xs text-gray-400 mb-1' }, '🍽️ Aptit (1 = ingen alls)'),
+            h('div', { className: 'flex gap-1' }, [1,2,3,4,5].map(function(v){ return chip(dl.aptit === v, String(v), function(){ setDayTag(tds, 'aptit', dl.aptit === v ? null : v); }); }))
+          ),
+          h('div', null,
+            h('p', { className: 'text-xs text-gray-400 mb-1' }, '🤢 Illamående (0 = inget)'),
+            h('div', { className: 'flex gap-1' }, [0,1,2,3].map(function(v){ return chip(dl.illamaende === v, String(v), function(){ setDayTag(tds, 'illamaende', dl.illamaende === v ? null : v); }, 'bg-amber-500 text-white'); }))
+          ),
+          h('div', null,
+            h('p', { className: 'text-xs text-gray-400 mb-1' }, '🍷 Alkohol (enheter)'),
+            h('div', { className: 'flex items-center gap-1.5' },
+              h('button', { onClick: function(){ setDayTag(tds, 'alkohol', Math.max(0, (dl.alkohol || 0) - 1) || null); }, className: 'w-8 h-8 rounded-lg bg-gray-100 font-bold text-gray-600' }, '−'),
+              h('span', { className: 'w-6 text-center font-black text-gray-800' }, dl.alkohol || 0),
+              h('button', { onClick: function(){ setDayTag(tds, 'alkohol', (dl.alkohol || 0) + 1); }, className: 'w-8 h-8 rounded-lg bg-gray-100 font-bold text-gray-600' }, '+')
+            )
+          ),
+          h('div', null,
+            h('p', { className: 'text-xs text-gray-400 mb-1' }, 'Övrigt'),
+            h('div', { className: 'flex gap-1.5' },
+              chip(!!dl.sjuk, '🤒 Sjuk', function(){ setDayTag(tds, 'sjuk', dl.sjuk ? null : true); }, 'bg-rose-500 text-white'),
+              chip(!!dl.bastu, '🧖 Bastu', function(){ setDayTag(tds, 'bastu', dl.bastu ? null : true); }, 'bg-orange-500 text-white'),
+              chip(!!dl.kallbad, '🧊 Kallbad', function(){ setDayTag(tds, 'kallbad', dl.kallbad ? null : true); }, 'bg-sky-500 text-white')
+            )
+          )
+        ),
+        (isSunday || dl.midja || dl.hals) ? h('div', { className: 'mt-4 pt-3 border-t border-gray-50 flex flex-wrap items-end gap-3' },
+          h('div', null,
+            h('p', { className: 'text-xs text-gray-400 mb-1' }, '📏 Midja (cm) — söndagsmätning'),
+            h('input', { type:'text', inputMode:'decimal', value: dl.midja || '', onChange: function(e){ var v = parseFloat(String(e.target.value).replace(',','.')); setDayTag(tds, 'midja', isNaN(v) ? null : v); }, className: 'w-24 px-3 py-2 border rounded-lg text-sm outline-none' })
+          ),
+          h('div', null,
+            h('p', { className: 'text-xs text-gray-400 mb-1' }, '📏 Hals (cm)'),
+            h('input', { type:'text', inputMode:'decimal', value: dl.hals || '', onChange: function(e){ var v = parseFloat(String(e.target.value).replace(',','.')); setDayTag(tds, 'hals', isNaN(v) ? null : v); }, className: 'w-24 px-3 py-2 border rounded-lg text-sm outline-none' })
+          ),
+          fat != null ? h('div', { className: 'bg-emerald-50 rounded-lg px-3 py-2' },
+            h('p', { className: 'text-xs text-gray-400' }, 'Kroppsfett (US Navy-est.)'),
+            h('p', { className: 'text-lg font-black text-emerald-700' }, fat + '%')
+          ) : (senasteMatt && senasteMatt.fat != null ? h('p', { className: 'text-xs text-gray-400' }, 'Senaste fett%-est: ' + senasteMatt.fat + '% (' + senasteMatt.date + ')') : null)
+        ) : null
+      );
+    })();
     if (!stats) {
-      return h('div', { className: 'bg-white rounded-xl p-12 text-center shadow-md' },
+      return h('div', null, tagCard, h('div', { className: 'bg-white rounded-xl p-12 text-center shadow-md' },
         h('div', { className: 'text-5xl mb-4' }, '📊'),
         h('p', { className: 'text-gray-600 text-lg mb-2' }, 'Ingen data än'),
         h('p', { className: 'text-gray-400 text-sm mb-6' }, 'Lägg till din första vikt eller importera historik'),
@@ -1337,7 +1446,7 @@ function WeightStepTracker() {
           h('button', { onClick: function(){setView('add');}, className: 'bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700' }, 'Lägg till mätning'),
           h('button', { onClick: function(){setShowImport(true);}, className: 'bg-white border-2 border-indigo-200 text-indigo-600 px-6 py-3 rounded-lg hover:bg-indigo-50' }, 'Importera data')
         )
-      );
+      ));
     }
     const diffNum = parseFloat(stats.diff);
     // Progress calculations for hero card
@@ -1429,6 +1538,7 @@ function WeightStepTracker() {
           )
         )
       ) : null,
+      tagCard,
       // ── Tvillingdagar ──
       twinDays ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
@@ -2742,7 +2852,13 @@ function WeightStepTracker() {
       });
       workouts.forEach(function(w){ mTrain[w.date]=(mTrain[w.date]||0)+w.duration; });
       entries.forEach(function(e){ if(e.mood) mMood[e.date]=e.mood; });
+      var mAptit={}, mAlk={};
+      var anyAlk = Object.keys(dayLogs).some(function(k){ return dayLogs[k].alkohol != null; });
+      Object.keys(dayLogs).forEach(function(k){ if (dayLogs[k].aptit != null) mAptit[k] = dayLogs[k].aptit; });
+      if (anyAlk) ouraData.forEach(function(d){ mAlk[d.date] = (dayLogs[d.date] && dayLogs[d.date].alkohol) || 0; });
       var drivers=[['🌙 Sömn',mSleep],['💗 HRV',mHrv],['👟 Steg',mSteps],['🔥 Stress',mStress],['💪 Träning',mTrain],['😊 Humör',mMood]];
+      if (Object.keys(mAptit).length >= 8) drivers.push(['🍽️ Aptit', mAptit]);
+      if (anyAlk) drivers.push(['🍷 Alkohol', mAlk]);
       var outcomes=[['Humör',mMood],['Sömn',mSleep],['HRV',mHrv],['ViktΔ',null]];
       var cells=drivers.map(function(dr){
         return outcomes.map(function(oc){
@@ -3762,17 +3878,20 @@ function WeightStepTracker() {
       entries.forEach(function(e){ wBD[e.date] = e.weight; if (e.mood) mBD[e.date] = e.mood; });
       ouraData.forEach(function(d){ if (d.sleep_score != null) sBD[d.date] = d.sleep_score; });
       var offsets = [];
-      for (var o = 0; o < 7; o++) offsets.push({ o: o, dw: [], mood: [], sleep: [] });
+      for (var o = 0; o < 7; o++) offsets.push({ o: o, dw: [], mood: [], sleep: [], aptit: [], illa: [] });
       dosesAsc.forEach(function(d){
         for (var o = 0; o < 7; o++) {
           var day = addDaysStr(d.date, o), next = addDaysStr(d.date, o+1);
           if (wBD[day] != null && wBD[next] != null) offsets[o].dw.push(wBD[next] - wBD[day]);
           if (mBD[day] != null) offsets[o].mood.push(mBD[day]);
           if (sBD[day] != null) offsets[o].sleep.push(sBD[day]);
+          var dl = dayLogs[day];
+          if (dl && dl.aptit != null) offsets[o].aptit.push(dl.aptit);
+          if (dl && dl.illamaende != null) offsets[o].illa.push(dl.illamaende);
         }
       });
       var avg = function(a){ return a.length ? a.reduce(function(x,y){ return x+y; },0)/a.length : null; };
-      var rows = offsets.map(function(x){ return { o: x.o, dw: avg(x.dw), nDw: x.dw.length, mood: avg(x.mood), sleep: avg(x.sleep) }; });
+      var rows = offsets.map(function(x){ return { o: x.o, dw: avg(x.dw), nDw: x.dw.length, mood: avg(x.mood), sleep: avg(x.sleep), aptit: avg(x.aptit), illa: avg(x.illa) }; });
       if (!rows.some(function(r){ return r.dw != null && r.nDw >= 3; })) return null;
       var withDw = rows.filter(function(r){ return r.dw != null; });
       var bestDay = withDw.length ? withDw.reduce(function(p,c){ return c.dw < p.dw ? c : p; }) : null;
@@ -3985,6 +4104,8 @@ function WeightStepTracker() {
               h('thead', null, h('tr', { className: 'bg-gray-50' },
                 h('th', { className: 'text-left px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Dag efter dos'),
                 h('th', { className: 'text-right px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'ViktΔ / dag'),
+                h('th', { className: 'text-right px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Aptit'),
+                h('th', { className: 'text-right px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Illa.'),
                 h('th', { className: 'text-right px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Humör'),
                 h('th', { className: 'text-right px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-gray-400' }, 'Sömn')
               )),
@@ -3994,6 +4115,8 @@ function WeightStepTracker() {
                   return h('tr', { key: ri, className: ri % 2 ? 'bg-gray-50/50' : '' },
                     h('td', { className: 'px-3 py-1.5 font-semibold text-gray-600' }, label),
                     h('td', { className: 'px-3 py-1.5 text-right font-bold ' + (r.dw == null ? 'text-gray-300' : r.dw <= 0 ? 'text-green-600' : 'text-red-500') }, r.dw == null ? '–' : (r.dw > 0 ? '+' : '') + r.dw.toFixed(2) + ' kg'),
+                    h('td', { className: 'px-3 py-1.5 text-right text-gray-600' }, r.aptit != null ? r.aptit.toFixed(1) : '–'),
+                    h('td', { className: 'px-3 py-1.5 text-right text-gray-600' }, r.illa != null ? r.illa.toFixed(1) : '–'),
                     h('td', { className: 'px-3 py-1.5 text-right text-gray-600' }, r.mood != null ? r.mood.toFixed(1) : '–'),
                     h('td', { className: 'px-3 py-1.5 text-right text-gray-600' }, r.sleep != null ? Math.round(r.sleep) : '–')
                   );
@@ -4329,6 +4452,19 @@ function WeightStepTracker() {
           Row('SpO2', o.spo2_avg != null ? o.spo2_avg + '%' : null),
           Row('Andning', o.breath_avg != null ? o.breath_avg + ' andetag/min' : null)
         ] : []),
+        Section('🏷️ Taggar', (function(){
+          var dl = dayLogs[selectedDay];
+          if (!dl) return [];
+          return [
+            dl.aptit != null ? Row('Aptit', dl.aptit + ' / 5') : null,
+            dl.illamaende != null ? Row('Illamående', dl.illamaende + ' / 3') : null,
+            dl.alkohol ? Row('Alkohol', dl.alkohol + ' enheter') : null,
+            dl.sjuk ? Row('Status', '🤒 Sjuk') : null,
+            dl.bastu ? Row('Bastu', '✓') : null,
+            dl.kallbad ? Row('Kallbad', '✓') : null,
+            (dl.midja && dl.hals) ? Row('Midja / hals', dl.midja + ' / ' + dl.hals + ' cm (fett ~' + bodyFatPct(dl.midja, dl.hals, height) + '%)') : null
+          ];
+        })()),
         Section('💉 Wegovy', dose ? [
           Row('Dos', dose.dose + ' mg'),
           Row('Biverkningar', dose.side_effects || null),
