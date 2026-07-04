@@ -1,4 +1,4 @@
-const CACHE = 'halsa-v3';
+const CACHE = 'halsa-v4';
 const ASSETS = [
   './', './index.html', './charts.js', './analytics.js', './manifest.json', './icon-192.png', './icon-512.png',
   'https://unpkg.com/react@18/umd/react.production.min.js',
@@ -21,7 +21,7 @@ self.addEventListener('fetch', function(e){
   }
   // Lokala JS-filer (charts.js, analytics.js): network-first så nya versioner alltid når klienten
   if (url.origin === location.origin && url.pathname.slice(-3) === '.js') {
-    e.respondWith(fetch(req).then(function(r){ if (r && r.ok) { var cp = r.clone(); caches.open(CACHE).then(function(c){ c.put(req, cp); }); } return r; }).catch(function(){ return caches.match(req); }));
+    e.respondWith(fetch(req, { cache: 'no-cache' }).then(function(r){ if (r && r.ok) { var cp = r.clone(); caches.open(CACHE).then(function(c){ c.put(req, cp); }); } return r; }).catch(function(){ return caches.match(req); }));
     return;
   }
   if (req.mode === 'navigate') {
