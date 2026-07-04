@@ -552,6 +552,28 @@ function WeightStepTracker() {
     };
     reader.readAsText(file);
   };
+  const restoreFromCloud = async function() {
+    try {
+      var r = await fetch('backup.enc?t=' + Date.now());
+      if (!r.ok) { showToast('Ingen molnbackup hittad i repot ännu', 'error'); return; }
+      var txt = await r.text();
+      var p = appSettings.backupPassword || window.prompt('Krypteringslösenord:');
+      if (!p) return;
+      var data = await CryptoBox.dec(txt, p);
+      if (data.entries) setEntries(data.entries);
+      if (data.workouts) setWorkouts(data.workouts);
+      if (data.goalWeight) setGoalWeight(data.goalWeight);
+      if (data.yearlyGoal) setYearlyGoal(data.yearlyGoal);
+      if (data.height) setHeight(data.height);
+      if (data.targetRate != null) setTargetRate(data.targetRate);
+      if (data.wegovyDoses) { setWegovyDoses(data.wegovyDoses); window.storage.set('wegovy-doses', JSON.stringify(data.wegovyDoses)); }
+      if (data.wegovyProtocol) { setWegovyProtocol(data.wegovyProtocol); window.storage.set('wegovy-protocol', JSON.stringify(data.wegovyProtocol)); }
+      if (data.experiments) { setExperiments(data.experiments); window.storage.set('experiments', JSON.stringify(data.experiments)); }
+      if (data.checkups) { setCheckups(data.checkups); window.storage.set('checkups', JSON.stringify(data.checkups)); }
+      showToast('☁️ Återställt från molnbackup (' + (data.exportDate ? new Date(data.exportDate).toLocaleDateString('sv-SE') : '?') + ')!');
+      setShowImport(false); setView('overview');
+    } catch(e) { showToast('Fel lösenord eller trasig molnbackup', 'error'); }
+  };
   const runCloudBackup = async function(manual) {
     var t = appSettings.ghToken, p = appSettings.backupPassword;
     if (!t || !p) { if (manual) showToast('Fyll i GitHub-token och lösenord under Inställningar', 'error'); return; }
@@ -4278,7 +4300,8 @@ function WeightStepTracker() {
           '🔓 Återställ krypterad',
           h('input', { type:'file', accept:'.enc,.json', onChange:importEncrypted, className:'hidden' })
         ),
-        h('button', { onClick:function(){ runCloudBackup(true); }, className:'bg-gray-800 text-white px-5 py-2 rounded-lg text-sm font-medium' }, '☁️ Ladda upp till repot nu')
+        h('button', { onClick:function(){ runCloudBackup(true); }, className:'bg-gray-800 text-white px-5 py-2 rounded-lg text-sm font-medium' }, '☁️ Ladda upp till repot nu'),
+        h('button', { onClick:restoreFromCloud, className:'bg-emerald-700 text-white px-5 py-2 rounded-lg text-sm font-medium' }, '⬇️ Hämta från molnet')
       ),
       lastCloudBackup ? h('p', { className: 'text-xs text-gray-400' }, 'Senaste molnbackup: ' + new Date(lastCloudBackup).toLocaleString('sv-SE') + ' · uppdateras automatiskt varje vecka') : h('p', { className: 'text-xs text-gray-400' }, 'Molnbackup kräver GitHub-token + lösenord under Inställningar. Filen krypteras innan den lämnar telefonen.'),
       h('div', { className: 'border-t pt-5' },
