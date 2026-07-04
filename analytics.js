@@ -656,5 +656,199 @@
     }
     return plan;
   };
+  // ── WEGOVY-MOTORER (rena, memoiseras i appen) ──────────────────────────────
+  A.getWegovyWeeksOn = function(proto) {
+    if (!proto || !proto.start_date) return 0;
+    var ms = new Date() - new Date(proto.start_date);
+    return Math.ceil(ms / (7*24*60*60*1000));
+  };
+  // Respons per dossteg + prognos + milstolpar + biverkningar + STEP 1-jämförelse
+  A.getWegovyDoseResponse = function(entries, wegovyDoses, wegovyProtocol, goalWeight) {
+    if (!wegovyDoses || !wegovyProtocol) return null;
+    var wgStart = wegovyProtocol.start_date;
+    var respEntries = wgStart ? entries.filter(function(e){return e.date>=wgStart;}).slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}) : [];
+    var dosesAsc = wegovyDoses.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+      if (!dosesAsc.length || respEntries.length < 2) return null;
+      var periods = []; var cur = null;
+      dosesAsc.forEach(function(d){
+        if (!cur || d.dose !== cur.dose) {
+          if (cur) cur.end = d.date;
+          periods.push({ dose: d.dose, start: d.date, end: null });
+          cur = periods[periods.length-1];
+        }
+      });
+      var perStep = periods.map(function(p){
+        var es = respEntries.filter(function(e){ return e.date >= p.start && (!p.end || e.date < p.end); });
+        if (es.length < 2) return { dose: p.dose, rate: null, weeks: null };
+        var days = (new Date(es[es.length-1].date) - new Date(es[0].date)) / 86400000;
+        if (days < 3) return { dose: p.dose, rate: null, weeks: null };
+        var rate = (es[es.length-1].weight - es[0].weight) / (days/7);
+        return { dose: p.dose, rate: parseFloat(rate.toFixed(2)), weeks: Math.round(days/7 * 10) / 10 };
+      });
+      var recent = respEntries.filter(function(e){ return (new Date() - new Date(e.date)) <= 28*86400000; });
+      var pace = null;
+      if (recent.length >= 4) {
+        var n = recent.length, sx=0, sy=0, sxy=0, sxx=0;
+        var t0 = new Date(recent[0].date).getTime();
+        recent.forEach(function(e){ var x = (new Date(e.date).getTime()-t0)/86400000; sx+=x; sy+=e.weight; sxy+=x*e.weight; sxx+=x*x; });
+        var sl = (n*sxy - sx*sy) / ((n*sxx - sx*sx) || 1);
+        pace = sl * 7;
+      }
+      var lastW = respEntries[respEntries.length-1].weight;
+      var forecast = null;
+      if (pace != null && pace < -0.05 && lastW > goalWeight) {
+        var wks = Math.round((lastW - goalWeight) / Math.abs(pace));
+        if (wks <= 200) { var fd = new Date(); fd.setDate(fd.getDate() + wks*7); forecast = { weeks: wks, date: fd }; }
+      }
+      if (!perStep.some(function(s){ return s.rate != null; }) && pace == null) return null;
+      // Procentuell viktminskning + milstolpar
+      var startW = respEntries[0].weight;
+      var pctLoss = (startW - lastW) / startW * 100;
+      var milestones = [5, 10, 15, 20].map(function(m){
+        return { pct: m, kg: parseFloat((startW * m / 100).toFixed(1)), reached: pctLoss >= m };
+      });
+      var nextMs = milestones.find(function(m){ return !m.reached; }) || null;
+      // Biverkningar per dosnivå
+      var seByDose = {};
+      dosesAsc.forEach(function(d){
+        var k = d.dose;
+        if (!seByDose[k]) seByDose[k] = { dose: k, total: 0, withSE: 0, effects: {} };
+        seByDose[k].total++;
+        if (d.side_effects && d.side_effects.trim()) { seByDose[k].withSE++; seByDose[k].effects[d.side_effects.trim().toLowerCase()] = true; }
+      });
+      var seRows = Object.values(seByDose).sort(function(a,b){ return a.dose - b.dose; });
+      var anySE = seRows.some(function(r){ return r.withSE > 0; });
+      // Typisk respons i kliniska studier (STEP 1, semaglutid 2.4 mg): interpolerad %-kurva
+      var stepCurve = [[0,0],[4,2],[8,4],[12,6],[16,7.5],[20,9],[28,10.8],[36,12.4],[44,13.8],[52,14.5],[60,15],[68,15.3]];
+      var typicalPct = null;
+      var wk = A.getWegovyWeeksOn(wegovyProtocol);
+      if (wk > 0) {
+        var capped = Math.min(wk, 68);
+        for (var si = 1; si < stepCurve.length; si++) {
+          if (capped <= stepCurve[si][0]) {
+            var a0 = stepCurve[si-1], a1 = stepCurve[si];
+            typicalPct = a0[1] + (a1[1]-a0[1]) * (capped - a0[0]) / (a1[0]-a0[0]);
+            break;
+          }
+        }
+        if (typicalPct == null) typicalPct = 15.3;
+      }
+      // Prognosgraf: historik + trendlinje till mål
+      var chart = null;
+      if (pace != null && pace < -0.02) {
+        var fWeeks = Math.min(30, forecast ? forecast.weeks : 30);
+        chart = respEntries.map(function(e, i){
+          return { datum: new Date(e.date).toLocaleDateString('sv-SE',{month:'short',day:'numeric'}), vikt: e.weight, prognos: i === respEntries.length-1 ? e.weight : null, mål: goalWeight };
+        });
+        var lastD = new Date(respEntries[respEntries.length-1].date);
+        for (var fk = 1; fk <= fWeeks; fk++) {
+          var fD = new Date(lastD); fD.setDate(lastD.getDate() + fk*7);
+          var fV = Math.max(goalWeight, lastW + pace*fk);
+          chart.push({ datum: fD.toLocaleDateString('sv-SE',{month:'short',day:'numeric'}), vikt: null, prognos: parseFloat(fV.toFixed(1)), mål: goalWeight });
+          if (fV <= goalWeight) break;
+        }
+      }
+      return { perStep: perStep, forecast: forecast, pace: pace != null ? parseFloat(pace.toFixed(2)) : null, lastW: lastW,
+        startW: startW, pctLoss: parseFloat(pctLoss.toFixed(1)), milestones: milestones, nextMs: nextMs,
+        seRows: seRows, anySE: anySE, typicalPct: typicalPct != null ? parseFloat(typicalPct.toFixed(1)) : null, weeksOn: wk, chart: chart };
+  };
+  // Takt över tid + signal vs brus
+  A.getWegovyTakt = function(entries, wegovyProtocol) {
+    if (!wegovyProtocol) return null;
+    var wgStart = wegovyProtocol.start_date;
+    var respEntries = wgStart ? entries.filter(function(e){return e.date>=wgStart;}).slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}) : [];
+      if (respEntries.length < 10) return null;
+      var wkMap = {};
+      respEntries.forEach(function(e){ var wk = A.getWeekNumber(e.date); (wkMap[wk] = wkMap[wk] || []).push(e.weight); });
+      var wks = Object.keys(wkMap).sort();
+      var bars = null;
+      if (wks.length >= 3) {
+        var avgs = wks.map(function(k){ var a = wkMap[k]; return a.reduce(function(x,y){ return x+y; },0)/a.length; });
+        bars = [];
+        for (var i = 1; i < wks.length; i++) {
+          bars.push({ label: A.getISOWeekNumber(wks[i]), takt: parseFloat((avgs[i]-avgs[i-1]).toFixed(2)) });
+        }
+        bars = bars.slice(-16);
+      }
+      var diffs = [];
+      for (var j = 1; j < respEntries.length; j++) {
+        var dd = (new Date(respEntries[j].date) - new Date(respEntries[j-1].date)) / 86400000;
+        if (dd === 1) diffs.push(respEntries[j].weight - respEntries[j-1].weight);
+      }
+      var noise = null;
+      if (diffs.length >= 10) {
+        var mu = diffs.reduce(function(a,b){ return a+b; },0)/diffs.length;
+        var sd = Math.sqrt(diffs.reduce(function(s,v){ return s+Math.pow(v-mu,2); },0)/diffs.length);
+        var within = diffs.filter(function(v){ return Math.abs(v - mu) <= sd; }).length;
+        noise = { sd: parseFloat(sd.toFixed(2)), muWeek: parseFloat((mu*7).toFixed(2)), n: diffs.length, withinPct: Math.round(within/diffs.length*100) };
+      }
+      return (bars || noise) ? { bars: bars, noise: noise } : null;
+  };
+  // Monte Carlo-prognos: bootstrap av egna veckoutfall (seedad mulberry32)
+  A.getWegovyMonteCarlo = function(entries, wegovyProtocol, goalWeight) {
+    if (!wegovyProtocol) return null;
+    var wgStart = wegovyProtocol.start_date;
+    var respEntries = wgStart ? entries.filter(function(e){return e.date>=wgStart;}).slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}) : [];
+      if (respEntries.length < 14 || !entries.length) return null;
+      var wkMap = {};
+      respEntries.forEach(function(e){ var wk = A.getWeekNumber(e.date); (wkMap[wk] = wkMap[wk] || []).push(e.weight); });
+      var wks = Object.keys(wkMap).sort();
+      if (wks.length < 5) return null;
+      var avgs = wks.map(function(k){ var a = wkMap[k]; return a.reduce(function(x,y){ return x+y; },0)/a.length; });
+      var deltas = [];
+      for (var i = 1; i < avgs.length; i++) deltas.push(avgs[i]-avgs[i-1]);
+      deltas = deltas.slice(-12);
+      if (deltas.length < 4) return null;
+      var lastW = respEntries[respEntries.length-1].weight;
+      if (lastW <= goalWeight) return null;
+      var tD = new Date();
+      var tstr = tD.getFullYear()+''+String(tD.getMonth()+1).padStart(2,'0')+String(tD.getDate()).padStart(2,'0');
+      var rnd = A.mulberry32(parseInt(tstr) || 42);
+      var sims = 2000, horizon = 156, arrivals = [];
+      for (var s = 0; s < sims; s++) {
+        var w = lastW, t = null;
+        for (var k = 1; k <= horizon; k++) {
+          w += deltas[Math.floor(rnd()*deltas.length)];
+          if (w <= goalWeight) { t = k; break; }
+        }
+        if (t != null) arrivals.push(t);
+      }
+      var pReach = arrivals.length/sims;
+      if (!arrivals.length) return { pReach: 0, nDeltas: deltas.length };
+      arrivals.sort(function(a,b){ return a-b; });
+      var q = function(p){ return arrivals[Math.min(arrivals.length-1, Math.floor(p*arrivals.length))]; };
+      var dt = function(wk){ var d = new Date(); d.setDate(d.getDate()+wk*7); return d.toLocaleDateString('sv-SE',{month:'long',year:'numeric'}); };
+      return { pReach: Math.round(pReach*100), p50: q(0.5), d10: dt(q(0.1)), d50: dt(q(0.5)), d90: dt(q(0.9)), nDeltas: deltas.length };
+  };
+  // Injektionscykeln: mönster per dag efter dos
+  A.getWegovyCycle = function(entries, ouraData, dayLogs, wegovyDoses) {
+    if (!wegovyDoses) return null;
+    var dosesAsc = wegovyDoses.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);});
+      if (dosesAsc.length < 3) return null;
+      var addDaysStr = function(ds, n){ var dd = new Date(ds); dd.setDate(dd.getDate()+n); return dd.getFullYear() + '-' + String(dd.getMonth()+1).padStart(2,'0') + '-' + String(dd.getDate()).padStart(2,'0'); };
+      var wBD = {}, mBD = {}, sBD = {};
+      entries.forEach(function(e){ wBD[e.date] = e.weight; if (e.mood) mBD[e.date] = e.mood; });
+      ouraData.forEach(function(d){ if (d.sleep_score != null) sBD[d.date] = d.sleep_score; });
+      var offsets = [];
+      for (var o = 0; o < 7; o++) offsets.push({ o: o, dw: [], mood: [], sleep: [], aptit: [], illa: [] });
+      dosesAsc.forEach(function(d){
+        for (var o = 0; o < 7; o++) {
+          var day = addDaysStr(d.date, o), next = addDaysStr(d.date, o+1);
+          if (wBD[day] != null && wBD[next] != null) offsets[o].dw.push(wBD[next] - wBD[day]);
+          if (mBD[day] != null) offsets[o].mood.push(mBD[day]);
+          if (sBD[day] != null) offsets[o].sleep.push(sBD[day]);
+          var dl = dayLogs[day];
+          if (dl && dl.aptit != null) offsets[o].aptit.push(dl.aptit);
+          if (dl && dl.illamaende != null) offsets[o].illa.push(dl.illamaende);
+        }
+      });
+      var avg = function(a){ return a.length ? a.reduce(function(x,y){ return x+y; },0)/a.length : null; };
+      var rows = offsets.map(function(x){ return { o: x.o, dw: avg(x.dw), nDw: x.dw.length, mood: avg(x.mood), sleep: avg(x.sleep), aptit: avg(x.aptit), illa: avg(x.illa) }; });
+      if (!rows.some(function(r){ return r.dw != null && r.nDw >= 3; })) return null;
+      var withDw = rows.filter(function(r){ return r.dw != null; });
+      var bestDay = withDw.length ? withDw.reduce(function(p,c){ return c.dw < p.dw ? c : p; }) : null;
+      var worstDay = withDw.length ? withDw.reduce(function(p,c){ return c.dw > p.dw ? c : p; }) : null;
+      return { rows: rows, bestDay: bestDay, worstDay: worstDay, nDoses: dosesAsc.length };
+  };
   window.Analytics = A;
 })();
