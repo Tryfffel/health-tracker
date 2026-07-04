@@ -1,0 +1,100 @@
+name: Apple Health import
+
+# Tar emot träningspass från iPhone-genvägen (repository_dispatch)
+# och mergar in dem i apple-workouts.json som appen läser.
+on:
+  repository_dispatch:
+    types: [apple-workouts]
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Merga in passen
+        env:
+          PAYLOAD: ${{ toJSON(github.event.client_payload) }}
+        run: |
+          cat > merge.mjs <<'EOF'
+          import fs from "node:fs";
+          const payload = JSON.parse(process.env.PAYLOAD || "{}");
+
+          let items = [];
+          if (Array.isArray(payload.workouts)) {
+            items = payload.workouts;
+          } else if (typeof payload.text === "string") {
+            // Radformat från genvägen: "2026-07-04|Running|45"
+            items = payload.text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => {
+              const p = l.split("|").map(s => s.trim());
+              return { date: p[0], type: p[1], duration: parseFloat((p[2] || "").replace(",", ".")) };
+            });
+          }
+
+          const TYPE_MAP = {
+            "running": "Löpning", "löpning": "Löpning", "outdoor run": "Löpning", "indoor run": "Löpning",
+            "walking": "Promenad", "promenad": "Promenad", "gång": "Promenad", "hiking": "Promenad", "vandring": "Promenad",
+            "traditional strength training": "Styrketräning", "functional strength training": "Styrketräning",
+            "strength training": "Styrketräning", "styrketräning": "Styrketräning", "core training": "Styrketräning",
+            "cycling": "Cykling", "cykling": "Cykling", "indoor cycling": "Spinning",
+            "swimming": "Simning", "simning": "Simning",
+            "yoga": "Yoga", "pilates": "Pilates",
+            "high intensity interval training": "Crossfit", "hiit": "Crossfit", "cross training": "Crossfit",
+            "soccer": "Fotboll", "fotboll": "Fotboll", "tennis": "Tennis", "golf": "Golf",
+            "boxing": "Boxning", "boxning": "Boxning", "dance": "Dans", "dans": "Dans",
+            "climbing": "Klättring", "klättring": "Klättring", "floorball": "Innebandy", "innebandy": "Innebandy",
+            "downhill skiing": "Skidåkning", "cross country skiing": "Skidåkning", "skidåkning": "Skidåkning"
+          };
+
+          const clean = items.map(it => {
+            if (!it || !it.date) return null;
+            const dm = String(it.date).match(/(\d{4})-(\d{2})-(\d{2})/);
+            let date = dm ? dm[0] : null;
+            if (!date) {
+              const d = new Date(it.date);
+              if (!isNaN(d)) date = d.toISOString().slice(0, 10);
+            }
+            let dur = parseFloat(it.duration);
+            if (!date || isNaN(dur) || dur <= 0) return null;
+            if (dur > 300) dur = dur / 60; // sekunder skickades — konvertera till minuter
+            dur = Math.round(dur);
+            if (dur < 1) return null;
+            const rawType = String(it.type || "").trim();
+            const type = TYPE_MAP[rawType.toLowerCase()] || (rawType ? rawType : "Annat");
+            return {
+              id: "ah-" + date + "-" + type.toLowerCase().replace(/[^a-zåäö0-9]/g, "") + "-" + dur,
+              date, type, duration: dur,
+              intensity: it.intensity && it.intensity >= 1 && it.intensity <= 5 ? Math.round(it.intensity) : 3,
+              comment: "⌚ Apple Watch"
+            };
+          }).filter(Boolean);
+
+          const existing = fs.existsSync("apple-workouts.json")
+            ? JSON.parse(fs.readFileSync("apple-workouts.json", "utf8")) : [];
+          const ids = new Set(existing.map(w => w.id));
+          const nya = clean.filter(w => !ids.has(w.id));
+          if (!nya.length) { console.log("Inga nya pass."); process.exit(0); }
+
+          const merged = existing.concat(nya)
+            .sort((a, b) => (a.date < b.date ? -1 : 1))
+            .slice(-500);
+          fs.writeFileSync("apple-workouts.json", JSON.stringify(merged));
+          console.log("La till " + nya.length + " pass (totalt " + merged.length + ").");
+          EOF
+          node merge.mjs
+
+      - name: Committa om något ändrats
+        run: |
+          rm -f merge.mjs
+          if [ -n "$(git status --porcelain apple-workouts.json)" ]; then
+            git config user.name  "apple-bot"
+            git config user.email "apple-bot@users.noreply.github.com"
+            git add apple-workouts.json
+            git commit -m "Watch-pass $(date -u +%Y-%m-%d)"
+            git push
+          else
+            echo "Ingen förändring."
+          fi
