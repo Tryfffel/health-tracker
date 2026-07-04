@@ -28,6 +28,7 @@ const h = React.createElement;
 const { useState, useEffect } = React;
 // ─── SVG Charts (no external library needed) ─────────────────────────────────
 function SvgLineChart({ data, lines, height, markers }) {
+  var hoverSt = useState(null); var hoverI = hoverSt[0], setHoverI = hoverSt[1];
   height = height || 260;
   if (!data || data.length < 2) return h('p', {className:'text-gray-400 text-sm text-center py-8'}, 'Lägg till fler mätningar för att se grafen');
   var PL=50,PR=20,PT=20,PB=36,W=800,H=height;
@@ -64,13 +65,37 @@ function SvgLineChart({ data, lines, height, markers }) {
       h('text',{x:lx+24,y:H-4,fontSize:10,fill:'#6b7280'},l.name)
     );
   });
-  return h('svg',{viewBox:'0 0 '+W+' '+H,style:{width:'100%',height:height+'px'},xmlns:'http://www.w3.org/2000/svg'},
+  var onMove = function(e){
+    var r = e.currentTarget.getBoundingClientRect();
+    var cx = (e.clientX - r.left) / r.width * W;
+    var i = Math.round((cx - PL) / chartW * (data.length - 1));
+    setHoverI(Math.max(0, Math.min(data.length - 1, i)));
+  };
+  var tipEls = null;
+  if (hoverI != null && data[hoverI]) {
+    var dd = data[hoverI], hx = tx(hoverI);
+    var rows = lines.filter(function(l){ return dd[l.key] != null; });
+    if (rows.length) {
+      var boxW = 160, boxH = 22 + rows.length*14;
+      var bx = (hx + 12 + boxW > W - PR) ? hx - 12 - boxW : hx + 12;
+      tipEls = h('g', { style: { pointerEvents: 'none' } },
+        h('line', { x1: hx, y1: PT, x2: hx, y2: PT + chartH, stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '2,2' }),
+        ...rows.map(function(l){ return h('circle', { key: 'hc'+l.key, cx: hx, cy: ty(dd[l.key]), r: 4, fill: l.color, stroke: 'white', strokeWidth: 1.5 }); }),
+        h('rect', { x: bx, y: PT + 4, width: boxW, height: boxH, rx: 6, fill: 'rgba(17,24,39,0.92)' }),
+        h('text', { x: bx + 9, y: PT + 20, fontSize: 11, fontWeight: 'bold', fill: 'white' }, dd.datum),
+        ...rows.map(function(l, ri){ return h('text', { key: 'ht'+l.key, x: bx + 9, y: PT + 34 + ri*14, fontSize: 10, fill: l.color }, l.name + ': ' + dd[l.key]); })
+      );
+    }
+  }
+  return h('svg',{viewBox:'0 0 '+W+' '+H,style:{width:'100%',height:height+'px'},xmlns:'http://www.w3.org/2000/svg',
+    onMouseMove:onMove, onMouseLeave:function(){setHoverI(null);}},
     h('line',{x1:PL,y1:PT,x2:PL,y2:PT+chartH,stroke:'#e5e7eb',strokeWidth:1}),
     h('line',{x1:PL,y1:PT+chartH,x2:PL+chartW,y2:PT+chartH,stroke:'#e5e7eb',strokeWidth:1}),
-    ...gridEls, ...markerEls, ...xLabels, ...lineEls, ...legendEls
+    ...gridEls, ...markerEls, ...xLabels, ...lineEls, ...legendEls, tipEls
   );
 }
 function SvgBarChart({ data, dataKey, color, height }) {
+  var hoverSt = useState(null); var hoverI = hoverSt[0], setHoverI = hoverSt[1];
   height = height || 200;
   if (!data || data.length === 0) return null;
   var PL=50,PR=20,PT=20,PB=36,W=800,H=height;
@@ -93,13 +118,34 @@ function SvgBarChart({ data, dataKey, color, height }) {
     var yv=Math.round((maxV/4)*yi), yyy=PT+chartH-(yi/4)*chartH;
     yLabels.push(h('text',{key:'y'+yi,x:PL-4,y:yyy+4,textAnchor:'end',fontSize:10,fill:'#9ca3af'},yv>=1000?Math.round(yv/1000)+'k':yv));
   }
-  return h('svg',{viewBox:'0 0 '+W+' '+H,style:{width:'100%',height:height+'px'},xmlns:'http://www.w3.org/2000/svg'},
+  var onMove = function(e){
+    var r = e.currentTarget.getBoundingClientRect();
+    var cx = (e.clientX - r.left) / r.width * W;
+    var i = Math.floor((cx - PL) / chartW * data.length);
+    setHoverI(Math.max(0, Math.min(data.length - 1, i)));
+  };
+  var tipEls = null;
+  if (hoverI != null && data[hoverI] && data[hoverI][dataKey] != null) {
+    var dd = data[hoverI];
+    var hx = PL + (hoverI/data.length)*chartW + (chartW/data.length)*0.5;
+    var boxW = 130;
+    var bx = (hx + 12 + boxW > W - PR) ? hx - 12 - boxW : hx + 12;
+    tipEls = h('g', { style: { pointerEvents: 'none' } },
+      h('rect', { x: PL + (hoverI/data.length)*chartW + (chartW/data.length)*0.125, y: PT, width: bW, height: chartH, fill: 'rgba(148,163,184,0.12)' }),
+      h('rect', { x: bx, y: PT + 4, width: boxW, height: 38, rx: 6, fill: 'rgba(17,24,39,0.92)' }),
+      h('text', { x: bx + 9, y: PT + 20, fontSize: 11, fontWeight: 'bold', fill: 'white' }, dd.datum),
+      h('text', { x: bx + 9, y: PT + 34, fontSize: 10, fill: '#a5b4fc' }, (dd[dataKey] != null ? dd[dataKey].toLocaleString('sv-SE') : '–'))
+    );
+  }
+  return h('svg',{viewBox:'0 0 '+W+' '+H,style:{width:'100%',height:height+'px'},xmlns:'http://www.w3.org/2000/svg',
+    onMouseMove:onMove, onMouseLeave:function(){setHoverI(null);}},
     h('line',{x1:PL,y1:PT+chartH,x2:PL+chartW,y2:PT+chartH,stroke:'#e5e7eb',strokeWidth:1}),
     ...[0,1,2,3,4].map(function(i){var gy=PT+chartH-(i/4)*chartH;return h('line',{key:'g'+i,x1:PL,y1:gy,x2:PL+chartW,y2:gy,stroke:'#f0f0f0',strokeWidth:1});}),
-    ...yLabels, ...xLabels, ...bars
+    ...yLabels, ...xLabels, ...bars, tipEls
   );
 }
 function SvgScatter({ points, xName, yName, color, height }) {
+  var hoverSt = useState(null); var hoverP = hoverSt[0], setHoverP = hoverSt[1];
   height=height||240;
   if(!points||points.length<3) return h('p',{className:'text-gray-400 text-sm text-center py-8'},'För lite gemensam data ännu');
   var PL=52,PR=20,PT=18,PB=42,W=800,H=height, chartW=W-PL-PR, chartH=H-PT-PB;
@@ -113,10 +159,31 @@ function SvgScatter({ points, xName, yName, color, height }) {
   var trend=h('line',{x1:tx(minX),y1:ty(slope*minX+intercept),x2:tx(maxX),y2:ty(slope*maxX+intercept),stroke:color,strokeWidth:2,strokeDasharray:'6,4'});
   var zero=(minY<0&&maxY>0)?h('line',{x1:PL,y1:ty(0),x2:PL+chartW,y2:ty(0),stroke:'#d1d5db',strokeWidth:1}):null;
   var dots=points.map(function(p,i){return h('circle',{key:i,cx:tx(p.x),cy:ty(p.y),r:3.5,fill:color,fillOpacity:0.45});});
-  return h('svg',{viewBox:'0 0 '+W+' '+H,style:{width:'100%',height:height+'px'},xmlns:'http://www.w3.org/2000/svg'},
+  var onMove = function(e){
+    var r = e.currentTarget.getBoundingClientRect();
+    var mx = (e.clientX - r.left) / r.width * W, my = (e.clientY - r.top) / r.height * H;
+    var best = null, bd = 400;
+    points.forEach(function(p){ var d = Math.pow(tx(p.x)-mx,2) + Math.pow(ty(p.y)-my,2); if (d < bd) { bd = d; best = p; } });
+    setHoverP(best);
+  };
+  var tipEls = null;
+  if (hoverP) {
+    var px = tx(hoverP.x), py = ty(hoverP.y);
+    var boxW = 140;
+    var bx = (px + 12 + boxW > W - PR) ? px - 12 - boxW : px + 12;
+    var by = Math.max(PT, Math.min(py - 20, PT + chartH - 40));
+    tipEls = h('g', { style: { pointerEvents: 'none' } },
+      h('circle', { cx: px, cy: py, r: 6, fill: 'none', stroke: color, strokeWidth: 2 }),
+      h('rect', { x: bx, y: by, width: boxW, height: 36, rx: 6, fill: 'rgba(17,24,39,0.92)' }),
+      h('text', { x: bx + 9, y: by + 15, fontSize: 10, fill: 'white' }, xName + ': ' + (Math.round(hoverP.x*100)/100).toLocaleString('sv-SE')),
+      h('text', { x: bx + 9, y: by + 29, fontSize: 10, fill: 'white' }, yName + ': ' + (Math.round(hoverP.y*100)/100).toLocaleString('sv-SE'))
+    );
+  }
+  return h('svg',{viewBox:'0 0 '+W+' '+H,style:{width:'100%',height:height+'px'},xmlns:'http://www.w3.org/2000/svg',
+    onMouseMove:onMove, onMouseLeave:function(){setHoverP(null);}},
     h('line',{x1:PL,y1:PT,x2:PL,y2:PT+chartH,stroke:'#e5e7eb',strokeWidth:1}),
     h('line',{x1:PL,y1:PT+chartH,x2:PL+chartW,y2:PT+chartH,stroke:'#e5e7eb',strokeWidth:1}),
-    zero, trend, ...dots,
+    zero, trend, ...dots, tipEls,
     h('text',{x:PL+chartW/2,y:H-6,textAnchor:'middle',fontSize:11,fill:'#6b7280'},xName),
     h('text',{x:16,y:PT+chartH/2,textAnchor:'middle',fontSize:11,fill:'#6b7280',transform:'rotate(-90 16 '+(PT+chartH/2)+')'},yName)
   );
