@@ -163,6 +163,7 @@ function WeightStepTracker() {
   const [ouraConnected, setOuraConnected] = useState(false);
   const [ouraSyncing, setOuraSyncing] = useState(false);
   const [ouraRange, setOuraRange] = useState(90);
+  const [ouraOpen, setOuraOpen] = useState({ status: true });
   const [showAllInsights, setShowAllInsights] = useState(false);
 
   useEffect(function() {
@@ -2252,6 +2253,21 @@ function WeightStepTracker() {
     var nW=mkNorm(function(d){return wByDate[d.date];}), nH=mkNorm(function(d){return d.hrv_avg;}), nS=mkNorm(function(d){return d.sleep_score;}), nSt=mkNorm(function(d){return d.steps;});
     var hasWeightOverlay = !!nW;
     var overlayData = ovRaw.map(function(d){ return { datum:new Date(d.date).toLocaleDateString('sv-SE',{month:'short',day:'numeric'}), nvikt:nW?nW(wByDate[d.date]):null, nhrv:nH?nH(d.hrv_avg):null, nsomn:nS?nS(d.sleep_score):null, nsteg:nSt?nSt(d.steps):null }; });
+    // ── Kollapsbara sektionsgrupper ──
+    var ouraGroup = function(id, emoji, title, sub, content) {
+      var open = !!ouraOpen[id];
+      return h('div', { className: 'mb-4' },
+        h('button', { onClick: function(){ var o = Object.assign({}, ouraOpen); o[id] = !open; setOuraOpen(o); },
+          className: 'w-full flex items-center justify-between bg-white rounded-2xl shadow-md px-6 py-4 text-left hover:bg-indigo-50 transition-colors' },
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, emoji + ' ' + title),
+            h('p', { className: 'text-xs text-gray-400' }, sub)
+          ),
+          h('span', { className: 'text-indigo-500 text-xl font-black ml-3' }, open ? '−' : '+')
+        ),
+        open ? h('div', { className: 'mt-4' }, content) : null
+      );
+    };
     return h('div', null,
       // Hero
       h('div', { className: 'bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700 rounded-2xl shadow-xl mb-5 p-6 text-white' },
@@ -2334,6 +2350,7 @@ function WeightStepTracker() {
           )
         )
       ),
+      ouraGroup('status', '🧭', 'Status', 'Veckocoach · hälsoflaggor & kroppslarm · baslinjer · trender & rekord', h('div', null,
       // ── Veckocoach ──
       coach ? h('div', { className: 'rounded-2xl shadow-xl mb-4 p-6 text-white bg-gradient-to-br ' + (coach.tone==='good'?'from-emerald-500 to-teal-600':coach.tone==='tough'?'from-amber-500 to-orange-600':'from-indigo-500 to-blue-600') },
         h('p', { className:'text-white/80 text-xs font-semibold uppercase tracking-widest mb-1' }, '🧠 Veckocoach'),
@@ -2418,6 +2435,9 @@ function WeightStepTracker() {
           ) : null
         )
       ),
+        null
+      )),
+      ouraGroup('somn', '🌙', 'Sömn', 'Regularitet & social jetlag · sömnbanken · läggtid & kronotyp · dagsljus', h('div', null,
       // ── Sömnregularitet ──
       sleepReg ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
@@ -2544,6 +2564,9 @@ function WeightStepTracker() {
           h('p', { className: 'text-xs text-gray-400' }, 'På din breddgrad svänger dagsljuset ~12 timmar över året — en av de starkaste dolda variablerna i svensk hälsodata. Sambanden blir pålitliga först med data över flera säsonger.')
         )
       ) : null,
+        null
+      )),
+      ouraGroup('aktivitet', '👟', 'Aktivitet', 'Aktivitetsbalans senaste 30 dagarna', h('div', null,
       // ── Aktivitetsbalans ──
       activityBalance ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
@@ -2593,6 +2616,9 @@ function WeightStepTracker() {
           ) : null
         )
       ) : null,
+        null
+      )),
+      ouraGroup('samband', '🔗', 'Samband', 'Lag-korrelationer (idag → imorgon) · Oura ↔ vikt', h('div', null,
       // ── Lag-korrelationsmatris ──
       lagMatrix ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
@@ -2665,6 +2691,9 @@ function WeightStepTracker() {
               h('p', { className:'text-xs text-gray-400 mt-2 px-2' }, 'Samband = inte nödvändigtvis orsak. Värden nära 0 betyder inget tydligt mönster.')
             )
       ),
+        null
+      )),
+      ouraGroup('grafer', '📈', 'Grafer', 'Överlagring · sömnstadier · aktivitet · sömnkvalitet · andning · stress · temperatur', h('div', null,
       // ── Normaliserad överlagring ──
       h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
@@ -2855,6 +2884,8 @@ function WeightStepTracker() {
           ]})
         )
       ),
+        null
+      )),
       // Sync info footer
       h('div', { className: 'text-center text-xs text-gray-400 mt-4' },
         ouraLastSync ? 'Senast synkad: ' + new Date(ouraLastSync).toLocaleString('sv-SE') : 'Aldrig synkad',
