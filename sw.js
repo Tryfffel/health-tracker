@@ -1,6 +1,6 @@
-const CACHE = 'halsa-v2';
+const CACHE = 'halsa-v3';
 const ASSETS = [
-  './', './index.html', './manifest.json', './icon-192.png', './icon-512.png',
+  './', './index.html', './charts.js', './analytics.js', './manifest.json', './icon-192.png', './icon-512.png',
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
   'https://cdn.tailwindcss.com'
@@ -17,6 +17,11 @@ self.addEventListener('fetch', function(e){
   var url = new URL(req.url);
   if (url.pathname.indexOf('oura-data.json') !== -1) {
     e.respondWith(fetch(req).then(function(r){ var cp=r.clone(); caches.open(CACHE).then(function(c){c.put(req,cp);}); return r; }).catch(function(){ return caches.match(req); }));
+    return;
+  }
+  // Lokala JS-filer (charts.js, analytics.js): network-first så nya versioner alltid når klienten
+  if (url.origin === location.origin && url.pathname.slice(-3) === '.js') {
+    e.respondWith(fetch(req).then(function(r){ if (r && r.ok) { var cp = r.clone(); caches.open(CACHE).then(function(c){ c.put(req, cp); }); } return r; }).catch(function(){ return caches.match(req); }));
     return;
   }
   if (req.mode === 'navigate') {
