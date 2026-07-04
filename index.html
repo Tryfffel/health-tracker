@@ -1406,8 +1406,8 @@ function WeightStepTracker() {
     );
   }
   // ─── View rendering helpers ─────────────────────────────────────────────────
-  function renderOverview() {
-    var tagCard = (function(){
+  function renderTagCard() {
+    return (function(){
       var tds = todayStr();
       var todayDate = new Date();
       var dl = dayLogs[tds] || {};
@@ -1470,6 +1470,8 @@ function WeightStepTracker() {
         ) : null
       );
     })();
+  }
+  function renderOverview() {
     var batteryCard = (function(){
       var bb = getBodyBattery();
       if (!bb || bb.today == null) return null;
@@ -1516,7 +1518,7 @@ function WeightStepTracker() {
       );
     })();
     if (!stats) {
-      return h('div', null, tagCard, batteryCard, h('div', { className: 'bg-white rounded-xl p-12 text-center shadow-md' },
+      return h('div', null, batteryCard, h('div', { className: 'bg-white rounded-xl p-12 text-center shadow-md' },
         h('div', { className: 'text-5xl mb-4' }, '📊'),
         h('p', { className: 'text-gray-600 text-lg mb-2' }, 'Ingen data än'),
         h('p', { className: 'text-gray-400 text-sm mb-6' }, 'Lägg till din första vikt eller importera historik'),
@@ -1616,7 +1618,6 @@ function WeightStepTracker() {
           )
         )
       ) : null,
-      tagCard,
       batteryCard,
       // ── Tvillingdagar ──
       twinDays ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
@@ -2265,7 +2266,8 @@ function WeightStepTracker() {
         h('div', { className: 'px-6 pb-6' },
           h('button', { onClick: addEntry, disabled: !newEntry.weight, className:'w-full bg-gradient-to-r from-indigo-500 to-blue-600 text-white py-4 rounded-xl hover:from-indigo-600 hover:to-blue-700 disabled:opacity-40 font-bold text-lg shadow-md transition-all' }, '✓ Spara mätning')
         )
-      )
+      ),
+      renderTagCard()
     );
   }
   function renderWorkouts() {
