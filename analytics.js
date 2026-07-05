@@ -876,5 +876,291 @@
     if (r == null) return null;
     return { points: points, r: parseFloat(r.toFixed(2)), n: points.length };
   };
+  // ── OURA-VYNS MOTORER (rena, memoiseras i appen) ─────────────────────────────
+  // Hälsoflaggor, kroppslarm, baslinjer (7d vs 30d), trender & rekord
+  A.getOuraHealth = function(ouraData) {
+    if (!ouraData || !ouraData.length) return null;
+    var oAvg = function(arr,key){ var v=arr.map(function(d){return d[key];}).filter(function(x){return x!=null;}); return v.length?v.reduce(function(a,b){return a+b;},0)/v.length:null; };
+    var last7 = ouraData.slice(0,7), prior30 = ouraData.slice(7,37), prev7 = ouraData.slice(7,14);
+    var flags = [];
+    // Hur många av senaste 7 dagarna som avviker (varaktighet)
+    var devDays = function(key, test) {
+      var base = oAvg(prior30, key);
+      if (base == null) return { base: null, days: 0 };
+      var n = 0;
+      last7.forEach(function(d){ if (d[key] != null && test(d[key], base)) n++; });
+      return { base: base, days: n };
+    };
+    var durTxt = function(n){ return n >= 2 ? ' Pågått ' + n + ' av senaste 7 dagarna.' : ''; };
+    var hrv7=oAvg(last7,'hrv_avg'), hrvBase=oAvg(prior30,'hrv_avg');
+    var hrvDev = devDays('hrv_avg', function(v,b){ return v < b*0.8; });
+    if(hrv7!=null && hrvBase!=null && hrv7 < hrvBase*0.8) flags.push({lvl:'warn',icon:'💔',key:'hrv',text:'HRV ligger '+Math.round((1-hrv7/hrvBase)*100)+'% under din 30-dagarsnivå ('+Math.round(hrv7)+' vs '+Math.round(hrvBase)+' ms).'+durTxt(hrvDev.days)});
+    var rhr7=oAvg(last7,'resting_hr'), rhrBase=oAvg(prior30,'resting_hr');
+    var rhrDev = devDays('resting_hr', function(v,b){ return v > b+4; });
+    if(rhr7!=null && rhrBase!=null && rhr7 > rhrBase+4) flags.push({lvl:'warn',icon:'❤️',key:'rhr',text:'Vilopulsen är förhöjd ('+Math.round(rhr7)+' vs '+Math.round(rhrBase)+' i snitt).'+durTxt(rhrDev.days)});
+    var tempSpike = ouraData.slice(0,3).find(function(d){return d.temp_dev!=null && d.temp_dev>=0.5;});
+    if(tempSpike) flags.push({lvl:'warn',icon:'🌡️',key:'temp',text:'Förhöjd kroppstemperatur (+'+tempSpike.temp_dev+'°) senaste dygnen — kan vara stress eller begynnande infektion.'});
+    var lowSpo2 = ouraData.slice(0,7).find(function(d){return d.spo2_avg!=null && d.spo2_avg<94;});
+    if(lowSpo2) flags.push({lvl:'info',icon:'🫁',text:'Låg syresättning en natt ('+lowSpo2.spo2_avg+'%).'});
+    var poorSleep = ouraData.slice(0,5).filter(function(d){return d.sleep_score!=null && d.sleep_score<70;});
+    if(poorSleep.length>=3) flags.push({lvl:'info',icon:'😴',text:poorSleep.length+' av senaste 5 nätterna under sömnpoäng 70.'});
+    var br7=oAvg(last7,'breath_avg'), brBase=oAvg(prior30,'breath_avg');
+    var brDev = devDays('breath_avg', function(v,b){ return v > b+1.5; });
+    if(br7!=null && brBase!=null && br7 > brBase+1.5) flags.push({lvl:'warn',icon:'🫁',key:'breath',text:'Andningsfrekvensen i sömn är förhöjd ('+br7.toFixed(1)+' vs '+brBase.toFixed(1)+' andetag/min) — kan tyda på stress eller begynnande infektion.'+durTxt(brDev.days)});
+    var shr7=oAvg(last7,'avg_hr_sleep'), shrBase=oAvg(prior30,'avg_hr_sleep');
+    if(shr7!=null && shrBase!=null && shr7 > shrBase+4) flags.push({lvl:'warn',icon:'💓',key:'shr',text:'Sömnpulsen ligger högre än vanligt ('+Math.round(shr7)+' vs '+Math.round(shrBase)+' slag/min i snitt).'});
+    var eff7=oAvg(last7,'sleep_efficiency');
+    if(eff7!=null && eff7 < 80) flags.push({lvl:'info',icon:'🛏️',text:'Sömneffektiviteten har varit låg ('+Math.round(eff7)+'%) — mycket vaken tid i sängen.'});
+    // Kroppslarm: flera fysiologiska mått avviker samtidigt (senaste 3 dygnen)
+    var bodyAlarm = (function(){
+      var last3 = ouraData.slice(0,3);
+      if (last3.length < 2) return null;
+      var a3 = function(key){ var v=last3.map(function(d){return d[key];}).filter(function(x){return x!=null;}); return v.length?v.reduce(function(a,b){return a+b;},0)/v.length:null; };
+      var hits = [];
+      var t3 = a3('temp_dev'); if (t3 != null && t3 >= 0.3) hits.push('temperatur');
+      var r3 = a3('resting_hr'); if (r3 != null && rhrBase != null && r3 > rhrBase + 3) hits.push('vilopuls');
+      var b3 = a3('breath_avg'); if (b3 != null && brBase != null && b3 > brBase + 1) hits.push('andning');
+      var h3 = a3('hrv_avg'); if (h3 != null && hrvBase != null && h3 < hrvBase * 0.82) hits.push('HRV');
+      return hits.length >= 2 ? hits : null;
+    })();
+    // Baslinjetabell: 7 dagar vs 30 dagar
+    var baselineRows = [
+      ['💗 HRV', hrv7, hrvBase, ' ms', 'up'],
+      ['❤️ Vilopuls', rhr7, rhrBase, '', 'down'],
+      ['💓 Sömnpuls', shr7, shrBase, '', 'down'],
+      ['🫁 Andning', br7, brBase, ' /min', 'down'],
+      ['🛏️ Sömneffektivitet', eff7, oAvg(prior30,'sleep_efficiency'), '%', 'up'],
+      ['🌙 Sömnpoäng', oAvg(last7,'sleep_score'), oAvg(prior30,'sleep_score'), '', 'up']
+    ].filter(function(r){ return r[1] != null && r[2] != null; });
+    var trendMetrics = [{key:'sleep_score',name:'Sömnpoäng',better:'up'},{key:'hrv_avg',name:'HRV',better:'up'},{key:'resting_hr',name:'Vilopuls',better:'down'},{key:'steps',name:'Steg',better:'up'}];
+    var trends = trendMetrics.map(function(m){ var a=oAvg(last7,m.key), b=oAvg(prev7,m.key); if(a==null||b==null) return null; return {name:m.name, now:Math.round(a), diff:a-b, better:m.better}; }).filter(function(x){return x;});
+    var maxBy=function(key){ var a=ouraData.filter(function(d){return d[key]!=null;}); return a.length?a.reduce(function(p,c){return c[key]>p[key]?c:p;}):null; };
+    var minBy=function(key){ var a=ouraData.filter(function(d){return d[key]!=null;}); return a.length?a.reduce(function(p,c){return c[key]<p[key]?c:p;}):null; };
+    var recBestSleep=maxBy('sleep_score'), recMaxHrv=maxBy('hrv_avg'), recMinRhr=minBy('resting_hr'), recMaxSteps=maxBy('steps');
+    return { flags: flags, bodyAlarm: bodyAlarm, baselineRows: baselineRows, trends: trends,
+      records: { bestSleep: recBestSleep, maxHrv: recMaxHrv, minRhr: recMinRhr, maxSteps: recMaxSteps } };
+  };
+  // Veckocoach (regelbaserad sammanfattning)
+  A.getOuraCoach = function(ouraData, entries, stepGoal) {
+    var oAvg = function(arr,key){ var v=arr.map(function(d){return d[key];}).filter(function(x){return x!=null;}); return v.length?v.reduce(function(a,b){return a+b;},0)/v.length:null; };
+    var last7 = ouraData.slice(0,7), prev7 = ouraData.slice(7,14);
+      if(last7.length<3) return null;
+      var sleepNow=oAvg(last7,'sleep_score'), hrvNow=oAvg(last7,'hrv_avg'), hrvPrev=oAvg(prev7,'hrv_avg');
+      var stepsNow=oAvg(last7,'steps'), stressNow=oAvg(last7,'stress_high_min');
+      var rc=entries.slice().sort(function(a,b){return new Date(a.date)-new Date(b.date);}).filter(function(e){ return (new Date() - new Date(e.date)) <= 7*86400000; });
+      var viktChange = rc.length>=2 ? rc[rc.length-1].weight - rc[0].weight : null;
+      var parts=[], tips=[], tone='mixed';
+      if(sleepNow!=null){
+        if(sleepNow>=80) parts.push('Sömnen har varit stark (snitt ' + Math.round(sleepNow) + ').');
+        else if(sleepNow>=70) parts.push('Sömnen har varit okej (snitt ' + Math.round(sleepNow) + ').');
+        else { parts.push('Sömnen har varit låg (snitt ' + Math.round(sleepNow) + ').'); tips.push('Prioritera läggtiden — sikta på 7–8 h och samma tid varje kväll.'); }
+      }
+      if(hrvNow!=null && hrvPrev!=null){
+        if(hrvNow < hrvPrev*0.9){ parts.push('Återhämtningen är på väg ned — HRV har sjunkit mot veckan innan.'); tips.push('Lägg in en lugn dag eller extra vila innan nästa hårda pass.'); tone='tough'; }
+        else if(hrvNow > hrvPrev*1.1){ parts.push('Återhämtningen ser stark ut — HRV har stigit.'); if(tone!=='tough') tone='good'; }
+      }
+      if(stepsNow!=null){
+        if(stepsNow<stepGoal*0.875){ parts.push('Aktiviteten har varit låg (' + Math.round(stepsNow).toLocaleString('sv-SE') + ' steg/dag).'); tips.push('Lägg till en extra 20-minuterspromenad om dagen.'); }
+        else if(stepsNow>=10000) parts.push('Bra aktivitetsnivå (' + Math.round(stepsNow).toLocaleString('sv-SE') + ' steg/dag).');
+      }
+      if(viktChange!=null){
+        if(viktChange<=-0.3){ parts.push('Vikten är på väg ned (' + viktChange.toFixed(1) + ' kg denna vecka) — åt rätt håll.'); if(tone!=='tough') tone='good'; }
+        else if(viktChange>=0.3){ parts.push('Vikten gick upp lite (+' + viktChange.toFixed(1) + ' kg) — ofta vätska, men håll koll.'); }
+        else parts.push('Vikten ligger stabil denna vecka.');
+      }
+      if(stressNow!=null && stressNow>120) tips.push('Höga stressnivåer — lägg in andningspauser eller en kort promenad mitt på dagen.');
+      if(!tips.length) tips.push('Fortsätt som du gör — det funkar.');
+      var headline = tone==='good'?'Stark vecka 💪' : tone==='tough'?'Kroppen behöver vila 🛌' : 'Stabil vecka 👍';
+      return { headline:headline, paragraph:parts.join(' '), tips:tips.slice(0,3), tone:tone };
+  };
+  // Samband: Oura-mått vs nästa dags viktförändring
+  A.getOuraWeightCorr = function(ouraData, entries) {
+    var wByDate = {};
+    entries.forEach(function(e){ wByDate[e.date] = e.weight; });
+    var addDays = function(ds,n){ var dd=new Date(ds); dd.setDate(dd.getDate()+n); return dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0'); };
+    
+    var sambandMetrics = [
+      {key:'sleep_score',name:'Sömnpoäng',up:'bättre sömn'},
+      {key:'hrv_avg',name:'HRV',up:'högre HRV'},
+      {key:'dagsform_score',name:'Dagsform',up:'bättre dagsform'},
+      {key:'resting_hr',name:'Vilopuls',up:'högre vilopuls'},
+      {key:'steps',name:'Steg',up:'fler steg'},
+      {key:'total_cal',name:'Kalorier (tot)',up:'fler kalorier'},
+      {key:'stress_high_min',name:'Stress',up:'mer stress'},
+      {key:'sleep_efficiency',name:'Sömneffektivitet',up:'bättre effektivitet'}
+    ];
+    var corr = sambandMetrics.map(function(m){
+      var pairs=[];
+      ouraData.forEach(function(d){ var v=d[m.key]; if(v==null) return; var w0=wByDate[d.date], w1=wByDate[addDays(d.date,1)]; if(w0!=null&&w1!=null) pairs.push([v, parseFloat((w1-w0).toFixed(2))]); });
+      return {name:m.name, key:m.key, up:m.up, r:A.calcPearson(pairs), n:pairs.length, pairs:pairs};
+    }).filter(function(x){return x.r!=null;}).sort(function(a,b){return Math.abs(b.r)-Math.abs(a.r);});
+    var topCorr = corr[0] || null;
+    return { corr: corr, topCorr: topCorr };
+  };
+  // Lag-korrelationsmatris: vad idag påverkar vad imorgon
+  A.getOuraLagMatrix = function(ouraData, workouts, entries, dayLogs) {
+    var wByDate = {}; entries.forEach(function(e){ wByDate[e.date] = e.weight; });
+    var addDays = function(ds,n){ var dd=new Date(ds); dd.setDate(dd.getDate()+n); return dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0'); };
+      var mSleep={}, mHrv={}, mSteps={}, mStress={}, mTrain={}, mMood={};
+      ouraData.forEach(function(d){
+        if(d.sleep_score!=null) mSleep[d.date]=d.sleep_score;
+        if(d.hrv_avg!=null) mHrv[d.date]=d.hrv_avg;
+        if(d.steps!=null) mSteps[d.date]=d.steps;
+        if(d.stress_high_min!=null) mStress[d.date]=d.stress_high_min;
+        mTrain[d.date]=0;
+      });
+      workouts.forEach(function(w){ mTrain[w.date]=(mTrain[w.date]||0)+w.duration; });
+      entries.forEach(function(e){ if(e.mood) mMood[e.date]=e.mood; });
+      var mAptit={}, mAlk={};
+      var anyAlk = Object.keys(dayLogs).some(function(k){ return dayLogs[k].alkohol != null; });
+      Object.keys(dayLogs).forEach(function(k){ if (dayLogs[k].aptit != null) mAptit[k] = dayLogs[k].aptit; });
+      if (anyAlk) ouraData.forEach(function(d){ mAlk[d.date] = (dayLogs[d.date] && dayLogs[d.date].alkohol) || 0; });
+      var drivers=[['🌙 Sömn',mSleep],['💗 HRV',mHrv],['👟 Steg',mSteps],['🔥 Stress',mStress],['💪 Träning',mTrain],['😊 Humör',mMood]];
+      if (Object.keys(mAptit).length >= 8) drivers.push(['🍽️ Aptit', mAptit]);
+      if (anyAlk) drivers.push(['🍷 Alkohol', mAlk]);
+      var outcomes=[['Humör',mMood],['Sömn',mSleep],['HRV',mHrv],['ViktΔ',null]];
+      var cells=drivers.map(function(dr){
+        return outcomes.map(function(oc){
+          var pairs=[];
+          Object.keys(dr[1]).forEach(function(ds){
+            var nd=addDays(ds,1), y;
+            if(oc[1]===null){ if(wByDate[ds]==null||wByDate[nd]==null) return; y=wByDate[nd]-wByDate[ds]; }
+            else { y=oc[1][nd]; if(y==null) return; }
+            pairs.push([dr[1][ds], y]);
+          });
+          return { r: pairs.length>=8 ? A.calcPearson(pairs) : null, n: pairs.length };
+        });
+      });
+      var any=cells.some(function(row){ return row.some(function(c){ return c.r!=null; }); });
+      return any ? { drivers: drivers.map(function(d){return d[0];}), outcomes: outcomes.map(function(o){return o[0];}), cells: cells } : null;
+  };
+  // Sömnregularitet & social jetlag (30 nätter)
+  A.getOuraSleepRegularity = function(ouraData) {
+      var nights = ouraData.slice(0,30).filter(function(d){ return d.total_sleep_min != null; });
+      if (nights.length < 10) return null;
+      var mins = nights.map(function(d){ return d.total_sleep_min; });
+      var mu = mins.reduce(function(a,b){ return a+b; },0)/mins.length;
+      var sd = Math.sqrt(mins.reduce(function(s,v){ return s+Math.pow(v-mu,2); },0)/mins.length);
+      var isWkend = function(d){ var dow = new Date(d.date).getDay(); return dow===0 || dow===6; };
+      var we = nights.filter(isWkend), wd = nights.filter(function(d){ return !isWkend(d); });
+      var avgT = function(a){ return a.length ? a.reduce(function(x,y){ return x+y.total_sleep_min; },0)/a.length : null; };
+      var weA = avgT(we), wdA = avgT(wd);
+      var jetlag = (weA != null && wdA != null && we.length >= 4) ? Math.round(weA - wdA) : null;
+      var grade = sd < 30 ? ['Utmärkt','text-green-600'] : sd < 45 ? ['Bra','text-green-500'] : sd < 60 ? ['Okej','text-amber-500'] : ['Ojämn','text-red-500'];
+      return { sd: Math.round(sd), mu: mu, jetlag: jetlag, grade: grade, n: nights.length };
+  };
+  // Ovanlig natt: percentilrank mot hela historiken
+  A.getOuraUnusualNight = function(ouraData) {
+    var ouraLatest = ouraData.length > 0 ? ouraData[0] : null;
+      if (!ouraLatest || ouraData.length < 30) return [];
+      var res = [];
+      [['sleep_score','Sömnpoängen','high'],['hrv_avg','HRV:n','high'],['resting_hr','Vilopulsen','low'],['total_sleep_min','Sömntiden','high']].forEach(function(m){
+        var vals = ouraData.map(function(d){ return d[m[0]]; }).filter(function(v){ return v != null; });
+        var v = ouraLatest[m[0]];
+        if (v == null || vals.length < 30) return;
+        var below = vals.filter(function(x){ return x < v; }).length;
+        var pct = below / vals.length * 100;
+        if (pct >= 92) res.push({ t: m[1] + ' i natt var bland dina ' + Math.max(1, Math.round(100-pct)) + '% högsta någonsin', good: m[2] === 'high' });
+        else if (pct <= 8) res.push({ t: m[1] + ' i natt var bland dina ' + Math.max(1, Math.round(pct)) + '% lägsta någonsin', good: m[2] === 'low' });
+      });
+      return res;
+  };
+  // Läggtid & kronotyp
+  A.getOuraBedtime = function(ouraData) {
+      var nights = ouraData.filter(function(d){ return d.bedtime_start; }).slice(0, 90);
+      if (nights.length < 7) return null;
+      // Minuter sedan midnatt, +24h om före kl 12 (så 23:30=1410, 00:30=1470)
+      var toMin = function(iso){ var dt = new Date(iso); var m = dt.getHours()*60 + dt.getMinutes(); return m < 720 ? m + 1440 : m; };
+      var fmtT = function(m){ m = Math.round(m) % 1440; return String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0'); };
+      var beds = nights.map(function(d){ return { min: toMin(d.bedtime_start), sleep: d.sleep_score, date: d.date }; });
+      var mins = beds.map(function(b){ return b.min; });
+      var mu = mins.reduce(function(a,b){ return a+b; },0)/mins.length;
+      var sd = Math.sqrt(mins.reduce(function(s,v){ return s+Math.pow(v-mu,2); },0)/mins.length);
+      var wakes = nights.filter(function(d){ return d.bedtime_end; }).map(function(d){ var dt = new Date(d.bedtime_end); return dt.getHours()*60 + dt.getMinutes(); });
+      var wakeMu = wakes.length ? wakes.reduce(function(a,b){ return a+b; },0)/wakes.length : null;
+      // Helg vs vardag läggtid (kväll före: fre+lör kväll = helgkväll)
+      var isWkendEve = function(iso){ var dow = new Date(iso).getDay(); return dow === 5 || dow === 6; };
+      var weB = beds.filter(function(b,i){ return nights[i].bedtime_start && isWkendEve(nights[i].bedtime_start); });
+      var wdB = beds.filter(function(b,i){ return nights[i].bedtime_start && !isWkendEve(nights[i].bedtime_start); });
+      var avgB = function(a){ return a.length ? a.reduce(function(x,y){ return x+y.min; },0)/a.length : null; };
+      var shift = (weB.length >= 3 && wdB.length >= 5) ? Math.round(avgB(weB) - avgB(wdB)) : null;
+      // Optimal läggtid: 30-minutersfack, minst 5 nätter, ranka på sömnpoäng
+      var buckets = {};
+      beds.forEach(function(b){ if (b.sleep == null) return; var k = Math.floor(b.min/30)*30; (buckets[k] = buckets[k] || []).push(b.sleep); });
+      var bRows = Object.keys(buckets).filter(function(k){ return buckets[k].length >= 5; }).map(function(k){
+        return { from: fmtT(parseInt(k)), to: fmtT(parseInt(k)+30), avg: buckets[k].reduce(function(a,b){ return a+b; },0)/buckets[k].length, n: buckets[k].length };
+      }).sort(function(a,b){ return b.avg - a.avg; });
+      return { n: nights.length, avgBed: fmtT(mu), sd: Math.round(sd), avgWake: wakeMu != null ? fmtT(wakeMu) : null,
+        midpoint: wakeMu != null ? fmtT((mu + (wakeMu + 1440))/2) : null, shift: shift,
+        best: bRows[0] || null, worst: bRows.length > 1 ? bRows[bRows.length-1] : null, buckets: bRows };
+  };
+  // Aktivitetsbalans (30 dagar)
+  A.getOuraActivityBalance = function(ouraData) {
+      var days = ouraData.slice(0, 30).filter(function(d){ return d.sedentary_min != null; });
+      if (days.length < 7) return null;
+      var avg = function(key){ var v = days.map(function(d){ return d[key]; }).filter(function(x){ return x != null; }); return v.length ? v.reduce(function(a,b){ return a+b; },0)/v.length : null; };
+      var hi = avg('high_act_min'), me = avg('med_act_min'), lo = avg('low_act_min'), sed = avg('sedentary_min');
+      var alerts = avg('inactivity_alerts'), met = avg('met_min');
+      // Stillasittande vs samma natts sömn
+      var pairs = [];
+      ouraData.forEach(function(d){
+        if (d.sedentary_min == null) return;
+        var next = ouraData.find(function(x){ return x.date === (function(){ var dd = new Date(d.date); dd.setDate(dd.getDate()+1); return dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0'); })(); });
+        if (next && next.sleep_score != null) pairs.push([d.sedentary_min, next.sleep_score]);
+      });
+      var rSed = A.calcPearson(pairs);
+      return { n: days.length, hi: hi, me: me, lo: lo, sed: sed, alerts: alerts, met: met, rSed: rSed, nSed: pairs.length };
+  };
+  // Långsiktiga mått (senaste värde)
+  A.getOuraLongTerm = function(ouraData) {
+      var latestOf = function(key){ var d = ouraData.find(function(x){ return x[key] != null; }); return d ? { v: d[key], date: d.date } : null; };
+      var res = { resilience: latestOf('resilience'), vo2: latestOf('vo2max'), cardio: latestOf('cardio_age') };
+      return (res.resilience || res.vo2 || res.cardio) ? res : null;
+  };
+  // Sömnbanken: ackumulerad skuld/överskott 14 nätter
+  A.getOuraSleepBank = function(ouraData, sleepNeed) {
+      var nights = ouraData.slice(0, 14).filter(function(d){ return d.total_sleep_min != null; });
+      if (nights.length < 7) return null;
+      var need = sleepNeed || 450;
+      var balance = nights.reduce(function(s,d){ return s + (d.total_sleep_min - need); }, 0);
+      var bars = nights.slice().reverse().map(function(d){ return { date: d.date, diff: d.total_sleep_min - need }; });
+      var payback = balance < 0 ? Math.ceil(Math.abs(balance) / 60) : null;
+      return { balance: Math.round(balance), bars: bars, need: need, n: nights.length, payback: payback };
+  };
+  // Dagsljus & säsong (astronomisk beräkning, inget API)
+  A.getOuraDaylight = function(ouraData, entries, latitude) {
+      var lat = latitude != null ? latitude : 59.3;
+      var dayLenH = function(date) {
+        var J = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 86400000);
+        var decl = 23.45 * Math.sin(2*Math.PI*(284+J)/365) * Math.PI/180;
+        var x = -Math.tan(lat*Math.PI/180) * Math.tan(decl);
+        if (x <= -1) return 24; if (x >= 1) return 0;
+        return 2*Math.acos(x)/(2*Math.PI)*24;
+      };
+      var today = new Date();
+      var now = dayLenH(today);
+      var nextWk = new Date(today); nextWk.setDate(today.getDate()+7);
+      var deltaMin = Math.round((dayLenH(nextWk) - now) * 60);
+      if (ouraData.length < 60) return { now: now, deltaMin: deltaMin, corr: [] };
+      var moodBD = {}; entries.forEach(function(e){ if (e.mood) moodBD[e.date] = e.mood; });
+      var mk = function(get, name, posMeans) {
+        var pairs = [];
+        ouraData.forEach(function(d){
+          var v = get(d);
+          if (v == null) return;
+          pairs.push([dayLenH(new Date(d.date)), v]);
+        });
+        var r = A.calcPearson(pairs);
+        return r != null ? { name: name, r: r, n: pairs.length, posMeans: posMeans } : null;
+      };
+      var corr = [
+        mk(function(d){ return d.sleep_score; }, '🌙 Sömnpoäng', 'sover bättre ljusa halvåret'),
+        mk(function(d){ return d.total_sleep_min; }, '⏰ Sömntid', 'sover längre ljusa halvåret'),
+        mk(function(d){ return d.hrv_avg; }, '💗 HRV', 'högre HRV ljusa halvåret'),
+        mk(function(d){ return d.steps; }, '👟 Steg', 'rör dig mer ljusa halvåret'),
+        mk(function(d){ return moodBD[d.date]; }, '😊 Humör', 'gladare ljusa halvåret')
+      ].filter(function(x){ return x && x.n >= 30; });
+      return { now: now, deltaMin: deltaMin, corr: corr, lat: lat };
+  };
   window.Analytics = A;
 })();

@@ -26,6 +26,8 @@ Senast uppdaterad: 2026-07-04. Läs detta innan du ändrar något.
 - Token i repo-secret `DASHBOARD` (workflow läser `OURA_TOKEN || DASHBOARD`).
 - Hämtar ~200 dagar × ~35 fält: sömn (score, stadier, effektivitet, latens, puls, HRV, andning), dagsform, aktivitet, stress, SpO2, temp, läggtider, resiliens, VO2max, kärlålder.
 - Appen läser `oura-data.json?t=<timestamp>` (cache-bust) + auto-sync om >2h.
+- **↻ Synka-knappen** triggar hela workflowen via GitHub API (`workflow_dispatch`) om GitHub-token finns i Inställningar, och pollar sedan tills ny data committats (~1 min). Kräver **Actions: write** på tokenen; utan den (403) faller knappen tillbaka till att hämta senast committade och visar en förklarande toast. Utan token: bara hämtning.
+- **Oura-vyns alla motorer** (`getOuraHealth`, `getOuraCoach`, `getOuraWeightCorr`, `getOuraLagMatrix`, `getOuraSleepRegularity`, `getOuraUnusualNight`, `getOuraBedtime`, `getOuraActivityBalance`, `getOuraLongTerm`, `getOuraSleepBank`, `getOuraDaylight`) ligger i analytics.js och är memoiserade på topplevel med `Analytics.fn ? ... : null`-guards (skydd mot CDN-race med gammal analytics.js). renderOura innehåller bara vy-formatering (chartData, overlay, aliaser).
 
 ## Wegovy-funktioner
 
@@ -62,9 +64,9 @@ Målvikt, tempo, längd, årsmål, injektionsdag, stegmål ×2, sömnbehov, lati
 ## Backlog (prioriterad)
 
 1. **SMHI-väderdata** — temperatur/nederbörd/soltimmar via metobs-API i oura-sync.yml (kräver val av mätstation, fråga användaren om ort), korsas mot humör/sömn som dagsljuset.
-2. Lyfta Oura-vyns interna motorer (bodyAlarm, coach, lagMatrix, sleepReg, bedtimeAnalysis, daylight m.fl.) till analytics.js + memoisering — de beräknas fortfarande inline i renderOura (körs bara när vyn visas och inga textfält finns där, så lågt tryck; kollapsade grupper renderar inte sitt innehåll).
-3. Redigera träningspass & doser i efterhand; push-notiser (SW finns); midjemått; biverknings-tidslinje.
-4. Läkarrapport-PDF (avböjd tidigare, kan bli aktuell inför uppföljning).
+2. Redigera träningspass & doser i efterhand; push-notiser (SW finns); midjemått; biverknings-tidslinje.
+3. Läkarrapport-PDF (avböjd tidigare, kan bli aktuell inför uppföljning).
+4. Ev. rullande/långsammare baslinje i kroppsbatteriet — vid varaktiga HRV-skiften (som sommaren 2026) blir batteriet strukturellt lågt med fast 30-dagarsbaslinje. Designbeslut, diskutera med användaren först.
 
 ## Kända egenheter
 
