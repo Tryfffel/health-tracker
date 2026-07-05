@@ -43,7 +43,7 @@ Titreringsplan med olika längd på första steget (`first_step_weeks`, hans pla
 
 1. Bygg → testa lokalt (jsdom-sele, se nedan) → `node --check` på alla ändrade .js.
 2. Ladda upp via GitHub "Upload files", committa till main.
-3. Vänta ~1 min. **Pages-deployen felar ibland** (deploy-jobbet, inte build) — kolla Actions → pages-build-deployment; vid rött: Re-run failed jobs. Hände 2026-07-04, omkörning löste det.
+3. Vänta ~1 min. **Pages-deployen felar ibland** (deploy-jobbet, inte build) — kolla Actions → pages-build-deployment; vid rött: Re-run failed jobs. **OBS: GitHub Pages har en timkvot (~10 deployer/timme per repo).** Vid intensiva sessioner med många deployer ger deploy-jobbet "Deployment failed, try again later" upprepade gånger tills kvoten släpper (2026-07-05: 4 raka fel, löste sig efter ~20 min väntan + omkörning). Sajten kör senaste lyckade versionen under tiden — inget går sönder. Batcha hellre flera ändringar per deploy sent i en session.
 4. Verifiera live med `document.body.innerText`-checkar + konsolfel (screenshot-verktyg i AI-sessioner renderar sidan konstigt).
 5. **CDN-race:** om index.html börjar ANVÄNDA nya funktioner i analytics.js kan filerna propagera olika snabbt → kort kraschfönster. Bakåtkompatibla tillägg (bara nya funktioner i analytics.js) är ofarliga. Vid beroende ändringar: deploya helst analytics.js först, index.html efter — eller acceptera minuters glapp (sw-fixen no-cache läker det vid nästa laddning).
 
