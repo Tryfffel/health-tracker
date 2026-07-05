@@ -202,9 +202,53 @@ function WeightStepTracker() {
 
   const triggerOuraSync = function() {
     setOuraSyncing(true);
-    fetchOuraData(false)
-      .catch(function() { showToast('Sync misslyckades', 'error'); })
-      .finally(function() { setOuraSyncing(false); });
+    var t = appSettings.ghToken;
+    if (!t) {
+      // Ingen token: hämta senast committade datat (workflowen kan inte triggas)
+      fetchOuraData(false)
+        .catch(function() { showToast('Sync misslyckades', 'error'); })
+        .finally(function() { setOuraSyncing(false); });
+      return;
+    }
+    // Med token: trigga själva GitHub-workflowen (hämtar färskt från Oura) och polla tills nytt data landat
+    showToast('⏳ Startar Oura-synk på GitHub — tar ca en minut…');
+    fetch('https://api.github.com/repos/Tryfffel/health-tracker/actions/workflows/oura-sync.yml/dispatches', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + t, 'Accept': 'application/vnd.github+json' },
+      body: JSON.stringify({ ref: 'main' })
+    }).then(function(r) {
+      if (r.status === 204) {
+        var startLatest = ouraData.length ? ouraData[0].date : null;
+        var tries = 0;
+        var poll = function() {
+          tries++;
+          fetchOuraData(true).then(function(data) {
+            if (data && data.length && data[0].date !== startLatest) {
+              showToast('💍 Färsk Oura-data — senaste natt: ' + data[0].date);
+              setOuraSyncing(false);
+            } else if (tries < 15) {
+              setTimeout(poll, 6000);
+            } else {
+              showToast('Synken kördes men datat var redan aktuellt');
+              setOuraSyncing(false);
+            }
+          });
+        };
+        setTimeout(poll, 20000);
+      } else if (r.status === 403 || r.status === 404) {
+        fetchOuraData(true).finally(function() {
+          setOuraSyncing(false);
+          showToast('Hämtade senast committade — ge din token Actions: write så kan knappen trigga en färsk synk', 'error');
+        });
+      } else {
+        throw new Error('GitHub svarade ' + r.status);
+      }
+    }).catch(function(e) {
+      fetchOuraData(true).finally(function() {
+        setOuraSyncing(false);
+        showToast('Kunde inte trigga synk (' + e.message + ') — hämtade senast committade', 'error');
+      });
+    });
   };
 
   // ── Apple Health-bron: auto-importera Watch-pass från apple-workouts.json ──
@@ -1965,7 +2009,7 @@ function WeightStepTracker() {
               ),
               h('div', { className: 'border-t pt-4' },
                 h('p', { className: 'text-sm font-semibold text-gray-700 mb-2' }, '☁️ Krypterad molnbackup'),
-                h('label', { className: 'text-xs text-gray-500' }, 'GitHub-token (fine-grained, endast detta repo, Contents: write)'),
+                h('label', { className: 'text-xs text-gray-500' }, 'GitHub-token (fine-grained, endast detta repo, Contents: write · lägg till Actions: write så kan Synka-knappen trigga en färsk Oura-synk)'),
                 h('input', { type:'password', value:appSettings.ghToken || '', placeholder:'github_pat_…', onChange:function(e){setAppSettings(Object.assign({},appSettings,{ghToken:e.target.value}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1 mb-2' }),
                 h('label', { className: 'text-xs text-gray-500' }, 'Krypteringslösenord (glöm inte detta — utan det kan backupen aldrig läsas)'),
                 h('input', { type:'password', value:appSettings.backupPassword || '', onChange:function(e){setAppSettings(Object.assign({},appSettings,{backupPassword:e.target.value}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1' }),
