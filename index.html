@@ -738,6 +738,18 @@ function WeightStepTracker() {
             h('p', { className: 'text-xs font-semibold uppercase tracking-widest mb-0.5 ' + (dagensForm.level === 'green' ? 'text-emerald-500' : dagensForm.level === 'yellow' ? 'text-amber-500' : 'text-rose-500') }, '⚡ Dagens form'),
             h('h2', { className: 'text-xl font-black text-gray-800 mb-1' }, dagensForm.headline),
             h('p', { className: 'text-sm text-gray-600' }, dagensForm.advice)
+          ) : null,
+          dagensForm ? h('div', { className: 'flex gap-2 flex-wrap' },
+            [['Dagsform', dagensForm.score, ''],
+             ['Sömn', dagensForm.sleep, ''],
+             ['HRV', dagensForm.hrv, dagensForm.hrvB != null && dagensForm.hrv != null ? (dagensForm.hrv >= dagensForm.hrvB ? '▲' : '▼') : ''],
+             ['Vilopuls', dagensForm.rhr, dagensForm.rhrB != null && dagensForm.rhr != null ? (dagensForm.rhr <= dagensForm.rhrB ? '▼' : '▲') : '']
+            ].filter(function(s){ return s[1] != null; }).map(function(s, i) {
+              return h('div', { key: i, className: 'bg-white/70 rounded-xl px-3 py-2 text-center min-w-[64px]' },
+                h('p', { className: 'text-xs text-gray-400' }, s[0]),
+                h('p', { className: 'text-lg font-black text-gray-800' }, s[1] + (s[2] ? ' ' + s[2] : ''))
+              );
+            })
           ) : null
         ),
         hasBb ? h('div', { className: 'mt-4' },
@@ -814,6 +826,27 @@ function WeightStepTracker() {
         ); })
       ) : null,
       batteryCard,
+      // ── I natt: nattens sömndetaljer från Oura ──
+      (ouraLatest && ouraLatest.total_sleep_min != null) ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 p-5' },
+        h('div', { className: 'flex items-center justify-between mb-3 flex-wrap gap-1' },
+          h('h2', { className: 'font-bold text-gray-800' }, '🌙 I natt'),
+          h('p', { className: 'text-xs text-gray-400' }, new Date(ouraLatest.date).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' }))
+        ),
+        h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-2' },
+          [
+            ['⏰ Sömntid', Math.floor(ouraLatest.total_sleep_min/60) + 'h ' + (ouraLatest.total_sleep_min%60) + 'm', (ouraStats && ouraStats.avgSleepMin != null) ? '7d-snitt ' + Math.floor(ouraStats.avgSleepMin/60) + 'h ' + Math.round(ouraStats.avgSleepMin%60) + 'm' : null],
+            ouraLatest.sleep_efficiency != null ? ['💤 Effektivitet', ouraLatest.sleep_efficiency + '%', null] : null,
+            (ouraLatest.deep_sleep_min != null && ouraLatest.rem_sleep_min != null) ? ['🌊 Djup / REM', Math.round(ouraLatest.deep_sleep_min/ouraLatest.total_sleep_min*100) + '% / ' + Math.round(ouraLatest.rem_sleep_min/ouraLatest.total_sleep_min*100) + '%', null] : null,
+            ouraLatest.sleep_latency_min != null ? ['⚡ Insomning', ouraLatest.sleep_latency_min + ' min', null] : null
+          ].filter(function(x){ return x; }).map(function(s, i) {
+            return h('div', { key: i, className: 'bg-gray-50 rounded-lg px-3 py-2 text-center' },
+              h('p', { className: 'text-xs text-gray-400' }, s[0]),
+              h('p', { className: 'text-base font-black text-gray-800' }, s[1]),
+              s[2] ? h('p', { className: 'text-xs text-gray-400' }, s[2]) : null
+            );
+          })
+        )
+      ) : null,
       // Plateau warning banner
       plateau ? h('div', { className: 'bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl p-5 mb-4 shadow-sm' },
         h('div', { className: 'flex items-start gap-3' },
@@ -884,6 +917,26 @@ function WeightStepTracker() {
             h('span', null, 'Mål ' + goalWeight + ' kg')
           )
         )
+      ),
+      // ── Snabbstatus: loggstreak, steg, veckans träning ──
+      h('div', { className: 'grid grid-cols-3 gap-3 mb-4' },
+        h('div', { className: 'bg-white rounded-xl p-4 shadow-md text-center' },
+          h('p', { className: 'text-2xl font-black text-orange-500' }, '🔥 ' + stats.streak),
+          h('p', { className: 'text-xs text-gray-400' }, stats.streak === 1 ? 'dag loggad i rad' : 'dagar loggade i rad')
+        ),
+        h('div', { className: 'bg-white rounded-xl p-4 shadow-md text-center' },
+          h('p', { className: 'text-2xl font-black text-teal-600' }, (ouraLatest && ouraLatest.steps != null) ? ouraLatest.steps.toLocaleString('sv-SE') : stats.avgSteps.toLocaleString('sv-SE')),
+          h('p', { className: 'text-xs text-gray-400' }, (ouraLatest && ouraLatest.steps != null) ? 'steg igår · 7d-snitt ' + stats.avgSteps.toLocaleString('sv-SE') : 'snitt steg (7d)')
+        ),
+        h('div', { className: 'bg-white rounded-xl p-4 shadow-md text-center' },
+          h('p', { className: 'text-2xl font-black text-indigo-600' }, '💪 ' + (currentWeek ? currentWeek.thisWeek.workoutCount : 0)),
+          h('p', { className: 'text-xs text-gray-400' }, 'pass denna vecka' + (currentWeek && currentWeek.thisWeek.totalMinutes ? ' · ' + currentWeek.thisWeek.totalMinutes + ' min' : ''))
+        )
+      ),
+      // ── Snabbknappar ──
+      h('div', { className: 'grid grid-cols-2 gap-3 mb-4' },
+        h('button', { onClick: function(){ setView('add'); }, className: 'bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl shadow-md' }, '➕ Logga vikt'),
+        h('button', { onClick: function(){ setView('workouts'); }, className: 'bg-white border-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-bold py-3.5 rounded-xl shadow-md' }, '💪 Logga pass')
       ),
       null
     );
