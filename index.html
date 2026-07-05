@@ -113,7 +113,7 @@ function WeightStepTracker() {
     { key: 'hb', label: 'Hemoglobin', unit: 'g/L', dec: 0, better: 'up', ref: function(v){ return (v >= 130 && v <= 170) ? 'good' : 'warn'; } },
     { key: 'eye', label: 'Ögontryck', unit: 'mmHg', dec: 1, better: 'down', ref: function(v){ return (v >= 8 && v <= 21) ? 'good' : 'warn'; } },
     { key: 'weight', label: 'Vikt (vid mätning)', unit: 'kg', dec: 1, better: 'down', ref: null },
-    { key: 'waist', label: 'Midjemått', unit: 'cm', dec: 0, better: 'down', ref: function(v){ return v < 94 ? 'good' : v < 102 ? 'warn' : 'bad'; } },
+    { key: 'waist', label: 'Midjemått (mät vid naveln)', unit: 'cm', dec: 0, better: 'down', ref: function(v){ return v < 94 ? 'good' : v < 102 ? 'warn' : 'bad'; } },
     { key: 'grip', label: 'Greppstyrka', unit: 'kg', dec: 0, better: 'up', ref: function(v){ return v >= 40 ? 'good' : v >= 30 ? 'warn' : 'bad'; } }
   ];
   const parseNekoText = Analytics.parseNekoText;
