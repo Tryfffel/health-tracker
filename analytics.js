@@ -850,5 +850,31 @@
       var worstDay = withDw.length ? withDw.reduce(function(p,c){ return c.dw > p.dw ? c : p; }) : null;
       return { rows: rows, bestDay: bestDay, worstDay: worstDay, nDoses: dosesAsc.length };
   };
+  // Kroppsbatteri vs Ouras dagsform — samvariation (Samband-kortet i Oura-vyn).
+  // Samma formel som getBodyBattery men över upp till 120 dagar, parat med dagsform_score.
+  A.getBatteryVsForm = function(ouraData, workouts, dayLogs) {
+    if (!ouraData || ouraData.length < 20) return null;
+    var base = function(key){ var v = ouraData.slice(0,30).map(function(d){ return d[key]; }).filter(function(x){ return x != null; }); return v.length ? v.reduce(function(a,b){ return a+b; },0)/v.length : null; };
+    var hrvB = base('hrv_avg'), rhrB = base('resting_hr');
+    var trainByDate = {}; (workouts || []).forEach(function(w){ trainByDate[w.date] = (trainByDate[w.date]||0) + w.duration; });
+    var clamp = function(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); };
+    var points = [];
+    ouraData.slice(0, 120).forEach(function(d){
+      if (d.sleep_score == null || d.dagsform_score == null) return;
+      var v = 50 + (d.sleep_score - 70) * 0.8;
+      if (d.hrv_avg != null && hrvB) v += clamp((d.hrv_avg - hrvB)/hrvB*60, -15, 15);
+      if (d.resting_hr != null && rhrB) v += -clamp((d.resting_hr - rhrB)*2, -10, 10);
+      if (d.stress_high_min != null) v += -clamp(d.stress_high_min*0.1, 0, 20);
+      v += -clamp((trainByDate[d.date]||0)*0.08, 0, 10);
+      var dl = (dayLogs || {})[d.date];
+      if (dl && dl.alkohol) v += -clamp(dl.alkohol*5, 0, 20);
+      if (dl && dl.sjuk) v -= 15;
+      points.push({ x: Math.round(clamp(v, 0, 100)), y: d.dagsform_score, date: d.date });
+    });
+    if (points.length < 15) return null;
+    var r = A.calcPearson(points.map(function(p){ return [p.x, p.y]; }));
+    if (r == null) return null;
+    return { points: points, r: parseFloat(r.toFixed(2)), n: points.length };
+  };
   window.Analytics = A;
 })();

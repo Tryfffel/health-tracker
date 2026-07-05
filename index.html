@@ -615,6 +615,7 @@ function WeightStepTracker() {
   const wegovyTakt = useMemo(function(){ return Analytics.getWegovyTakt(entries, wegovyProtocol); }, [entries, wegovyProtocol]);
   const wegovyMonteCarlo = useMemo(function(){ return Analytics.getWegovyMonteCarlo(entries, wegovyProtocol, goalWeight); }, [entries, wegovyProtocol, goalWeight]);
   const wegovyCycle = useMemo(function(){ return Analytics.getWegovyCycle(entries, ouraData, dayLogs, wegovyDoses); }, [entries, ouraData, dayLogs, wegovyDoses]);
+  const batteryVsForm = useMemo(function(){ return Analytics.getBatteryVsForm ? Analytics.getBatteryVsForm(ouraData, workouts, dayLogs) : null; }, [ouraData, workouts, dayLogs]);
   const NavButton = function(props) {
     return h('button', {
       onClick: function() { setView(props.id); },
@@ -2744,6 +2745,24 @@ function WeightStepTracker() {
               h('p', { className:'text-xs text-gray-400 mt-2 px-2' }, 'Samband = inte nödvändigtvis orsak. Värden nära 0 betyder inget tydligt mönster.')
             )
       ),
+        // ── Batteri ↔ Dagsform ──
+        batteryVsForm ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+          h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+            h('div', { className: 'w-1 h-8 rounded-full bg-emerald-500' }),
+            h('div', { className: 'flex-1' },
+              h('h2', { className: 'font-bold text-gray-800' }, '🔋 Kroppsbatteri ↔ Ouras dagsform'),
+              h('p', { className: 'text-xs text-gray-400' }, batteryVsForm.n + ' dagar · batteriet väger in stress, träning och taggar mot fast 30-dagarsbaslinje — dagsform är Ouras adaptiva modell')
+            ),
+            h('div', { className: 'text-right' },
+              h('p', { className: 'text-2xl font-black ' + (Math.abs(batteryVsForm.r) >= 0.7 ? 'text-emerald-600' : Math.abs(batteryVsForm.r) >= 0.4 ? 'text-blue-500' : 'text-gray-400') }, (batteryVsForm.r > 0 ? '+' : '') + batteryVsForm.r),
+              h('p', { className: 'text-xs text-gray-400' }, 'korrelation')
+            )
+          ),
+          h('div', { className: 'px-4 py-4' },
+            h(SvgScatter, { points: batteryVsForm.points, xName: 'Kroppsbatteri (%)', yName: 'Dagsform', color: '#10b981', height: 240 }),
+            h('p', { className: 'text-xs text-gray-400 px-2 mt-1' }, 'Punkter långt från trendlinjen = dagar då måtten var oense. Lågt batteri men hög dagsform brukar betyda att HRV/vilopuls avviker från långtidsbaslinjen men att Oura hunnit vänja sig — eller att stress, träning eller alkohol dragit ner batteriet.')
+          )
+        ) : null,
         null
       )),
       ouraGroup('grafer', '📈', 'Grafer', 'Överlagring · sömnstadier · aktivitet · sömnkvalitet · andning · stress · temperatur', h('div', null,
