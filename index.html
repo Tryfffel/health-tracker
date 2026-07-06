@@ -273,12 +273,31 @@ function WeightStepTracker() {
       .catch(function(){});
   }, [loading]);
   // Auto-fetch on load if data is stale (>2h)
+  // + Självläkning: GitHubs cron-schema skippas ofta. Om nattens data saknas och
+  //   GitHub-token (Actions: write) finns triggas workflowen tyst, max 1 gång/2h.
+  const autoDispatchIfStale = function(data) {
+    var t = appSettings.ghToken;
+    if (!t || !data || !data.length) return;
+    if (data[0].date >= todayStr()) return; // nattens data finns redan
+    var last = parseInt(localStorage.getItem('oura-auto-dispatch') || '0');
+    if (Date.now() - last < 2 * 60 * 60 * 1000) return;
+    localStorage.setItem('oura-auto-dispatch', String(Date.now()));
+    fetch('https://api.github.com/repos/Tryfffel/health-tracker/actions/workflows/oura-sync.yml/dispatches', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + t, 'Accept': 'application/vnd.github+json' },
+      body: JSON.stringify({ ref: 'main' })
+    }).then(function(r) {
+      if (r.status === 204) setTimeout(function(){ fetchOuraData(true); }, 90000);
+    }).catch(function(){});
+  };
   useEffect(function() {
     if (loading) return;
     var lastSync = ouraLastSync ? new Date(ouraLastSync).getTime() : 0;
     var twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
     if (lastSync < twoHoursAgo) {
-      fetchOuraData(true);
+      fetchOuraData(true).then(autoDispatchIfStale);
+    } else {
+      autoDispatchIfStale(ouraData);
     }
   }, [loading, ouraConnected]);
 
