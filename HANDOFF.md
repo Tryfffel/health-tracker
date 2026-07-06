@@ -1,6 +1,10 @@
 # HANDOFF — health-tracker (Hälsodagbok)
 
-Senast uppdaterad: 2026-07-04. Läs detta innan du ändrar något.
+Senast uppdaterad: 2026-07-06. Läs detta innan du ändrar något.
+
+## Status just nu (2026-07-06)
+
+Allt nedan är byggt, testat, deployat och live-verifierat under 2026-07-04→06: modulrefaktorn (charts.js + analytics.js), vyerna Idag/Insikter, sammanslaget form+batteri-kort, veckokortet, memoisering av samtliga ~47 motorer, kollapsbara Oura-grupper, utbyggd Idag-vy, batteri↔dagsform-kortet, riktiga Synka-knappen och självläkande auto-sync. Användarens GitHub-token (health-tracker-deploy) fick **Actions: Read and write** 2026-07-06 — självläkningen och Synka-knappen är alltså skarpa, FÖRUTSATT att tokenen är inklistrad i appens Inställningar på telefonen (verifiera: token visade "Never used" på GitHub 2026-07-06, så det kan behöva göras). Nästa öppna fråga är batteribaslinjen (backlog p. 4).
 
 ## Grundfakta
 
