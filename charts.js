@@ -14,7 +14,11 @@ function SvgLineChart({ data, lines, height, markers }) {
   lines.forEach(function(l){ data.forEach(function(d){ if(d[l.key]!=null) allVals.push(d[l.key]); }); });
   var minV=Math.min.apply(null,allVals)-0.5, maxV=Math.max.apply(null,allVals)+0.5;
   var rng=maxV-minV||1;
-  var tx=function(i){ return PL+(i/(data.length-1))*chartW; };
+  var timed = data[0] && data[0].t != null;
+  var tmin, tmax;
+  if (timed) { var _ts = data.map(function(d){ return d.t; }); tmin = Math.min.apply(null,_ts); tmax = Math.max.apply(null,_ts); }
+  var fx=function(i){ return timed ? (data[i].t - tmin)/((tmax-tmin)||1) : (i/(data.length-1)); };
+  var tx=function(i){ return PL+fx(i)*chartW; };
   var ty=function(v){ return PT+chartH-((v-minV)/rng)*chartH; };
   var gridEls=[];
   for(var gi=0;gi<=4;gi++){
@@ -45,8 +49,9 @@ function SvgLineChart({ data, lines, height, markers }) {
   var onMove = function(e){
     var r = e.currentTarget.getBoundingClientRect();
     var cx = (e.clientX - r.left) / r.width * W;
-    var i = Math.round((cx - PL) / chartW * (data.length - 1));
-    setHoverI(Math.max(0, Math.min(data.length - 1, i)));
+    var best = 0, bd = Infinity;
+    for (var mi = 0; mi < data.length; mi++) { var dd2 = Math.abs(tx(mi) - cx); if (dd2 < bd) { bd = dd2; best = mi; } }
+    setHoverI(best);
   };
   var tipEls = null;
   if (hoverI != null && data[hoverI]) {

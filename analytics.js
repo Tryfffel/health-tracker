@@ -738,13 +738,13 @@
       if (pace != null && pace < -0.02) {
         var fWeeks = Math.min(30, forecast ? forecast.weeks : 30);
         chart = respEntries.map(function(e, i){
-          return { datum: new Date(e.date).toLocaleDateString('sv-SE',{month:'short',day:'numeric'}), vikt: e.weight, prognos: i === respEntries.length-1 ? e.weight : null, mål: goalWeight };
+          return { datum: new Date(e.date).toLocaleDateString('sv-SE',{month:'short',day:'numeric'}), t: new Date(e.date).getTime(), vikt: e.weight, prognos: i === respEntries.length-1 ? e.weight : null, mål: goalWeight };
         });
         var lastD = new Date(respEntries[respEntries.length-1].date);
         for (var fk = 1; fk <= fWeeks; fk++) {
           var fD = new Date(lastD); fD.setDate(lastD.getDate() + fk*7);
           var fV = Math.max(goalWeight, lastW + pace*fk);
-          chart.push({ datum: fD.toLocaleDateString('sv-SE',{month:'short',day:'numeric'}), vikt: null, prognos: parseFloat(fV.toFixed(1)), mål: goalWeight });
+          chart.push({ datum: fD.toLocaleDateString('sv-SE',{month:'short',day:'numeric'}), t: fD.getTime(), vikt: null, prognos: parseFloat(fV.toFixed(1)), mål: goalWeight });
           if (fV <= goalWeight) break;
         }
       }
