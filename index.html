@@ -276,9 +276,17 @@ function WeightStepTracker() {
   // + Självläkning: GitHubs cron-schema skippas ofta. Om nattens data saknas och
   //   GitHub-token (Actions: write) finns triggas workflowen tyst, max 1 gång/2h.
   const autoDispatchIfStale = function(data) {
-    var t = appSettings.ghToken;
-    if (!t || !data || !data.length) return;
+    if (!data || !data.length) return;
     if (data[0].date >= todayStr()) return; // nattens data finns redan
+    var t = appSettings.ghToken;
+    if (!t) {
+      // Ingen token → appen kan inte trigga workflowen. Påminn (max 1 gång/dygn) i stället för att misslyckas tyst.
+      if (localStorage.getItem('oura-token-hint') !== todayStr()) {
+        localStorage.setItem('oura-token-hint', todayStr());
+        showToast('Nattens Oura-data saknas och ingen GitHub-token är inlagd — lägg in den (Actions: write) i Inställningar så synkar appen automatiskt.', 'error');
+      }
+      return;
+    }
     var last = parseInt(localStorage.getItem('oura-auto-dispatch') || '0');
     if (Date.now() - last < 2 * 60 * 60 * 1000) return;
     localStorage.setItem('oura-auto-dispatch', String(Date.now()));
@@ -287,7 +295,21 @@ function WeightStepTracker() {
       headers: { 'Authorization': 'Bearer ' + t, 'Accept': 'application/vnd.github+json' },
       body: JSON.stringify({ ref: 'main' })
     }).then(function(r) {
-      if (r.status === 204) setTimeout(function(){ fetchOuraData(true); }, 90000);
+      if (r.status !== 204) return;
+      // Polla tills nytt data landat (workflow + commit + Pages-deploy kan ta > 90s)
+      var startLatest = data[0].date;
+      var tries = 0;
+      var poll = function() {
+        tries++;
+        fetchOuraData(true).then(function(d2) {
+          if (d2 && d2.length && d2[0].date !== startLatest) {
+            showToast('💍 Färsk Oura-data — senaste natt: ' + d2[0].date);
+          } else if (tries < 20) {
+            setTimeout(poll, 9000);
+          }
+        });
+      };
+      setTimeout(poll, 20000);
     }).catch(function(){});
   };
   useEffect(function() {
@@ -681,7 +703,7 @@ function WeightStepTracker() {
   const batteryVsForm = useMemo(function(){ return Analytics.getBatteryVsForm ? Analytics.getBatteryVsForm(ouraData, workouts, dayLogs) : null; }, [ouraData, workouts, dayLogs]);
   const ouraHealth = useMemo(function(){ return Analytics.getOuraHealth ? Analytics.getOuraHealth(ouraData) : null; }, [ouraData]);
   const ouraCoach = useMemo(function(){ return Analytics.getOuraCoach ? Analytics.getOuraCoach(ouraData, entries, appSettings.stepGoal) : null; }, [ouraData, entries, appSettings.stepGoal]);
-  const ouraWeightCorr = useMemo(function(){ return Analytics.getOuraWeightCorr ? Analytics.getOuraWeightCorr(ouraData, entries) : null; }, [ouraData, entries]);
+  const ouraWeightCorr = useMemo(function(){ return Analytics.getOuraWeightCorr ? Analytics.getOuraWeightCorr(ouraData, entries, dayLogs) : null; }, [ouraData, entries, dayLogs]);
   const ouraLagMatrix = useMemo(function(){ return Analytics.getOuraLagMatrix ? Analytics.getOuraLagMatrix(ouraData, workouts, entries, dayLogs) : null; }, [ouraData, workouts, entries, dayLogs]);
   const ouraSleepReg = useMemo(function(){ return Analytics.getOuraSleepRegularity ? Analytics.getOuraSleepRegularity(ouraData) : null; }, [ouraData]);
   const ouraUnusual = useMemo(function(){ return Analytics.getOuraUnusualNight ? Analytics.getOuraUnusualNight(ouraData) : []; }, [ouraData]);
@@ -751,7 +773,8 @@ function WeightStepTracker() {
             h('div', { className: 'flex gap-1.5' },
               chip(!!dl.sjuk, '🤒 Sjuk', function(){ setDayTag(tds, 'sjuk', dl.sjuk ? null : true); }, 'bg-rose-500 text-white'),
               chip(!!dl.bastu, '🧖 Bastu', function(){ setDayTag(tds, 'bastu', dl.bastu ? null : true); }, 'bg-orange-500 text-white'),
-              chip(!!dl.kallbad, '🧊 Kallbad', function(){ setDayTag(tds, 'kallbad', dl.kallbad ? null : true); }, 'bg-sky-500 text-white')
+              chip(!!dl.kallbad, '🧊 Kallbad', function(){ setDayTag(tds, 'kallbad', dl.kallbad ? null : true); }, 'bg-sky-500 text-white'),
+              chip(!!dl.spikmatta, '🪡 Spikmatta', function(){ setDayTag(tds, 'spikmatta', dl.spikmatta ? null : true); }, 'bg-violet-500 text-white')
             )
           )
         ),
@@ -2546,7 +2569,7 @@ function WeightStepTracker() {
           ? h('div', { className: 'px-6 py-8 text-center text-gray-400 text-sm' }, 'Logga vikt fler dagar så hittar jag samband mellan din Oura-data och vikten.')
           : h('div', { className: 'px-4 py-4' },
               h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-2 mb-4' },
-                corr.slice(0,4).map(function(c,i){
+                (function(){ var top = corr.slice(0,4); var sp = corr.filter(function(c){ return c.key==='spikmatta'; })[0]; if (sp && top.indexOf(sp)===-1) top = top.concat([sp]); return top; })().map(function(c,i){
                   var pos = c.r > 0;
                   return h('div', { key:i, className: 'flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2' },
                     h('div', null,
@@ -3465,6 +3488,7 @@ function WeightStepTracker() {
             dl.sjuk ? Row('Status', '🤒 Sjuk') : null,
             dl.bastu ? Row('Bastu', '✓') : null,
             dl.kallbad ? Row('Kallbad', '✓') : null,
+            dl.spikmatta ? Row('Spikmatta', '🪡 ✓') : null,
             (dl.midja && dl.hals) ? Row('Midja / hals', dl.midja + ' / ' + dl.hals + ' cm (fett ~' + bodyFatPct(dl.midja, dl.hals, height) + '%)') : null
           ];
         })()),
