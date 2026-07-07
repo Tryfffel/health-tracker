@@ -1080,6 +1080,7 @@ function WeightStepTracker() {
         var spikDates = Object.keys(dayLogs).filter(function(k){ return dayLogs[k] && dayLogs[k].spikmatta; }).sort();
         var firstSpik = spikDates.length ? spikDates[0] : null;
         var series = ouraData.slice(0, 90).reverse().map(function(d){ return { datum: new Date(d.date).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}), date: d.date, hrv: d.hrv_avg }; });
+        series.forEach(function(p, i){ var w = series.slice(Math.max(0,i-6), i+1).map(function(x){ return x.hrv; }).filter(function(v){ return v!=null; }); p.hrv7 = w.length ? Math.round(w.reduce(function(a,b){ return a+b; },0)/w.length*10)/10 : null; });
         var markers = [];
         if (firstSpik) { var mi = series.findIndex(function(x){ return x.date >= firstSpik; }); if (mi >= 0) markers.push({ i: mi, label: '🪡 start' }); }
         return h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
@@ -1101,7 +1102,7 @@ function WeightStepTracker() {
             )
           ),
           h('div', { className: 'px-4 pb-2 pt-2' },
-            h(SvgLineChart, { data: series, lines: [{ key:'hrv', name:'HRV (ms)', color:'#8b5cf6', width:2 }], height: 240, markers: markers })
+            h(SvgLineChart, { data: series, lines: [{ key:'hrv', name:'HRV (ms)', color:'#c4b5fd', width:1.5 }, { key:'hrv7', name:'7-dagars snitt', color:'#7c3aed', width:2.5 }], height: 240, markers: markers })
           ),
           h('p', { className: 'text-xs text-gray-400 px-6 pb-4' }, firstSpik ? 'Lila streck = dagen du började med spikmattan. Följ om HRV-linjen trendar uppåt efter det.' : 'När du taggat spikmatta-dagar markeras startdagen här så du ser HRV-utvecklingen.')
         );
@@ -3641,6 +3642,6 @@ function WeightStepTracker() {
 ReactDOM.createRoot(document.getElementById('root')).render(h(WeightStepTracker, null));
 
 </script>
-  <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script>
+  <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){var hadController=!!navigator.serviceWorker.controller;navigator.serviceWorker.register('sw.js').then(function(reg){reg.update();setInterval(function(){reg.update();},30*60*1000);}).catch(function(){});var reloaded=false;navigator.serviceWorker.addEventListener('controllerchange',function(){if(reloaded||!hadController)return;reloaded=true;location.reload();});});}</script>
 </body>
 </html>

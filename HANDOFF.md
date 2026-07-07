@@ -1,10 +1,31 @@
 # HANDOFF — health-tracker (Hälsodagbok)
 
-Senast uppdaterad: 2026-07-06. Läs detta innan du ändrar något.
+Senast uppdaterad: 2026-07-07. Läs detta innan du ändrar något.
 
 ## Status just nu (2026-07-06)
 
 Allt nedan är byggt, testat, deployat och live-verifierat under 2026-07-04→06: modulrefaktorn (charts.js + analytics.js), vyerna Idag/Insikter, sammanslaget form+batteri-kort, veckokortet, memoisering av samtliga ~47 motorer, kollapsbara Oura-grupper, utbyggd Idag-vy, batteri↔dagsform-kortet, riktiga Synka-knappen och självläkande auto-sync. Användarens GitHub-token (health-tracker-deploy) fick **Actions: Read and write** 2026-07-06 — självläkningen och Synka-knappen är alltså skarpa, FÖRUTSATT att tokenen är inklistrad i appens Inställningar på telefonen (verifiera: token visade "Never used" på GitHub 2026-07-06, så det kan behöva göras). Nästa öppna fråga är batteribaslinjen (backlog p. 4).
+
+## Spikmatta (tillagt 2026-07-07)
+
+Användaren började med spikmatta 2026-07-06 och ville logga + följa effekten. Byggt, testat och live-verifierat:
+
+- **Loggning:** daglig tagg `🪡 Spikmatta` i "Dagens taggar → Övrigt" (bredvid Sjuk/Bastu/Kallbad) på Lägg till vikt. Sparas som `dayLogs[datum].spikmatta = true`. Syns även i dag-drilldownen (Historik).
+- **Insikter-kort `🪡 Spikmatta & HRV`** (överst i renderInsights): visar för senaste natten Ja/Nej + HRV, och en HRV-graf över 90 dagar med rå HRV (tunn) + 7-dagars glidande snitt (fet) och en vertikal markör på första spikmatta-dagen (`SvgLineChart` markers).
+- **Lag-korrelationsmatrisen** (`getOuraLagMatrix`, Oura-vyn): spikmatta läggs till som driver mot nästa dags Sömn/HRV/Humör/ViktΔ när ≥8 dagar är taggade (binär 0/1 över hela ouraData → varians finns eftersom dagar före 6 juli = 0).
+- OBS: spikmatta testades även i getOuraWeightCorr men **togs bort** — fel hem (mäter mot vikt). Använd lag-matrisen/HRV-kortet.
+
+## Oura-sync: härdning (2026-07-07)
+
+Grundproblemet återkom: GitHubs cron hoppade över ALLA morgonkörningar 2026-07-07 (verifierat: 0 runs, senaste var 6/7 11:52 UTC). Roten till att självläkningen inte räddar det: **ingen GitHub-token låg i appens Inställningar** (verifierat live: `appSettings.ghToken` tom). Åtgärdat i kod:
+
+- `autoDispatchIfStale` (index.html): misslyckas inte längre tyst utan token → visar en påminnelse (max 1/dygn). Efter dispatch pollas nu upp till ~3 min tills färsk data landat (i st.f. ett enda 90s-försök).
+- Service worker (`sw.js` `halsa-v5`) + registreringen i index.html auto-uppdaterar nu: `reg.update()` på load + var 30:e min, och `controllerchange` → engångs `location.reload()` (guardad mot första besöket). Alltså inget behov av hård omladdning för att få ny version.
+- **Kvar för användaren:** klistra in en fine-grained token (health-tracker, Contents + Actions: Read/write) i Inställningar → GitHub-token. Utan den fastnar Oura på gårdagens data när cron sviker; kör då manuellt Actions → Oura sync → Run workflow.
+
+## Deploy denna session
+
+Gjordes via Claude in Chrome mot användarens inloggade GitHub: `/upload/main` → dra in index.html/analytics.js/sw.js → Commit directly to main. Oura-workflowen kördes också manuellt via Actions → Run workflow (gav 7 juli-datan).
 
 ## Grundfakta
 
