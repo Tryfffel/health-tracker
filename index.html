@@ -1072,6 +1072,40 @@ function WeightStepTracker() {
     var scOverall = scParts.length ? Math.round(scParts.reduce(function(a,b){return a+b[1];},0)/scParts.length) : null;
     var scGrade = scOverall==null?'–':scOverall>=85?'A':scOverall>=70?'B':scOverall>=55?'C':scOverall>=40?'D':'E';
     return h('div', null,
+      // ── Spikmatta & HRV ──
+      (function(){
+        if (!ouraData.length) return null;
+        var latest = ouraData[0];
+        var latestSpik = !!(dayLogs[latest.date] && dayLogs[latest.date].spikmatta);
+        var spikDates = Object.keys(dayLogs).filter(function(k){ return dayLogs[k] && dayLogs[k].spikmatta; }).sort();
+        var firstSpik = spikDates.length ? spikDates[0] : null;
+        var series = ouraData.slice(0, 90).reverse().map(function(d){ return { datum: new Date(d.date).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}), date: d.date, hrv: d.hrv_avg }; });
+        var markers = [];
+        if (firstSpik) { var mi = series.findIndex(function(x){ return x.date >= firstSpik; }); if (mi >= 0) markers.push({ i: mi, label: '🪡 start' }); }
+        return h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+          h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+            h('div', { className: 'w-1 h-8 rounded-full bg-violet-500' }),
+            h('div', { className: 'flex-1' },
+              h('h2', { className: 'font-bold text-gray-800' }, '🪡 Spikmatta & HRV'),
+              h('p', { className: 'text-xs text-gray-400' }, spikDates.length ? (spikDates.length + ' dagar loggade sedan ' + firstSpik) : 'Tagga 🪡 Spikmatta på Lägg till vikt så börjar mätningen')
+            )
+          ),
+          h('div', { className: 'px-6 pt-4 flex items-center gap-8' },
+            h('div', null,
+              h('p', { className: 'text-xs text-gray-400' }, new Date(latest.date).toLocaleDateString('sv-SE',{day:'numeric',month:'long'})),
+              h('p', { className: 'text-lg font-black ' + (latestSpik ? 'text-violet-600' : 'text-gray-400') }, latestSpik ? '🪡 Spikmatta: Ja' : 'Spikmatta: Nej')
+            ),
+            h('div', null,
+              h('p', { className: 'text-xs text-gray-400' }, 'HRV den natten'),
+              h('p', { className: 'text-lg font-black text-gray-800' }, latest.hrv_avg != null ? (latest.hrv_avg + ' ms') : '–')
+            )
+          ),
+          h('div', { className: 'px-4 pb-2 pt-2' },
+            h(SvgLineChart, { data: series, lines: [{ key:'hrv', name:'HRV (ms)', color:'#8b5cf6', width:2 }], height: 240, markers: markers })
+          ),
+          h('p', { className: 'text-xs text-gray-400 px-6 pb-4' }, firstSpik ? 'Lila streck = dagen du började med spikmattan. Följ om HRV-linjen trendar uppåt efter det.' : 'När du taggat spikmatta-dagar markeras startdagen här så du ser HRV-utvecklingen.')
+        );
+      })(),
       // ── Tvillingdagar ──
       twinDays ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
