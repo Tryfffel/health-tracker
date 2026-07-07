@@ -703,7 +703,7 @@ function WeightStepTracker() {
   const batteryVsForm = useMemo(function(){ return Analytics.getBatteryVsForm ? Analytics.getBatteryVsForm(ouraData, workouts, dayLogs) : null; }, [ouraData, workouts, dayLogs]);
   const ouraHealth = useMemo(function(){ return Analytics.getOuraHealth ? Analytics.getOuraHealth(ouraData) : null; }, [ouraData]);
   const ouraCoach = useMemo(function(){ return Analytics.getOuraCoach ? Analytics.getOuraCoach(ouraData, entries, appSettings.stepGoal) : null; }, [ouraData, entries, appSettings.stepGoal]);
-  const ouraWeightCorr = useMemo(function(){ return Analytics.getOuraWeightCorr ? Analytics.getOuraWeightCorr(ouraData, entries, dayLogs) : null; }, [ouraData, entries, dayLogs]);
+  const ouraWeightCorr = useMemo(function(){ return Analytics.getOuraWeightCorr ? Analytics.getOuraWeightCorr(ouraData, entries) : null; }, [ouraData, entries]);
   const ouraLagMatrix = useMemo(function(){ return Analytics.getOuraLagMatrix ? Analytics.getOuraLagMatrix(ouraData, workouts, entries, dayLogs) : null; }, [ouraData, workouts, entries, dayLogs]);
   const ouraSleepReg = useMemo(function(){ return Analytics.getOuraSleepRegularity ? Analytics.getOuraSleepRegularity(ouraData) : null; }, [ouraData]);
   const ouraUnusual = useMemo(function(){ return Analytics.getOuraUnusualNight ? Analytics.getOuraUnusualNight(ouraData) : []; }, [ouraData]);
@@ -2569,7 +2569,7 @@ function WeightStepTracker() {
           ? h('div', { className: 'px-6 py-8 text-center text-gray-400 text-sm' }, 'Logga vikt fler dagar så hittar jag samband mellan din Oura-data och vikten.')
           : h('div', { className: 'px-4 py-4' },
               h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-2 mb-4' },
-                (function(){ var top = corr.slice(0,4); var sp = corr.filter(function(c){ return c.key==='spikmatta'; })[0]; if (sp && top.indexOf(sp)===-1) top = top.concat([sp]); return top; })().map(function(c,i){
+                corr.slice(0,4).map(function(c,i){
                   var pos = c.r > 0;
                   return h('div', { key:i, className: 'flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2' },
                     h('div', null,

@@ -974,7 +974,7 @@
       return { headline:headline, paragraph:parts.join(' '), tips:tips.slice(0,3), tone:tone };
   };
   // Samband: Oura-mått vs nästa dags viktförändring
-  A.getOuraWeightCorr = function(ouraData, entries, dayLogs) {
+  A.getOuraWeightCorr = function(ouraData, entries) {
     var wByDate = {};
     entries.forEach(function(e){ wByDate[e.date] = e.weight; });
     var addDays = function(ds,n){ var dd=new Date(ds); dd.setDate(dd.getDate()+n); return dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0'); };
@@ -993,17 +993,7 @@
       var pairs=[];
       ouraData.forEach(function(d){ var v=d[m.key]; if(v==null) return; var w0=wByDate[d.date], w1=wByDate[addDays(d.date,1)]; if(w0!=null&&w1!=null) pairs.push([v, parseFloat((w1-w0).toFixed(2))]); });
       return {name:m.name, key:m.key, up:m.up, r:A.calcPearson(pairs), n:pairs.length, pairs:pairs};
-    }).filter(function(x){return x.r!=null;});
-    // 🪡 Spikmatta (daglig tagg) vs nästa dags viktförändring — point-biserial (0/1)
-    var dl = dayLogs || {};
-    var anySpik = Object.keys(dl).some(function(k){ return dl[k] && dl[k].spikmatta; });
-    if (anySpik) {
-      var sp = [];
-      ouraData.forEach(function(d){ var w0=wByDate[d.date], w1=wByDate[addDays(d.date,1)]; if(w0!=null&&w1!=null) sp.push([(dl[d.date] && dl[d.date].spikmatta)?1:0, parseFloat((w1-w0).toFixed(2))]); });
-      var rsp = A.calcPearson(sp);
-      if (rsp != null && isFinite(rsp)) corr.push({ name:'🪡 Spikmatta', key:'spikmatta', up:'spikmatta-dag', r:rsp, n:sp.length, pairs:sp });
-    }
-    corr.sort(function(a,b){return Math.abs(b.r)-Math.abs(a.r);});
+    }).filter(function(x){return x.r!=null;}).sort(function(a,b){return Math.abs(b.r)-Math.abs(a.r);});
     var topCorr = corr[0] || null;
     return { corr: corr, topCorr: topCorr };
   };
@@ -1028,6 +1018,8 @@
       var drivers=[['🌙 Sömn',mSleep],['💗 HRV',mHrv],['👟 Steg',mSteps],['🔥 Stress',mStress],['💪 Träning',mTrain],['😊 Humör',mMood]];
       if (Object.keys(mAptit).length >= 8) drivers.push(['🍽️ Aptit', mAptit]);
       if (anyAlk) drivers.push(['🍷 Alkohol', mAlk]);
+      var spikDays = Object.keys(dayLogs).filter(function(k){ return dayLogs[k] && dayLogs[k].spikmatta; });
+      if (spikDays.length >= 8) { var mSpik={}; ouraData.forEach(function(d){ mSpik[d.date] = (dayLogs[d.date] && dayLogs[d.date].spikmatta) ? 1 : 0; }); drivers.push(['🪡 Spikmatta', mSpik]); }
       var outcomes=[['Humör',mMood],['Sömn',mSleep],['HRV',mHrv],['ViktΔ',null]];
       var cells=drivers.map(function(dr){
         return outcomes.map(function(oc){
