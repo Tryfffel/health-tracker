@@ -774,11 +774,12 @@ function WeightStepTracker() {
               chip(!!dl.sjuk, '🤒 Sjuk', function(){ setDayTag(tds, 'sjuk', dl.sjuk ? null : true); }, 'bg-rose-500 text-white'),
               chip(!!dl.bastu, '🧖 Bastu', function(){ setDayTag(tds, 'bastu', dl.bastu ? null : true); }, 'bg-orange-500 text-white'),
               chip(!!dl.kallbad, '🧊 Kallbad', function(){ setDayTag(tds, 'kallbad', dl.kallbad ? null : true); }, 'bg-sky-500 text-white'),
-              chip(!!dl.spikmatta, '🪡 Spikmatta', function(){ setDayTag(tds, 'spikmatta', dl.spikmatta ? null : true); }, 'bg-violet-500 text-white')
+              chip(!!dl.spikmatta, '🪡 Spikmatta', function(){ setDayTag(tds, 'spikmatta', dl.spikmatta ? null : true); }, 'bg-violet-500 text-white'),
+              chip(!!dl.situps, '💪 100 situps', function(){ setDayTag(tds, 'situps', dl.situps ? null : true); }, 'bg-teal-500 text-white')
             )
           )
         ),
-        (isSunday || dl.midja || dl.hals) ? h('div', { className: 'mt-4 pt-3 border-t border-gray-50 flex flex-wrap items-end gap-3' },
+        (isSunday || dl.midja || dl.hals || dl.brost || dl.lar || dl.arm) ? h('div', { className: 'mt-4 pt-3 border-t border-gray-50 flex flex-wrap items-end gap-3' },
           h('div', null,
             h('p', { className: 'text-xs text-gray-400 mb-1' }, '📏 Midja (cm) — söndagsmätning'),
             h('input', { type:'text', inputMode:'decimal', value: dl.midja || '', onChange: function(e){ var v = parseFloat(String(e.target.value).replace(',','.')); setDayTag(tds, 'midja', isNaN(v) ? null : v); }, className: 'w-24 px-3 py-2 border rounded-lg text-sm outline-none' })
@@ -786,6 +787,18 @@ function WeightStepTracker() {
           h('div', null,
             h('p', { className: 'text-xs text-gray-400 mb-1' }, '📏 Hals (cm)'),
             h('input', { type:'text', inputMode:'decimal', value: dl.hals || '', onChange: function(e){ var v = parseFloat(String(e.target.value).replace(',','.')); setDayTag(tds, 'hals', isNaN(v) ? null : v); }, className: 'w-24 px-3 py-2 border rounded-lg text-sm outline-none' })
+          ),
+          h('div', null,
+            h('p', { className: 'text-xs text-gray-400 mb-1' }, '📏 Bröst (cm)'),
+            h('input', { type:'text', inputMode:'decimal', value: dl.brost || '', onChange: function(e){ var v = parseFloat(String(e.target.value).replace(',','.')); setDayTag(tds, 'brost', isNaN(v) ? null : v); }, className: 'w-24 px-3 py-2 border rounded-lg text-sm outline-none' })
+          ),
+          h('div', null,
+            h('p', { className: 'text-xs text-gray-400 mb-1' }, '📏 Lår (cm)'),
+            h('input', { type:'text', inputMode:'decimal', value: dl.lar || '', onChange: function(e){ var v = parseFloat(String(e.target.value).replace(',','.')); setDayTag(tds, 'lar', isNaN(v) ? null : v); }, className: 'w-24 px-3 py-2 border rounded-lg text-sm outline-none' })
+          ),
+          h('div', null,
+            h('p', { className: 'text-xs text-gray-400 mb-1' }, '📏 Arm (cm)'),
+            h('input', { type:'text', inputMode:'decimal', value: dl.arm || '', onChange: function(e){ var v = parseFloat(String(e.target.value).replace(',','.')); setDayTag(tds, 'arm', isNaN(v) ? null : v); }, className: 'w-24 px-3 py-2 border rounded-lg text-sm outline-none' })
           ),
           fat != null ? h('div', { className: 'bg-emerald-50 rounded-lg px-3 py-2' },
             h('p', { className: 'text-xs text-gray-400' }, 'Kroppsfett (US Navy-est.)'),
@@ -1105,6 +1118,31 @@ function WeightStepTracker() {
             h(SvgLineChart, { data: series, lines: [{ key:'hrv', name:'HRV (ms)', color:'#c4b5fd', width:1.5 }, { key:'hrv7', name:'7-dagars snitt', color:'#7c3aed', width:2.5 }], height: 240, markers: markers })
           ),
           h('p', { className: 'text-xs text-gray-400 px-6 pb-4' }, firstSpik ? 'Lila streck = dagen du började med spikmattan. Följ om HRV-linjen trendar uppåt efter det.' : 'När du taggat spikmatta-dagar markeras startdagen här så du ser HRV-utvecklingen.')
+        );
+      })(),
+      // ── Mått & kroppsfett över tid ──
+      (function(){
+        var mkeys = [['midja','Midja','#db2777'],['brost','Bröst','#8b5cf6'],['lar','Lår','#0ea5e9'],['arm','Arm','#f59e0b'],['hals','Hals','#10b981']];
+        var mdates = Object.keys(dayLogs).filter(function(k){ return mkeys.some(function(m){ return dayLogs[k][m[0]] != null; }); }).sort();
+        if (mdates.length < 2) return null;
+        var mseries = mdates.map(function(k){ var o = { datum: new Date(k).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}), t: new Date(k).getTime() }; mkeys.forEach(function(m){ o[m[0]] = dayLogs[k][m[0]] != null ? dayLogs[k][m[0]] : null; }); return o; });
+        var activeLines = mkeys.filter(function(m){ return mseries.filter(function(pp){ return pp[m[0]] != null; }).length >= 2; }).map(function(m){ return { key:m[0], name:m[1], color:m[2], width:2 }; });
+        var fdates = mdates.filter(function(k){ return dayLogs[k].midja != null && dayLogs[k].hals != null; });
+        var fseries = fdates.map(function(k){ return { datum: new Date(k).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}), t: new Date(k).getTime(), fett: bodyFatPct(dayLogs[k].midja, dayLogs[k].hals, height) }; });
+        return h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+          h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+            h('div', { className: 'w-1 h-8 rounded-full bg-pink-500' }),
+            h('div', { className: 'flex-1' },
+              h('h2', { className: 'font-bold text-gray-800' }, '📏 Mått & kroppsfett över tid'),
+              h('p', { className: 'text-xs text-gray-400' }, mdates.length + ' mätningar · söndagsmått i cm')
+            )
+          ),
+          activeLines.length ? h('div', { className: 'px-4 pt-3' }, h(SvgLineChart, { data: mseries, lines: activeLines, height: 240 })) : null,
+          fseries.length >= 2 ? h('div', null,
+            h('p', { className: 'text-xs font-semibold text-gray-500 px-6 pt-2' }, 'Kroppsfett % (US Navy-est.)'),
+            h('div', { className: 'px-4 pb-3' }, h(SvgLineChart, { data: fseries, lines: [{ key:'fett', name:'Kroppsfett %', color:'#059669', width:2.5 }], height: 200 }))
+          ) : null,
+          h('p', { className: 'text-xs text-gray-400 px-6 pb-4' }, 'Mät på samma ställe varje söndag för jämförbarhet. Fett% räknas från midja + hals + längd.')
         );
       })(),
       // ── Tvillingdagar ──
