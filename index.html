@@ -721,7 +721,11 @@ function WeightStepTracker() {
   const ouraLongTerm = useMemo(function(){ return Analytics.getOuraLongTerm ? Analytics.getOuraLongTerm(ouraData) : null; }, [ouraData]);
   const ouraSleepBank = useMemo(function(){ return Analytics.getOuraSleepBank ? Analytics.getOuraSleepBank(ouraData, appSettings.sleepNeed) : null; }, [ouraData, appSettings.sleepNeed]);
   const ouraDaylight = useMemo(function(){ return Analytics.getOuraDaylight ? Analytics.getOuraDaylight(ouraData, entries, appSettings.latitude) : null; }, [ouraData, entries, appSettings.latitude]);
-  const topSignals = useMemo(function(){ return Analytics.getTopSignals ? Analytics.getTopSignals({ ouraHealth: ouraHealth, sleepBank: ouraSleepBank, sleepReg: ouraSleepReg, plateau: plateau }) : null; }, [ouraHealth, ouraSleepBank, ouraSleepReg, plateau]);
+  const topSignals = useMemo(function(){ return Analytics.getTopSignals ? Analytics.getTopSignals({
+    ouraHealth: ouraHealth, sleepBank: ouraSleepBank, sleepReg: ouraSleepReg, plateau: plateau,
+    ouraData: ouraData, entries: entries, dayLogs: dayLogs, height: height,
+    wegovy: wegovyDoseResponse, activity: ouraActivityBalance
+  }) : null; }, [ouraHealth, ouraSleepBank, ouraSleepReg, plateau, ouraData, entries, dayLogs, height, wegovyDoseResponse, ouraActivityBalance]);
   const NavButton = function(props) {
     return h('button', {
       onClick: function() { setView(props.id); },
@@ -1110,7 +1114,7 @@ function WeightStepTracker() {
             h('div', { className: 'w-1 h-8 rounded-full ' + SEV[head].bar }),
             h('div', { className: 'flex-1' },
               h('h2', { className: 'font-bold text-gray-800' }, '🎯 Vad betyder det här idag'),
-              h('p', { className: 'text-xs text-gray-400' }, sigs.length ? 'De ' + sigs.length + ' signaler som förtjänar din uppmärksamhet — rankade' : 'Rankat ur dina baslinjer, flaggor och trender')
+              h('p', { className: 'text-xs text-gray-400' }, sigs.length ? 'De ' + sigs.length + ' signaler som förtjänar din uppmärksamhet — rankade' : 'Rankat ur baslinjer, trender, vikt, mått och taggar')
             )
           ),
           sigs.length ? h('div', { className: 'divide-y divide-gray-50' },
@@ -1124,7 +1128,8 @@ function WeightStepTracker() {
                     i === 0 ? h('span', { className: 'text-xs text-gray-300' }, 'högst prioritet') : null
                   ),
                   h('p', { className: 'text-sm text-gray-700' }, sg.text),
-                  sg.action ? h('p', { className: 'text-xs text-gray-500 mt-1' }, '→ ' + sg.action) : null
+                  sg.action ? h('p', { className: 'text-xs text-gray-500 mt-1' }, '→ ' + sg.action) : null,
+                  (sg.n != null && sg.n < N_WEAK) ? h('p', { className: 'text-xs text-gray-300 mt-1' }, 'Bygger på ' + sg.n + ' mätpunkter — preliminärt.') : null
                 )
               );
             })
@@ -1132,7 +1137,7 @@ function WeightStepTracker() {
             h('p', { className: 'text-sm text-gray-700' }, '✅ Inget sticker ut mot dina baslinjer just nu.'),
             h('p', { className: 'text-xs text-gray-400 mt-1' }, 'Sömn, HRV, vilopuls och vikt ligger inom dina vanliga nivåer. Detaljerna finns i korten nedan.')
           ),
-          h('p', { className: 'text-xs text-gray-400 px-6 py-3 border-t border-gray-50' }, 'Rankas på hur mycket varje mått avviker från din egen baslinje — inte på allmänna gränsvärden.')
+          h('p', { className: 'text-xs text-gray-400 px-6 py-3 border-t border-gray-50' }, 'Rankas på avvikelse mot din egen baslinje, momentum (förvärras/vänder) och hur mycket data signalen vilar på.')
         );
       })(),
       // ── Spikmatta & HRV ──

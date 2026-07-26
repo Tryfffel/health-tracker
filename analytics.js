@@ -1130,89 +1130,201 @@
       return { balance: Math.round(balance), bars: bars, need: need, n: nights.length, payback: payback };
   };
   // Dagsljus & säsong (astronomisk beräkning, inget API)
-  // ── ALGORITHM: Topp-signaler — rankar dagens viktigaste avvikelser ──
-  // Rena indata (redan beräknade motorer) in, rankad lista ut. Poäng = hur mycket
-  // signalen förtjänar din uppmärksamhet just nu.
+  // ── ALGORITHM: Topp-signaler v2 — rankar dagens viktigaste avvikelser ──
+  // Rankar på (a) hur mycket måttet avviker från DIN baslinje, (b) momentum
+  // (förvärras/återhämtar), (c) konfidens (hur mycket data signalen vilar på).
+  // Deduplicerar på mått, inte rubrik — HRV kan aldrig visas två gånger.
   A.getTopSignals = function(ctx) {
     ctx = ctx || {};
     var oh = ctx.ouraHealth, sb = ctx.sleepBank, sr = ctx.sleepReg;
+    var od = ctx.ouraData || [], dl = ctx.dayLogs || {}, ent = ctx.entries || [];
     var out = [];
-    var push = function(o){ out.push(o); };
+    var push = function(o){
+      o.conf = o.n == null ? 1 : (o.n < 8 ? 0.65 : o.n < 14 ? 0.8 : o.n < 30 ? 0.92 : 1);
+      o.score = o.score * o.conf;
+      out.push(o);
+    };
+    var avg = function(a){ var v = a.filter(function(x){ return x != null; }); return v.length ? v.reduce(function(x,y){ return x+y; },0)/v.length : null; };
+
+    // Momentum: hur många dygn i rad avviker måttet, och är det på väg åt rätt håll?
+    var momentum = function(key, isBad) {
+      var streak = 0;
+      for (var i = 0; i < od.length && i < 14; i++) {
+        var v = od[i][key];
+        if (v == null) break;
+        if (isBad(v)) streak++; else break;
+      }
+      var recent = od.slice(0,2).map(function(d){ return d[key]; });
+      var prior = od.slice(2,5).map(function(d){ return d[key]; });
+      var a = avg(recent), b = avg(prior), dir = null;
+      if (a != null && b != null && b !== 0) {
+        var chg = (a - b) / Math.abs(b);
+        if (Math.abs(chg) >= 0.03) dir = chg > 0 ? 'up' : 'down';
+      }
+      return { streak: streak, dir: dir };
+    };
+    var momTxt = function(m, betterDir) {
+      var t = [];
+      if (m.streak >= 2) t.push(m.streak + ' dygn i rad');
+      if (m.dir) t.push(m.dir === betterDir ? 'men vänder åt rätt håll' : 'och förvärras');
+      return t.length ? ' (' + t.join(', ') + ')' : '';
+    };
 
     // 1) Kroppslarm — flera mått avviker samtidigt
     if (oh && oh.bodyAlarm && oh.bodyAlarm.length) {
-      push({ score: 100, sev: 'alert', icon: '🚨', title: 'Kroppslarm',
+      push({ metric:'multi', score: 100, sev: 'alert', icon: '🚨', title: 'Kroppslarm',
         text: oh.bodyAlarm.length + ' mått avviker samtidigt mot din baslinje. Det mönstret föregår ofta infektion eller överbelastning.',
         action: 'Ta det lugnt idag och prioritera sömn.' });
     }
 
-    // 2) Hälsoflaggor (warn väger tyngre än info)
+    // 2) Hälsoflaggor — med momentum där måttet finns i Oura-serien
+    var flagKeyMap = { hrv:['hrv_avg','up'], rhr:['resting_hr','down'], shr:['avg_hr_sleep','down'], breath:['breath_avg','down'], temp:['temp_dev','down'] };
     if (oh && oh.flags) {
       oh.flags.forEach(function(f){
-        push({ score: f.lvl === 'warn' ? 84 : 46, sev: f.lvl === 'warn' ? 'warn' : 'info',
-          icon: f.icon || '⚠️', title: 'Avvikelse', text: f.text });
+        var mk = f.key ? flagKeyMap[f.key] : null, extra = '';
+        if (mk && od.length) {
+          var base = avg(od.slice(0,30).map(function(d){ return d[mk[0]]; }));
+          if (base != null) {
+            var bad = mk[1] === 'up' ? function(v){ return v < base * 0.85; } : function(v){ return v > base * 1.05; };
+            extra = momTxt(momentum(mk[0], bad), mk[1] === 'up' ? 'up' : 'down');
+          }
+        }
+        push({ metric: f.key || ('flag' + f.icon), score: f.lvl === 'warn' ? 84 : 46,
+          sev: f.lvl === 'warn' ? 'warn' : 'info', icon: f.icon || '⚠️', title: 'Avvikelse',
+          text: f.text + extra });
       });
     }
 
-    // 3) Sömnskuld
+    // 3) Sömnskuld / sömnöverskott
     if (sb && sb.payback != null && sb.payback >= 2) {
-      push({ score: Math.min(78, 44 + sb.payback * 6), sev: sb.payback >= 5 ? 'warn' : 'info',
-        icon: '😴', title: 'Sömnskuld',
+      push({ metric:'sleep_debt', score: Math.min(78, 44 + sb.payback * 6), n: sb.n,
+        sev: sb.payback >= 5 ? 'warn' : 'info', icon: '😴', title: 'Sömnskuld',
         text: 'Du ligger ' + Math.abs(Math.round(sb.balance/60)) + ' h under ditt sömnbehov de senaste ' + sb.n + ' nätterna.',
         action: 'Lägg dig 30–45 min tidigare de närmaste kvällarna.' });
+    } else if (sb && sb.balance != null && sb.balance >= 180) {
+      push({ metric:'sleep_debt', score: 38, n: sb.n, sev: 'good', icon: '🛌', title: 'Sömnen i plus',
+        text: 'Du ligger ' + Math.round(sb.balance/60) + ' h över ditt sömnbehov senaste ' + sb.n + ' nätterna — bra buffert.' });
     }
 
     // 4) Största baslinjeavvikelsen (7d vs 30d)
+    var rowKey = { '💗 HRV':'hrv', '❤️ Vilopuls':'rhr', '💓 Sömnpuls':'shr', '🫁 Andning':'breath', '🛏️ Sömneffektivitet':'eff', '🌙 Sömnpoäng':'sleep' };
     if (oh && oh.baselineRows && oh.baselineRows.length) {
       var worst = null;
       oh.baselineRows.forEach(function(r){
         var now = r[1], base = r[2], better = r[4];
         if (now == null || base == null || !base) return;
         var rel = (now - base) / Math.abs(base);
-        var bad = better === 'up' ? -rel : rel; // positivt tal = åt fel håll
-        if (bad > 0.04 && (!worst || bad > worst.bad)) worst = { name: r[0], now: now, base: base, unit: r[3], bad: bad };
+        var bad = better === 'up' ? -rel : rel;
+        if (bad > 0.04 && (!worst || bad > worst.bad)) worst = { name:r[0], now:now, base:base, unit:r[3], bad:bad };
       });
       if (worst) {
-        push({ score: Math.min(72, 30 + worst.bad * 220), sev: worst.bad > 0.12 ? 'warn' : 'info',
-          icon: '📉', title: 'Under din baslinje',
+        push({ metric: rowKey[worst.name] || worst.name, score: Math.min(72, 30 + worst.bad * 220), n: 30,
+          sev: worst.bad > 0.12 ? 'warn' : 'info', icon: '📉', title: 'Under din baslinje',
           text: worst.name + ' ligger ' + Math.round(worst.bad * 100) + ' % sämre än din 30-dagarsnivå (' +
             (Math.round(worst.now * 10) / 10) + worst.unit + ' mot ' + (Math.round(worst.base * 10) / 10) + worst.unit + ').' });
       }
     }
 
-    // 5) Positiv kvittens — bästa trenden vecka mot vecka
+    // 5) Bästa veckotrenden (positiv kvittens)
     if (oh && oh.trends && oh.trends.length) {
       var best = null;
       oh.trends.forEach(function(t){
         var good = t.better === 'up' ? t.diff : -t.diff;
         var rel = t.now ? good / Math.abs(t.now) : 0;
-        if (rel > 0.05 && (!best || rel > best.rel)) best = { t: t, rel: rel };
+        if (rel > 0.05 && (!best || rel > best.rel)) best = { t:t, rel:rel };
       });
       if (best) {
-        push({ score: 40, sev: 'good', icon: '📈', title: 'Går åt rätt håll',
+        push({ metric:'trend_' + best.t.name, score: 40, n: 14, sev: 'good', icon: '📈', title: 'Går åt rätt håll',
           text: best.t.name + ' är ' + Math.abs(Math.round(best.t.diff * 10) / 10) + ' bättre än förra veckan (nu ' + best.t.now + ').' });
       }
     }
 
-    // 6) Viktplatå
+    // 6) Vikt: platå, takt och prognos
     if (ctx.plateau) {
-      push({ score: 66, sev: 'warn', icon: '⚖️', title: 'Viktplatå',
+      push({ metric:'weight', score: 66, n: ctx.plateau.days, sev: 'warn', icon: '⚖️', title: 'Viktplatå',
         text: 'Vikten har rört sig under ' + ctx.plateau.range + ' kg på ' + ctx.plateau.days + ' dagar (snitt ' + ctx.plateau.avgWeight + ' kg).',
         action: 'Platåer är normala — håll kursen ett par veckor innan du ändrar något.' });
+    } else if (ctx.wegovy && ctx.wegovy.pace != null) {
+      var pace = ctx.wegovy.pace;
+      if (pace <= -0.2) {
+        push({ metric:'weight', score: 42, n: 28, sev: 'good', icon: '⚖️', title: 'Vikten faller stadigt',
+          text: 'Takten senaste 4 veckorna är ' + pace + ' kg/vecka' + (ctx.wegovy.forecast ? ' — målvikten om ca ' + ctx.wegovy.forecast.weeks + ' veckor med bibehållen takt.' : '.') });
+      } else if (pace > 0.1) {
+        push({ metric:'weight', score: 64, n: 28, sev: 'warn', icon: '⚖️', title: 'Vikten vänder uppåt',
+          text: 'Takten senaste 4 veckorna är +' + pace + ' kg/vecka.',
+          action: 'Kolla om något ändrats i mat, sömn eller aktivitet senaste veckorna.' });
+      }
     }
 
-    // 7) Ojämn sömnrytm
+    // 7) WHtR (midja/längd) — mest robusta bukfettsmåttet
+    (function(){
+      if (!ctx.height) return;
+      var wd = Object.keys(dl).filter(function(k){ return dl[k] && dl[k].midja != null; }).sort();
+      if (!wd.length) return;
+      var latest = dl[wd[wd.length-1]].midja, whtr = latest / ctx.height;
+      if (whtr >= 0.5) {
+        push({ metric:'whtr', score: 44 + Math.min(20, (whtr - 0.5) * 200), n: wd.length, sev: whtr >= 0.6 ? 'warn' : 'info',
+          icon: '📏', title: 'Midja/längd över 0,50',
+          text: 'Din WHtR är ' + (Math.round(whtr*100)/100).toFixed(2).replace('.', ',') + ' (midja ' + latest + ' cm). Under 0,50 räknas som sunt bukfett.' });
+      } else if (wd.length >= 2) {
+        var prev = dl[wd[wd.length-2]].midja;
+        if (prev != null && latest < prev) {
+          push({ metric:'whtr', score: 36, n: wd.length, sev: 'good', icon: '📏', title: 'Midjan krymper',
+            text: 'Midjan är ' + (Math.round((prev - latest)*10)/10) + ' cm mindre än förra mätningen (nu ' + latest + ' cm, WHtR ' + (Math.round(latest/ctx.height*100)/100).toFixed(2).replace('.', ',') + ').' });
+        }
+      }
+    })();
+
+    // 8) Spikmatta — syns den i HRV?
+    (function(){
+      var sd = Object.keys(dl).filter(function(k){ return dl[k] && dl[k].spikmatta; }).sort();
+      if (sd.length < 10) return;
+      var start = sd[0];
+      var before = od.filter(function(d){ return d.date < start; }).slice(0, 21).map(function(d){ return d.hrv_avg; });
+      var after = od.filter(function(d){ return d.date >= start; }).map(function(d){ return d.hrv_avg; });
+      var a = avg(after), b = avg(before);
+      if (a == null || b == null || !b) return;
+      var chg = (a - b) / b;
+      if (Math.abs(chg) < 0.05) {
+        push({ metric:'spikmatta', score: 34, n: sd.length, sev: 'info', icon: '🪡', title: 'Spikmattan: inget utslag',
+          text: sd.length + ' loggade dygn sedan ' + start + '. HRV ligger på ' + Math.round(a) + ' mot ' + Math.round(b) + ' före — ingen tydlig effekt än.' });
+      } else {
+        push({ metric:'spikmatta', score: 46, n: sd.length, sev: chg > 0 ? 'good' : 'info', icon: '🪡',
+          title: chg > 0 ? 'Spikmattan: HRV upp' : 'Spikmattan: HRV ned',
+          text: 'HRV är ' + Math.abs(Math.round(chg*100)) + ' % ' + (chg > 0 ? 'högre' : 'lägre') + ' sedan du började (' + Math.round(a) + ' mot ' + Math.round(b) + ' ms, ' + sd.length + ' dygn).' });
+      }
+    })();
+
+    // 9) Alkohol senaste veckan
+    (function(){
+      var wk = od.slice(0,7).map(function(d){ return d.date; });
+      var units = wk.reduce(function(sum,k){ return sum + ((dl[k] && dl[k].alkohol) || 0); }, 0);
+      if (units >= 8) {
+        push({ metric:'alcohol', score: 40 + Math.min(18, units), n: 7, sev: units >= 14 ? 'warn' : 'info',
+          icon: '🍷', title: 'Alkohol senaste veckan',
+          text: units + ' enheter loggade senaste 7 dagarna — alkohol trycker ner både HRV och djupsömn.' });
+      }
+    })();
+
+    // 10) Ojämn sömnrytm
     if (sr && sr.sd != null && sr.sd >= 60) {
-      push({ score: 52, sev: 'info', icon: '🕰️', title: 'Ojämn sömnrytm',
+      push({ metric:'sleep_reg', score: 52, n: sr.n, sev: 'info', icon: '🕰️', title: 'Ojämn sömnrytm',
         text: 'Din sovtid varierar ±' + sr.sd + ' min mellan nätter — oregelbundenhet kostar återhämtning.',
         action: 'Sikta på samma läggtid ±30 min, även på helgen.' });
     }
 
+    // 11) Stillasittande
+    if (ctx.activity && ctx.activity.alerts != null && ctx.activity.alerts >= 3) {
+      push({ metric:'activity', score: 38, n: ctx.activity.n, sev: 'info', icon: '🪑', title: 'Mycket stillasittande',
+        text: ctx.activity.alerts + ' inaktivitetslarm i snitt per dag senaste perioden.',
+        action: 'Res dig varje timme — det syns i både steg och dagsform.' });
+    }
+
+    // Dedup på MÅTT (inte rubrik) — behåll högst rankade signalen per mått
     out.sort(function(a,b){ return b.score - a.score; });
-    // Ta bort dubbletter av samma titel, behåll den högst rankade
     var seen = {}, top = [];
-    out.forEach(function(o){ if (seen[o.title]) return; seen[o.title] = 1; top.push(o); });
-    return top.length ? top.slice(0, 3) : null;
+    out.forEach(function(o){ if (seen[o.metric]) return; seen[o.metric] = 1; top.push(o); });
+    return top.length ? top.slice(0, 4) : null;
   };
   A.getOuraDaylight = function(ouraData, entries, latitude) {
       var lat = latitude != null ? latitude : 59.3;
