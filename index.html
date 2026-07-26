@@ -85,6 +85,15 @@ function WeightStepTracker() {
     saveDayLogs(next);
   };
   const bodyFatPct = Analytics.bodyFatPct;
+  // Konfidens: en korrelation på för få datapunkter ska inte se lika skarp ut som en välbelagd.
+  const N_WEAK = 14, N_OK = 30;
+  const confTone = function(n, strongCls){ return (n == null || n < N_WEAK) ? 'text-gray-300' : strongCls; };
+  const confTag = function(n){
+    if (n == null) return null;
+    if (n < N_WEAK) return h('span', { className: 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 ml-1' }, 'prel. n=' + n);
+    if (n < N_OK) return h('span', { className: 'text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 ml-1' }, 'tunt n=' + n);
+    return null;
+  };
   const [checkups, setCheckups] = useState([]);
   const [checkupForm, setCheckupForm] = useState({});
   const [showCheckupForm, setShowCheckupForm] = useState(false);
@@ -712,6 +721,7 @@ function WeightStepTracker() {
   const ouraLongTerm = useMemo(function(){ return Analytics.getOuraLongTerm ? Analytics.getOuraLongTerm(ouraData) : null; }, [ouraData]);
   const ouraSleepBank = useMemo(function(){ return Analytics.getOuraSleepBank ? Analytics.getOuraSleepBank(ouraData, appSettings.sleepNeed) : null; }, [ouraData, appSettings.sleepNeed]);
   const ouraDaylight = useMemo(function(){ return Analytics.getOuraDaylight ? Analytics.getOuraDaylight(ouraData, entries, appSettings.latitude) : null; }, [ouraData, entries, appSettings.latitude]);
+  const topSignals = useMemo(function(){ return Analytics.getTopSignals ? Analytics.getTopSignals({ ouraHealth: ouraHealth, sleepBank: ouraSleepBank, sleepReg: ouraSleepReg, plateau: plateau }) : null; }, [ouraHealth, ouraSleepBank, ouraSleepReg, plateau]);
   const NavButton = function(props) {
     return h('button', {
       onClick: function() { setView(props.id); },
@@ -1085,6 +1095,46 @@ function WeightStepTracker() {
     var scOverall = scParts.length ? Math.round(scParts.reduce(function(a,b){return a+b[1];},0)/scParts.length) : null;
     var scGrade = scOverall==null?'–':scOverall>=85?'A':scOverall>=70?'B':scOverall>=55?'C':scOverall>=40?'D':'E';
     return h('div', null,
+      // ── Vad betyder det här idag (prioriterat) ──
+      (function(){
+        var SEV = {
+          alert: { bar:'bg-red-500',   chip:'bg-red-50 text-red-700',       dot:'text-red-500' },
+          warn:  { bar:'bg-amber-500', chip:'bg-amber-50 text-amber-700',   dot:'text-amber-500' },
+          good:  { bar:'bg-emerald-500', chip:'bg-emerald-50 text-emerald-700', dot:'text-emerald-500' },
+          info:  { bar:'bg-slate-400', chip:'bg-slate-50 text-slate-600',   dot:'text-slate-400' }
+        };
+        var sigs = topSignals || [];
+        var head = sigs.length && sigs[0].sev === 'alert' ? 'alert' : sigs.length && sigs[0].sev === 'warn' ? 'warn' : sigs.length ? 'good' : 'good';
+        return h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+          h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+            h('div', { className: 'w-1 h-8 rounded-full ' + SEV[head].bar }),
+            h('div', { className: 'flex-1' },
+              h('h2', { className: 'font-bold text-gray-800' }, '🎯 Vad betyder det här idag'),
+              h('p', { className: 'text-xs text-gray-400' }, sigs.length ? 'De ' + sigs.length + ' signaler som förtjänar din uppmärksamhet — rankade' : 'Rankat ur dina baslinjer, flaggor och trender')
+            )
+          ),
+          sigs.length ? h('div', { className: 'divide-y divide-gray-50' },
+            sigs.map(function(sg, i){
+              var st = SEV[sg.sev] || SEV.info;
+              return h('div', { key: i, className: 'flex gap-3 px-6 py-3' },
+                h('div', { className: 'text-xl leading-none pt-0.5' }, sg.icon),
+                h('div', { className: 'flex-1' },
+                  h('div', { className: 'flex items-center gap-2 mb-0.5' },
+                    h('span', { className: 'text-xs font-bold px-2 py-0.5 rounded-full ' + st.chip }, sg.title),
+                    i === 0 ? h('span', { className: 'text-xs text-gray-300' }, 'högst prioritet') : null
+                  ),
+                  h('p', { className: 'text-sm text-gray-700' }, sg.text),
+                  sg.action ? h('p', { className: 'text-xs text-gray-500 mt-1' }, '→ ' + sg.action) : null
+                )
+              );
+            })
+          ) : h('div', { className: 'px-6 py-5' },
+            h('p', { className: 'text-sm text-gray-700' }, '✅ Inget sticker ut mot dina baslinjer just nu.'),
+            h('p', { className: 'text-xs text-gray-400 mt-1' }, 'Sömn, HRV, vilopuls och vikt ligger inom dina vanliga nivåer. Detaljerna finns i korten nedan.')
+          ),
+          h('p', { className: 'text-xs text-gray-400 px-6 py-3 border-t border-gray-50' }, 'Rankas på hur mycket varje mått avviker från din egen baslinje — inte på allmänna gränsvärden.')
+        );
+      })(),
       // ── Spikmatta & HRV ──
       (function(){
         if (!ouraData.length) return null;
@@ -1464,13 +1514,13 @@ function WeightStepTracker() {
             h('p', { className: 'text-xs font-semibold text-gray-500 mb-2' }, 'Korrelationer'),
             h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-2' },
               moodAnalysis.rows.map(function(c, i) {
-                var strong = Math.abs(c.r) >= 0.3;
+                var strong = Math.abs(c.r) >= 0.3 && c.n >= N_WEAK;
                 return h('div', { key: i, className: 'flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2' },
                   h('div', null,
-                    h('p', { className: 'text-sm font-semibold text-gray-700' }, c.name),
+                    h('p', { className: 'text-sm font-semibold text-gray-700' }, c.name, confTag(c.n)),
                     h('p', { className: 'text-xs text-gray-400' }, 'n=' + c.n + (strong ? ' · ' + c.posMeans : ''))
                   ),
-                  h('p', { className: 'text-lg font-black ' + (strong ? 'text-pink-600' : 'text-gray-400') }, (c.r > 0 ? '+' : '') + c.r.toFixed(2))
+                  h('p', { className: 'text-lg font-black ' + confTone(c.n, strong ? 'text-pink-600' : 'text-gray-400') }, (c.r > 0 ? '+' : '') + c.r.toFixed(2))
                 );
               })
             ),
@@ -2654,13 +2704,14 @@ function WeightStepTracker() {
               h('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-2 mb-4' },
                 corr.slice(0,4).map(function(c,i){
                   var pos = c.r > 0;
+                  var cStrong = Math.abs(c.r) >= 0.3 && c.n >= N_WEAK;
                   return h('div', { key:i, className: 'flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2' },
                     h('div', null,
-                      h('p', { className:'text-sm font-semibold text-gray-700' }, c.name),
-                      h('p', { className:'text-xs text-gray-400' }, corrTxt(c.r) + ' samband · n=' + c.n)
+                      h('p', { className:'text-sm font-semibold text-gray-700' }, c.name, confTag(c.n)),
+                      h('p', { className:'text-xs text-gray-400' }, (c.n >= N_WEAK ? corrTxt(c.r) + ' samband · ' : 'för få mätningar · ') + 'n=' + c.n)
                     ),
                     h('div', { className: 'text-right' },
-                      h('p', { className:'text-lg font-black ' + (Math.abs(c.r)>=0.3?(pos?'text-red-500':'text-green-600'):'text-gray-400') }, (c.r>0?'+':'') + c.r.toFixed(2)),
+                      h('p', { className:'text-lg font-black ' + confTone(c.n, cStrong?(pos?'text-red-500':'text-green-600'):'text-gray-400') }, (c.r>0?'+':'') + c.r.toFixed(2)),
                       h('p', { className:'text-xs text-gray-400' }, c.up + (pos?' → upp':' → ned'))
                     )
                   );
@@ -2683,7 +2734,7 @@ function WeightStepTracker() {
               h('p', { className: 'text-xs text-gray-400' }, batteryVsForm.n + ' dagar · batteriet väger in stress, träning och taggar mot fast 30-dagarsbaslinje — dagsform är Ouras adaptiva modell')
             ),
             h('div', { className: 'text-right' },
-              h('p', { className: 'text-2xl font-black ' + (Math.abs(batteryVsForm.r) >= 0.7 ? 'text-emerald-600' : Math.abs(batteryVsForm.r) >= 0.4 ? 'text-blue-500' : 'text-gray-400') }, (batteryVsForm.r > 0 ? '+' : '') + batteryVsForm.r),
+              h('p', { className: 'text-2xl font-black ' + confTone(batteryVsForm.n, Math.abs(batteryVsForm.r) >= 0.7 ? 'text-emerald-600' : Math.abs(batteryVsForm.r) >= 0.4 ? 'text-blue-500' : 'text-gray-400') }, (batteryVsForm.r > 0 ? '+' : '') + batteryVsForm.r),
               h('p', { className: 'text-xs text-gray-400' }, 'korrelation')
             )
           ),

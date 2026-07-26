@@ -1130,6 +1130,90 @@
       return { balance: Math.round(balance), bars: bars, need: need, n: nights.length, payback: payback };
   };
   // Dagsljus & säsong (astronomisk beräkning, inget API)
+  // ── ALGORITHM: Topp-signaler — rankar dagens viktigaste avvikelser ──
+  // Rena indata (redan beräknade motorer) in, rankad lista ut. Poäng = hur mycket
+  // signalen förtjänar din uppmärksamhet just nu.
+  A.getTopSignals = function(ctx) {
+    ctx = ctx || {};
+    var oh = ctx.ouraHealth, sb = ctx.sleepBank, sr = ctx.sleepReg;
+    var out = [];
+    var push = function(o){ out.push(o); };
+
+    // 1) Kroppslarm — flera mått avviker samtidigt
+    if (oh && oh.bodyAlarm && oh.bodyAlarm.length) {
+      push({ score: 100, sev: 'alert', icon: '🚨', title: 'Kroppslarm',
+        text: oh.bodyAlarm.length + ' mått avviker samtidigt mot din baslinje. Det mönstret föregår ofta infektion eller överbelastning.',
+        action: 'Ta det lugnt idag och prioritera sömn.' });
+    }
+
+    // 2) Hälsoflaggor (warn väger tyngre än info)
+    if (oh && oh.flags) {
+      oh.flags.forEach(function(f){
+        push({ score: f.lvl === 'warn' ? 84 : 46, sev: f.lvl === 'warn' ? 'warn' : 'info',
+          icon: f.icon || '⚠️', title: 'Avvikelse', text: f.text });
+      });
+    }
+
+    // 3) Sömnskuld
+    if (sb && sb.payback != null && sb.payback >= 2) {
+      push({ score: Math.min(78, 44 + sb.payback * 6), sev: sb.payback >= 5 ? 'warn' : 'info',
+        icon: '😴', title: 'Sömnskuld',
+        text: 'Du ligger ' + Math.abs(Math.round(sb.balance/60)) + ' h under ditt sömnbehov de senaste ' + sb.n + ' nätterna.',
+        action: 'Lägg dig 30–45 min tidigare de närmaste kvällarna.' });
+    }
+
+    // 4) Största baslinjeavvikelsen (7d vs 30d)
+    if (oh && oh.baselineRows && oh.baselineRows.length) {
+      var worst = null;
+      oh.baselineRows.forEach(function(r){
+        var now = r[1], base = r[2], better = r[4];
+        if (now == null || base == null || !base) return;
+        var rel = (now - base) / Math.abs(base);
+        var bad = better === 'up' ? -rel : rel; // positivt tal = åt fel håll
+        if (bad > 0.04 && (!worst || bad > worst.bad)) worst = { name: r[0], now: now, base: base, unit: r[3], bad: bad };
+      });
+      if (worst) {
+        push({ score: Math.min(72, 30 + worst.bad * 220), sev: worst.bad > 0.12 ? 'warn' : 'info',
+          icon: '📉', title: 'Under din baslinje',
+          text: worst.name + ' ligger ' + Math.round(worst.bad * 100) + ' % sämre än din 30-dagarsnivå (' +
+            (Math.round(worst.now * 10) / 10) + worst.unit + ' mot ' + (Math.round(worst.base * 10) / 10) + worst.unit + ').' });
+      }
+    }
+
+    // 5) Positiv kvittens — bästa trenden vecka mot vecka
+    if (oh && oh.trends && oh.trends.length) {
+      var best = null;
+      oh.trends.forEach(function(t){
+        var good = t.better === 'up' ? t.diff : -t.diff;
+        var rel = t.now ? good / Math.abs(t.now) : 0;
+        if (rel > 0.05 && (!best || rel > best.rel)) best = { t: t, rel: rel };
+      });
+      if (best) {
+        push({ score: 40, sev: 'good', icon: '📈', title: 'Går åt rätt håll',
+          text: best.t.name + ' är ' + Math.abs(Math.round(best.t.diff * 10) / 10) + ' bättre än förra veckan (nu ' + best.t.now + ').' });
+      }
+    }
+
+    // 6) Viktplatå
+    if (ctx.plateau) {
+      push({ score: 66, sev: 'warn', icon: '⚖️', title: 'Viktplatå',
+        text: 'Vikten har rört sig under ' + ctx.plateau.range + ' kg på ' + ctx.plateau.days + ' dagar (snitt ' + ctx.plateau.avgWeight + ' kg).',
+        action: 'Platåer är normala — håll kursen ett par veckor innan du ändrar något.' });
+    }
+
+    // 7) Ojämn sömnrytm
+    if (sr && sr.sd != null && sr.sd >= 60) {
+      push({ score: 52, sev: 'info', icon: '🕰️', title: 'Ojämn sömnrytm',
+        text: 'Din sovtid varierar ±' + sr.sd + ' min mellan nätter — oregelbundenhet kostar återhämtning.',
+        action: 'Sikta på samma läggtid ±30 min, även på helgen.' });
+    }
+
+    out.sort(function(a,b){ return b.score - a.score; });
+    // Ta bort dubbletter av samma titel, behåll den högst rankade
+    var seen = {}, top = [];
+    out.forEach(function(o){ if (seen[o.title]) return; seen[o.title] = 1; top.push(o); });
+    return top.length ? top.slice(0, 3) : null;
+  };
   A.getOuraDaylight = function(ouraData, entries, latitude) {
       var lat = latitude != null ? latitude : 59.3;
       var dayLenH = function(date) {
