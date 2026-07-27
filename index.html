@@ -27,7 +27,7 @@ window.storage = {
   set: async (key, value) => { localStorage.setItem(key, value); }
 };
 const h = React.createElement;
-const { useState, useEffect, useMemo } = React;
+const { useState, useEffect, useMemo, useRef } = React;
 // ─── Sub-components ──────────────────────────────────────────────────────────
 const Toast = ({ toast, onClose }) => {
   if (!toast) return null;
@@ -493,7 +493,7 @@ function WeightStepTracker() {
     showToast('💾 Backup nedladdad!');
   };
   const buildBackupObj = function() {
-    return { entries: entries, workouts: workouts, goalWeight: goalWeight, height: height, yearlyGoal: yearlyGoal, targetRate: targetRate, wegovyDoses: wegovyDoses, wegovyProtocol: wegovyProtocol, experiments: experiments, checkups: checkups, dayLogs: dayLogs, exportDate: new Date().toISOString() };
+    return { entries: entries, workouts: workouts, goalWeight: goalWeight, height: height, yearlyGoal: yearlyGoal, targetRate: targetRate, wegovyDoses: wegovyDoses, wegovyProtocol: wegovyProtocol, experiments: experiments, checkups: checkups, dayLogs: dayLogs, updatedAt: localStorage.getItem('data-updated-at') || new Date().toISOString(), exportDate: new Date().toISOString() };
   };
   const exportEncrypted = async function() {
     var p = appSettings.backupPassword || window.prompt('Lösenord för krypteringen:');
@@ -517,18 +517,10 @@ function WeightStepTracker() {
     reader.onload = async function(e) {
       try {
         var data = await CryptoBox.dec(e.target.result, p);
-        if (data.entries) setEntries(data.entries);
-        if (data.workouts) setWorkouts(data.workouts);
-        if (data.goalWeight) setGoalWeight(data.goalWeight);
-        if (data.yearlyGoal) setYearlyGoal(data.yearlyGoal);
-        if (data.height) setHeight(data.height);
-        if (data.targetRate != null) setTargetRate(data.targetRate);
-        if (data.wegovyDoses) { setWegovyDoses(data.wegovyDoses); window.storage.set('wegovy-doses', JSON.stringify(data.wegovyDoses)); }
-        if (data.wegovyProtocol) { setWegovyProtocol(data.wegovyProtocol); window.storage.set('wegovy-protocol', JSON.stringify(data.wegovyProtocol)); }
-        if (data.experiments) { setExperiments(data.experiments); window.storage.set('experiments', JSON.stringify(data.experiments)); }
-        if (data.checkups) { setCheckups(data.checkups); window.storage.set('checkups', JSON.stringify(data.checkups)); }
-        if (data.dayLogs) { setDayLogs(data.dayLogs); window.storage.set('day-logs', JSON.stringify(data.dayLogs)); }
-        showToast('✓ Krypterad backup återställd!');
+        var resEnc = Analytics.mergeBackup(buildBackupObj(), data);
+        localStorage.setItem('sync-snapshot-before', JSON.stringify(buildBackupObj()));
+        applyBackupObj(resEnc.merged);
+        showToast('✓ Backup sammanslagen — ' + resEnc.stats.added + ' nya, ' + resEnc.stats.updated + ' uppdaterade');
         setShowImport(false); setView('overview');
       } catch(err) { showToast('Fel lösenord eller trasig fil', 'error'); }
     };
@@ -536,27 +528,103 @@ function WeightStepTracker() {
   };
   const restoreFromCloud = async function() {
     try {
-      var r = await fetch('backup.enc?t=' + Date.now());
-      if (!r.ok) { showToast('Ingen molnbackup hittad i repot ännu', 'error'); return; }
-      var txt = await r.text();
       var p = appSettings.backupPassword || window.prompt('Krypteringslösenord:');
       if (!p) return;
+      var txt = null;
+      if (appSettings.ghToken) { var got = await fetchCloudBackup(appSettings.ghToken); txt = got.txt; }
+      if (!txt) { var r = await fetch('backup.enc?t=' + Date.now()); if (r.ok) txt = await r.text(); }
+      if (!txt) { showToast('Ingen molnbackup hittad i repot ännu', 'error'); return; }
       var data = await CryptoBox.dec(txt, p);
-      if (data.entries) setEntries(data.entries);
-      if (data.workouts) setWorkouts(data.workouts);
-      if (data.goalWeight) setGoalWeight(data.goalWeight);
-      if (data.yearlyGoal) setYearlyGoal(data.yearlyGoal);
-      if (data.height) setHeight(data.height);
-      if (data.targetRate != null) setTargetRate(data.targetRate);
-      if (data.wegovyDoses) { setWegovyDoses(data.wegovyDoses); window.storage.set('wegovy-doses', JSON.stringify(data.wegovyDoses)); }
-      if (data.wegovyProtocol) { setWegovyProtocol(data.wegovyProtocol); window.storage.set('wegovy-protocol', JSON.stringify(data.wegovyProtocol)); }
-      if (data.experiments) { setExperiments(data.experiments); window.storage.set('experiments', JSON.stringify(data.experiments)); }
-      if (data.checkups) { setCheckups(data.checkups); window.storage.set('checkups', JSON.stringify(data.checkups)); }
-      if (data.dayLogs) { setDayLogs(data.dayLogs); window.storage.set('day-logs', JSON.stringify(data.dayLogs)); }
-      showToast('☁️ Återställt från molnbackup (' + (data.exportDate ? new Date(data.exportDate).toLocaleDateString('sv-SE') : '?') + ')!');
+      // Slås ihop — molnet kan aldrig radera lokala poster
+      var res = Analytics.mergeBackup(buildBackupObj(), data);
+      localStorage.setItem('sync-snapshot-before', JSON.stringify(buildBackupObj()));
+      applyBackupObj(res.merged);
+      showToast('☁️ Sammanslaget med molnbackup — ' + res.stats.added + ' nya, ' + res.stats.updated + ' uppdaterade');
       setShowImport(false); setView('overview');
     } catch(e) { showToast('Fel lösenord eller trasig molnbackup', 'error'); }
   };
+  // ── DUBBELRIKTAD MOLNSYNK ────────────────────────────────────────────────
+  // Union-merge (analytics.mergeBackup) — lokala poster kan aldrig raderas av
+  // molnet. Kör vid appstart och 45 s efter senaste ändring.
+  const syncBusy = useRef(false);
+  const applyBackupObj = function(d) {
+    if (d.entries) { setEntries(d.entries); window.storage.set('weight-entries', JSON.stringify(d.entries)); }
+    if (d.workouts) { setWorkouts(d.workouts); window.storage.set('workouts', JSON.stringify(d.workouts)); }
+    if (d.goalWeight != null) { setGoalWeight(d.goalWeight); window.storage.set('goal-weight', String(d.goalWeight)); }
+    if (d.height != null) { setHeight(d.height); window.storage.set('user-height', String(d.height)); }
+    if (d.yearlyGoal != null) { setYearlyGoal(d.yearlyGoal); window.storage.set('yearly-goal', JSON.stringify(d.yearlyGoal)); }
+    if (d.targetRate != null) { setTargetRate(d.targetRate); window.storage.set('target-rate', String(d.targetRate)); }
+    if (d.wegovyDoses) { setWegovyDoses(d.wegovyDoses); window.storage.set('wegovy-doses', JSON.stringify(d.wegovyDoses)); }
+    if (d.wegovyProtocol) { setWegovyProtocol(d.wegovyProtocol); window.storage.set('wegovy-protocol', JSON.stringify(d.wegovyProtocol)); }
+    if (d.experiments) { setExperiments(d.experiments); window.storage.set('experiments', JSON.stringify(d.experiments)); }
+    if (d.checkups) { setCheckups(d.checkups); window.storage.set('checkups', JSON.stringify(d.checkups)); }
+    if (d.dayLogs) { setDayLogs(d.dayLogs); window.storage.set('day-logs', JSON.stringify(d.dayLogs)); }
+  };
+  const fetchCloudBackup = async function(token) {
+    var url = 'https://api.github.com/repos/Tryfffel/health-tracker/contents/backup.enc';
+    var r = await fetch(url + '?t=' + Date.now(), { headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' } });
+    if (r.status === 404) return { txt: null, sha: null };
+    if (!r.ok) throw new Error('GitHub ' + r.status);
+    var j = await r.json();
+    return { txt: decodeURIComponent(escape(atob((j.content || '').replace(/\n/g, '')))), sha: j.sha };
+  };
+  const putCloudBackup = async function(token, obj, pw, sha) {
+    var encTxt = await CryptoBox.enc(obj, pw);
+    var url = 'https://api.github.com/repos/Tryfffel/health-tracker/contents/backup.enc';
+    var body = { message: 'Synk ' + todayStr(), content: btoa(unescape(encodeURIComponent(encTxt))) };
+    if (sha) body.sha = sha;
+    var r = await fetch(url, { method: 'PUT', headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json' }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error('GitHub ' + r.status);
+  };
+  const cloudSync = async function(manual) {
+    var t = appSettings.ghToken, pw = appSettings.backupPassword;
+    if (!t || !pw) { if (manual) showToast('Fyll i GitHub-token och krypteringslösenord under Inställningar', 'error'); return; }
+    if (syncBusy.current) return;
+    syncBusy.current = true;
+    try {
+      var local = buildBackupObj();
+      var got = await fetchCloudBackup(t);
+      var remote = null;
+      if (got.txt) { try { remote = await CryptoBox.dec(got.txt, pw); } catch (e) { showToast('Fel krypteringslösenord — synk avbruten', 'error'); syncBusy.current = false; return; } }
+      var res = Analytics.mergeBackup(local, remote || {});
+      if (res.localChanged) {
+        localStorage.setItem('sync-snapshot-before', JSON.stringify(local));
+        applyBackupObj(res.merged);
+        var st = res.stats;
+        showToast('☁️ Synkad — ' + st.added + ' nya, ' + st.updated + ' uppdaterade poster hämtade');
+      }
+      if (res.remoteChanged || !got.txt) {
+        var toPush = Object.assign({}, res.merged, { updatedAt: new Date().toISOString(), exportDate: new Date().toISOString() });
+        await putCloudBackup(t, toPush, pw, got.sha);
+        var now = new Date().toISOString();
+        window.storage.set('last-cloud-backup', now); setLastCloudBackup(now);
+        window.storage.set('last-backup', now); setLastBackup(now);
+        localStorage.setItem('data-updated-at', now);
+        if (manual && !res.localChanged) showToast('☁️ Molnet uppdaterat med dina ändringar');
+      } else if (manual && !res.localChanged) {
+        showToast('✅ Allt redan i synk');
+      }
+    } catch (e) {
+      if (manual) showToast('Synk misslyckades: ' + e.message, 'error'); else console.warn('cloudSync', e);
+    }
+    syncBusy.current = false;
+  };
+  // Synk vid appstart
+  useEffect(function(){
+    if (loading) return;
+    if (!appSettings.ghToken || !appSettings.backupPassword) return;
+    var id = setTimeout(function(){ cloudSync(false); }, 1500);
+    return function(){ clearTimeout(id); };
+  }, [loading]);
+  // Debouncad synk 45 s efter senaste dataändring
+  useEffect(function(){
+    if (loading) return;
+    localStorage.setItem('data-updated-at', new Date().toISOString());
+    if (!appSettings.ghToken || !appSettings.backupPassword) return;
+    var id = setTimeout(function(){ cloudSync(false); }, 45000);
+    return function(){ clearTimeout(id); };
+  }, [entries, workouts, dayLogs, wegovyDoses, experiments, checkups, goalWeight, height, yearlyGoal, targetRate]);
+
   const runCloudBackup = async function(manual) {
     var t = appSettings.ghToken, p = appSettings.backupPassword;
     if (!t || !p) { if (manual) showToast('Fyll i GitHub-token och lösenord under Inställningar', 'error'); return; }
@@ -584,7 +652,7 @@ function WeightStepTracker() {
   useEffect(function() {
     if (loading || !appSettings.ghToken || !appSettings.backupPassword) return;
     var last = lastCloudBackup ? new Date(lastCloudBackup).getTime() : 0;
-    if (Date.now() - last > 7*86400000 && entries.length >= 5) runCloudBackup(false);
+    if (Date.now() - last > 7*86400000 && entries.length >= 5) cloudSync(false);
   }, [loading]);
   const importFromFile = function(event) {
     const file = event.target.files[0];
@@ -593,18 +661,10 @@ function WeightStepTracker() {
     reader.onload = function(e) {
       try {
         const data = JSON.parse(e.target.result);
-        if (data.entries)    setEntries(data.entries);
-        if (data.workouts)   setWorkouts(data.workouts);
-        if (data.goalWeight) setGoalWeight(data.goalWeight);
-        if (data.yearlyGoal) setYearlyGoal(data.yearlyGoal);
-        if (data.height)     setHeight(data.height);
-        if (data.targetRate != null) setTargetRate(data.targetRate);
-        if (data.wegovyDoses) { setWegovyDoses(data.wegovyDoses); window.storage.set('wegovy-doses', JSON.stringify(data.wegovyDoses)); }
-        if (data.wegovyProtocol) { setWegovyProtocol(data.wegovyProtocol); window.storage.set('wegovy-protocol', JSON.stringify(data.wegovyProtocol)); }
-        if (data.experiments) { setExperiments(data.experiments); window.storage.set('experiments', JSON.stringify(data.experiments)); }
-        if (data.checkups) { setCheckups(data.checkups); window.storage.set('checkups', JSON.stringify(data.checkups)); }
-        if (data.dayLogs) { setDayLogs(data.dayLogs); window.storage.set('day-logs', JSON.stringify(data.dayLogs)); }
-        showToast('✓ Data importerad!');
+        var resJson = Analytics.mergeBackup(buildBackupObj(), data);
+        localStorage.setItem('sync-snapshot-before', JSON.stringify(buildBackupObj()));
+        applyBackupObj(resJson.merged);
+        showToast('✓ Data importerad och sammanslagen — ' + resJson.stats.added + ' nya poster');
         setShowImport(false);
         setView('overview');
       } catch(err) { showToast('Kunde inte läsa filen', 'error'); }
@@ -3670,8 +3730,8 @@ function WeightStepTracker() {
           '🔓 Återställ krypterad',
           h('input', { type:'file', accept:'.enc,.json', onChange:importEncrypted, className:'hidden' })
         ),
-        h('button', { onClick:function(){ runCloudBackup(true); }, className:'bg-gray-800 text-white px-5 py-2 rounded-lg text-sm font-medium' }, '☁️ Ladda upp till repot nu'),
-        h('button', { onClick:restoreFromCloud, className:'bg-emerald-700 text-white px-5 py-2 rounded-lg text-sm font-medium' }, '⬇️ Hämta från molnet')
+        h('button', { onClick:function(){ cloudSync(true); }, className:'bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium' }, '🔄 Synka nu (dubbelriktat)'),
+        h('button', { onClick:restoreFromCloud, className:'bg-emerald-700 text-white px-5 py-2 rounded-lg text-sm font-medium' }, '⬇️ Hämta & slå ihop från molnet')
       ),
       lastCloudBackup ? h('p', { className: 'text-xs text-gray-400' }, 'Senaste molnbackup: ' + new Date(lastCloudBackup).toLocaleString('sv-SE') + ' · uppdateras automatiskt varje vecka') : h('p', { className: 'text-xs text-gray-400' }, 'Molnbackup kräver GitHub-token + lösenord under Inställningar. Filen krypteras innan den lämnar telefonen.'),
       h('div', { className: 'border-t pt-5' },

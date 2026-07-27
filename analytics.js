@@ -1326,6 +1326,89 @@
     out.forEach(function(o){ if (seen[o.metric]) return; seen[o.metric] = 1; top.push(o); });
     return top.length ? top.slice(0, 4) : null;
   };
+  // ── SYNK: säker sammanslagning av lokal och molnlagrad data ──────────────
+  // Grundregel: UNION. En post som finns lokalt men saknas i molnet (eller tvärtom)
+  // ska ALDRIG försvinna. Bara vid äkta konflikt (samma nyckel, olika innehåll)
+  // vinner den sida vars snapshot är nyast.
+  A.mergeBackup = function(local, remote) {
+    local = local || {}; remote = remote || {};
+    var lt = Date.parse(local.updatedAt || local.exportDate || 0) || 0;
+    var rt = Date.parse(remote.updatedAt || remote.exportDate || 0) || 0;
+    var remoteNewer = rt > lt;
+    var stats = { added: 0, updated: 0, kept: 0 };
+
+    // Slår ihop en array av objekt på en nyckelfunktion
+    var mergeList = function(a, b, keyFn) {
+      a = Array.isArray(a) ? a : []; b = Array.isArray(b) ? b : [];
+      var map = {}, order = [];
+      a.forEach(function(item){ var k = keyFn(item); if (k == null) return; if (!(k in map)) order.push(k); map[k] = { val: item, from: 'local' }; });
+      b.forEach(function(item){
+        var k = keyFn(item); if (k == null) return;
+        if (!(k in map)) { order.push(k); map[k] = { val: item, from: 'remote' }; stats.added++; return; }
+        var cur = map[k];
+        if (JSON.stringify(cur.val) === JSON.stringify(item)) { stats.kept++; return; }
+        if (remoteNewer) { map[k] = { val: item, from: 'remote' }; stats.updated++; }
+        else stats.kept++;
+      });
+      return order.map(function(k){ return map[k].val; });
+    };
+
+    // dayLogs slås ihop per datum OCH per fält — taggar från två enheter
+    // samma dag ska båda överleva.
+    var mergeDayLogs = function(a, b) {
+      a = a || {}; b = b || {};
+      var out = {};
+      Object.keys(a).forEach(function(d){ out[d] = Object.assign({}, a[d]); });
+      Object.keys(b).forEach(function(d){
+        if (!out[d]) { out[d] = Object.assign({}, b[d]); stats.added++; return; }
+        var merged = Object.assign({}, out[d]);
+        Object.keys(b[d] || {}).forEach(function(f){
+          if (!(f in merged)) { merged[f] = b[d][f]; stats.added++; }
+          else if (JSON.stringify(merged[f]) !== JSON.stringify(b[d][f])) {
+            if (remoteNewer) { merged[f] = b[d][f]; stats.updated++; } else stats.kept++;
+          }
+        });
+        out[d] = merged;
+      });
+      return out;
+    };
+
+    var idOrDate = function(x){ return x && (x.id != null ? String(x.id) : x.date != null ? 'd' + x.date : null); };
+
+    var merged = {
+      entries:   mergeList(local.entries,   remote.entries,   function(e){ return e && e.date != null ? String(e.date) : null; }),
+      workouts:  mergeList(local.workouts,  remote.workouts,  idOrDate),
+      wegovyDoses: mergeList(local.wegovyDoses, remote.wegovyDoses, idOrDate),
+      experiments: mergeList(local.experiments, remote.experiments, idOrDate),
+      checkups:  mergeList(local.checkups,  remote.checkups,  idOrDate),
+      dayLogs:   mergeDayLogs(local.dayLogs, remote.dayLogs)
+    };
+
+    // Skalärer: ta från nyaste sidan, men aldrig skriv över ett värde med tomt
+    ['goalWeight','height','yearlyGoal','targetRate','wegovyProtocol'].forEach(function(k){
+      var lv = local[k], rv = remote[k];
+      var pick = remoteNewer ? (rv != null ? rv : lv) : (lv != null ? lv : rv);
+      if (pick != null) merged[k] = pick;
+    });
+
+    // Sortera datumserier stabilt
+    merged.entries.sort(function(x,y){ return new Date(x.date) - new Date(y.date); });
+
+    var changedVs = function(orig, key) {
+      var o = orig[key];
+      if (key === 'dayLogs') return JSON.stringify(o || {}) !== JSON.stringify(merged.dayLogs);
+      if (Array.isArray(merged[key])) return JSON.stringify(Array.isArray(o) ? o : []) !== JSON.stringify(merged[key]);
+      return JSON.stringify(o) !== JSON.stringify(merged[key]);
+    };
+    var keys = ['entries','workouts','wegovyDoses','experiments','checkups','dayLogs','goalWeight','height','yearlyGoal','targetRate','wegovyProtocol'];
+    var localChanged = keys.some(function(k){ return changedVs(local, k); });
+    var remoteChanged = keys.some(function(k){ return changedVs(remote, k); });
+
+    return { merged: merged, stats: stats, remoteNewer: remoteNewer,
+      localChanged: localChanged,   // lokalt tillstånd behöver uppdateras
+      remoteChanged: remoteChanged  // molnet behöver skrivas om
+    };
+  };
   A.getOuraDaylight = function(ouraData, entries, latitude) {
       var lat = latitude != null ? latitude : 59.3;
       var dayLenH = function(date) {
