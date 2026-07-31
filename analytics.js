@@ -964,7 +964,16 @@
         else if(stepsNow>=10000) parts.push('Bra aktivitetsnivå (' + Math.round(stepsNow).toLocaleString('sv-SE') + ' steg/dag).');
       }
       if(viktChange!=null){
-        if(viktChange<=-0.3){ parts.push('Vikten är på väg ned (' + viktChange.toFixed(1) + ' kg denna vecka) — åt rätt håll.'); if(tone!=='tough') tone='good'; }
+        // Rimlighetsspärr: mer än 4 kg på en vecka är fysiologiskt orimligt och
+        // beror nästan alltid på en felinmatad vikt eller ett felaktigt datum.
+        // Då rapporteras det som ett datafel — inte som en trend.
+        if(Math.abs(viktChange) > 4){
+          var lo = Math.min.apply(null, rc.map(function(e){ return e.weight; }));
+          var hi = Math.max.apply(null, rc.map(function(e){ return e.weight; }));
+          parts.push('Viktdatan för denna vecka ser fel ut (' + lo.toFixed(1) + '–' + hi.toFixed(1) + ' kg på ' + rc.length + ' mätningar) — kontrollera om någon mätning fått fel värde eller datum.');
+          tips.push('Öppna Historik och rätta mätningen som sticker ut.');
+        }
+        else if(viktChange<=-0.3){ parts.push('Vikten är på väg ned (' + viktChange.toFixed(1) + ' kg denna vecka) — åt rätt håll.'); if(tone!=='tough') tone='good'; }
         else if(viktChange>=0.3){ parts.push('Vikten gick upp lite (+' + viktChange.toFixed(1) + ' kg) — ofta vätska, men håll koll.'); }
         else parts.push('Vikten ligger stabil denna vecka.');
       }
