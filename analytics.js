@@ -1029,6 +1029,8 @@
       if (anyAlk) drivers.push(['🍷 Alkohol', mAlk]);
       var spikDays = Object.keys(dayLogs).filter(function(k){ return dayLogs[k] && dayLogs[k].spikmatta; });
       if (spikDays.length >= 8) { var mSpik={}; ouraData.forEach(function(d){ mSpik[d.date] = (dayLogs[d.date] && dayLogs[d.date].spikmatta) ? 1 : 0; }); drivers.push(['🪡 Spikmatta', mSpik]); }
+      var pwDays = Object.keys(dayLogs).filter(function(k){ return dayLogs[k] && dayLogs[k].powerwalk; });
+      if (pwDays.length >= 8) { var mPw={}; ouraData.forEach(function(d){ mPw[d.date] = (dayLogs[d.date] && dayLogs[d.date].powerwalk) ? 1 : 0; }); drivers.push(['🚶 Powerwalk', mPw]); }
       var outcomes=[['Humör',mMood],['Sömn',mSleep],['HRV',mHrv],['ViktΔ',null]];
       var cells=drivers.map(function(dr){
         return outcomes.map(function(oc){
@@ -1301,6 +1303,32 @@
         push({ metric:'spikmatta', score: 46, n: sd.length, sev: chg > 0 ? 'good' : 'info', icon: '🪡',
           title: chg > 0 ? 'Spikmattan: HRV upp' : 'Spikmattan: HRV ned',
           text: 'HRV är ' + Math.abs(Math.round(chg*100)) + ' % ' + (chg > 0 ? 'högre' : 'lägre') + ' sedan du började (' + Math.round(a) + ' mot ' + Math.round(b) + ' ms, ' + sd.length + ' dygn).' });
+      }
+    })();
+
+    // 8b) Powerwalk — vilopuls är primärmåttet (svarar snabbare än HRV)
+    (function(){
+      var pw = Object.keys(dl).filter(function(k){ return dl[k] && dl[k].powerwalk; }).sort();
+      if (pw.length < 10) return;
+      var start = pw[0];
+      var pick = function(arr, key){ return arr.map(function(d){ return d[key]; }); };
+      var beforeArr = od.filter(function(d){ return d.date < start; }).slice(0, 28);
+      var afterArr = od.filter(function(d){ return d.date >= start; });
+      var rhrB = avg(pick(beforeArr,'resting_hr')), rhrA = avg(pick(afterArr,'resting_hr'));
+      var hrvB = avg(pick(beforeArr,'hrv_avg')), hrvA = avg(pick(afterArr,'hrv_avg'));
+      if (rhrB == null || rhrA == null) return;
+      var dRhr = rhrA - rhrB;
+      var dHrv = (hrvA != null && hrvB != null) ? hrvA - hrvB : null;
+      var hrvTxt = dHrv == null ? '' : ' HRV ' + (dHrv >= 0 ? '+' : '') + (Math.round(dHrv*10)/10) + ' ms.';
+      if (dRhr <= -1) {
+        push({ metric:'powerwalk', score: 54, n: pw.length, sev: 'good', icon: '🚶', title: 'Powerwalk ger effekt',
+          text: 'Vilopulsen är ' + Math.abs(Math.round(dRhr*10)/10) + ' slag lägre sedan du började (' + Math.round(rhrA) + ' mot ' + Math.round(rhrB) + ').' + hrvTxt + ' ' + pw.length + ' loggade dagar.' });
+      } else if (dRhr >= 1) {
+        push({ metric:'powerwalk', score: 50, n: pw.length, sev: 'info', icon: '🚶', title: 'Powerwalk: vilopulsen stiger än',
+          text: 'Vilopulsen är ' + Math.round(dRhr*10)/10 + ' slag högre än före starten (' + Math.round(rhrA) + ' mot ' + Math.round(rhrB) + ').' + hrvTxt + ' Kan betyda att totalbelastningen är för hög — inte att du behöver gå mer.' });
+      } else {
+        push({ metric:'powerwalk', score: 36, n: pw.length, sev: 'info', icon: '🚶', title: 'Powerwalk: för tidigt att säga',
+          text: pw.length + ' loggade dagar sedan ' + start + '. Vilopulsen ligger på ' + Math.round(rhrA) + ' mot ' + Math.round(rhrB) + ' före — ingen tydlig förändring än.' + hrvTxt });
       }
     })();
 

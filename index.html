@@ -849,7 +849,8 @@ function WeightStepTracker() {
               chip(!!dl.bastu, '🧖 Bastu', function(){ setDayTag(tds, 'bastu', dl.bastu ? null : true); }, 'bg-orange-500 text-white'),
               chip(!!dl.kallbad, '🧊 Kallbad', function(){ setDayTag(tds, 'kallbad', dl.kallbad ? null : true); }, 'bg-sky-500 text-white'),
               chip(!!dl.spikmatta, '🪡 Spikmatta', function(){ setDayTag(tds, 'spikmatta', dl.spikmatta ? null : true); }, 'bg-violet-500 text-white'),
-              chip(!!dl.situps, '💪 100 situps', function(){ setDayTag(tds, 'situps', dl.situps ? null : true); }, 'bg-teal-500 text-white')
+              chip(!!dl.situps, '💪 100 situps', function(){ setDayTag(tds, 'situps', dl.situps ? null : true); }, 'bg-teal-500 text-white'),
+              chip(!!dl.powerwalk, '🚶 Powerwalk', function(){ setDayTag(tds, 'powerwalk', dl.powerwalk ? null : true); }, 'bg-lime-600 text-white')
             )
           )
         ),
@@ -3688,6 +3689,7 @@ function WeightStepTracker() {
             dl.bastu ? Row('Bastu', '✓') : null,
             dl.kallbad ? Row('Kallbad', '✓') : null,
             dl.spikmatta ? Row('Spikmatta', '🪡 ✓') : null,
+            dl.powerwalk ? Row('Powerwalk', '🚶 ✓') : null,
             (dl.midja && dl.hals) ? Row('Midja / hals', dl.midja + ' / ' + dl.hals + ' cm (fett ~' + bodyFatPct(dl.midja, dl.hals, height) + '%)') : null
           ];
         })()),
