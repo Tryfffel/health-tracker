@@ -683,9 +683,14 @@
         var days = (new Date(es[es.length-1].date) - new Date(es[0].date)) / 86400000;
         if (days < 3) return { dose: p.dose, rate: null, weeks: null };
         var rate = (es[es.length-1].weight - es[0].weight) / (days/7);
-        return { dose: p.dose, rate: parseFloat(rate.toFixed(2)), weeks: Math.round(days/7 * 10) / 10 };
+        // Under 14 dagar dränks takten i vätskebrus (dygnsvariationen är ~±1 kg)
+        // — markera som preliminär i stället för att visa en skarp siffra.
+        return { dose: p.dose, rate: parseFloat(rate.toFixed(2)), weeks: Math.round(days/7 * 10) / 10,
+                 n: es.length, days: Math.round(days), weak: days < 14 };
       });
       var recent = respEntries.filter(function(e){ return (new Date() - new Date(e.date)) <= 28*86400000; });
+      var paceN = recent.length;
+      var paceSpan = recent.length >= 2 ? Math.round((new Date(recent[recent.length-1].date) - new Date(recent[0].date))/86400000) : 0;
       var pace = null;
       if (recent.length >= 4) {
         var n = recent.length, sx=0, sy=0, sxy=0, sxx=0;
@@ -748,7 +753,7 @@
           if (fV <= goalWeight) break;
         }
       }
-      return { perStep: perStep, forecast: forecast, pace: pace != null ? parseFloat(pace.toFixed(2)) : null, lastW: lastW,
+      return { perStep: perStep, forecast: forecast, pace: pace != null ? parseFloat(pace.toFixed(2)) : null, paceN: paceN, paceSpan: paceSpan, lastW: lastW,
         startW: startW, pctLoss: parseFloat(pctLoss.toFixed(1)), milestones: milestones, nextMs: nextMs,
         seRows: seRows, anySE: anySE, typicalPct: typicalPct != null ? parseFloat(typicalPct.toFixed(1)) : null, weeksOn: wk, chart: chart };
   };
@@ -795,8 +800,16 @@
       var wks = Object.keys(wkMap).sort();
       if (wks.length < 5) return null;
       var avgs = wks.map(function(k){ var a = wkMap[k]; return a.reduce(function(x,y){ return x+y; },0)/a.length; });
+      // Veckonycklarna är måndagsdatum. Saknas veckor (t.ex. period utan våg)
+      // ligger två poster flera veckor isär — då måste deltat delas på antalet
+      // veckor som faktiskt passerat, annars bokförs en flerveckorsnedgång som
+      // en enda veckas och bootstrappen blir för optimistisk.
       var deltas = [];
-      for (var i = 1; i < avgs.length; i++) deltas.push(avgs[i]-avgs[i-1]);
+      for (var i = 1; i < avgs.length; i++) {
+        var gapWks = Math.round((new Date(wks[i]) - new Date(wks[i-1])) / (7*86400000)) || 1;
+        if (gapWks > 4) continue;                 // för långt hopp — säger inget om veckotakt
+        deltas.push((avgs[i]-avgs[i-1]) / gapWks);
+      }
       deltas = deltas.slice(-12);
       if (deltas.length < 4) return null;
       var lastW = respEntries[respEntries.length-1].weight;

@@ -3211,16 +3211,20 @@ function WeightStepTracker() {
           h('div', { className: 'flex gap-2 overflow-x-auto pb-2 mb-3' },
             doseResponse.perStep.map(function(s, i) {
               var good = s.rate != null && s.rate < 0;
-              return h('div', { key: i, className: 'flex-shrink-0 rounded-xl px-4 py-3 text-center border-2 min-w-[100px] ' + (s.rate == null ? 'border-gray-100 bg-gray-50' : good ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50') },
+              var weak = !!s.weak;
+              return h('div', { key: i, className: 'flex-shrink-0 rounded-xl px-4 py-3 text-center border-2 min-w-[100px] ' + (s.rate == null || weak ? 'border-gray-100 bg-gray-50' : good ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50') },
                 h('p', { className: 'text-sm font-black text-gray-800' }, s.dose + ' mg'),
-                h('p', { className: 'text-lg font-black ' + (s.rate == null ? 'text-gray-400' : good ? 'text-green-600' : 'text-red-500') }, s.rate == null ? '–' : (s.rate > 0 ? '+' : '') + s.rate + ' kg/v'),
-                s.weeks ? h('p', { className: 'text-xs text-gray-400' }, s.weeks + ' veckor') : null
+                h('p', { className: 'text-lg font-black ' + (s.rate == null ? 'text-gray-400' : weak ? 'text-gray-300' : good ? 'text-green-600' : 'text-red-500') }, s.rate == null ? '–' : (s.rate > 0 ? '+' : '') + s.rate + ' kg/v'),
+                s.weeks ? h('p', { className: 'text-xs ' + (weak ? 'text-gray-300' : 'text-gray-400') }, s.weeks + ' veckor') : null,
+                weak ? h('p', { className: 'text-[10px] font-bold text-amber-600 mt-0.5' }, 'för kort period') : null
               );
             })
           ),
           doseResponse.pace != null ? h('p', { className: 'text-sm text-gray-600 mb-1' },
             'Nuvarande takt (senaste 4 veckorna): ',
-            h('span', { className: 'font-bold ' + (doseResponse.pace < 0 ? 'text-green-600' : 'text-red-500') }, (doseResponse.pace > 0 ? '+' : '') + doseResponse.pace + ' kg/vecka')
+            h('span', { className: 'font-bold ' + (doseResponse.pace < 0 ? 'text-green-600' : 'text-red-500') }, (doseResponse.pace > 0 ? '+' : '') + doseResponse.pace + ' kg/vecka'),
+            doseResponse.paceN != null ? h('span', { className: 'text-xs ' + (doseResponse.paceN < 8 || doseResponse.paceSpan < 14 ? 'text-amber-600' : 'text-gray-400') },
+              ' · ' + doseResponse.paceN + ' vägningar över ' + doseResponse.paceSpan + ' dagar' + (doseResponse.paceN < 8 || doseResponse.paceSpan < 14 ? ' — tunt underlag' : '')) : null
           ) : null,
           doseResponse.forecast
             ? h('p', { className: 'text-sm text-gray-600' }, 'Med den takten når du ', h('span', { className: 'font-bold' }, goalWeight + ' kg'), ' om ca ',
@@ -3238,7 +3242,7 @@ function WeightStepTracker() {
               ', och 80 % av simuleringarna landar mellan ' + monteCarlo.d10 + ' och ' + monteCarlo.d90 + '. ' +
               (monteCarlo.pReach < 100 ? monteCarlo.pReach + '% av simuleringarna når målet inom 3 år.' : '')
             ) : h('p', { className: 'text-sm text-gray-600' }, 'Med de senaste veckornas utfall når simuleringarna inte målet inom 3 år — trenden behöver vända först.'),
-            h('p', { className: 'text-xs text-gray-400 mt-1' }, 'Bootstrap på din egen variation — fångar osäkerheten som en rät linje döljer.')
+            h('p', { className: 'text-xs text-gray-400 mt-1' }, 'Bootstrap på din egen variation (12 veckor) — den linjära prognosen ovan tittar bara 4 veckor bakåt, därför kan de skilja sig. Veckor utan vägning hoppas över i stället för att räknas som en veckas nedgång.')
           ) : null,
           doseResponse.chart ? h('div', { className: 'mt-3' },
             h('p', { className: 'text-xs font-semibold text-gray-500 mb-1' }, 'Din väg till målet (streckad linje = prognos)'),
