@@ -4,6 +4,26 @@
 (function () {
   const h = React.createElement;
   const { useState } = React;
+  // Skärmkoordinat -> viewBox-koordinat. Nödvändig eftersom SVG:erna ritas med
+  // preserveAspectRatio (default): är elementet bredare än viewBox-proportionen
+  // centreras ritytan och lämnar tomma marginaler. En linjär mappning över hela
+  // elementbredden hamnar då fel — hovern träffar vid sidan av datapunkten.
+  const svgPos = function(e, W, H) {
+    var svg = e.currentTarget;
+    if (svg.getScreenCTM) {
+      var ctm = svg.getScreenCTM();
+      if (ctm) {
+        var pt = svg.createSVGPoint();
+        pt.x = e.clientX; pt.y = e.clientY;
+        var p = pt.matrixTransform(ctm.inverse());
+        return { x: p.x, y: p.y };
+      }
+    }
+    var r = svg.getBoundingClientRect();
+    var scale = Math.min(r.width / W, r.height / H) || 1;
+    return { x: (e.clientX - r.left - (r.width - W*scale)/2) / scale,
+             y: (e.clientY - r.top  - (r.height - H*scale)/2) / scale };
+  };
 function SvgLineChart({ data, lines, height, markers }) {
   var hoverSt = useState(null); var hoverI = hoverSt[0], setHoverI = hoverSt[1];
   height = height || 260;
@@ -47,8 +67,7 @@ function SvgLineChart({ data, lines, height, markers }) {
     );
   });
   var onMove = function(e){
-    var r = e.currentTarget.getBoundingClientRect();
-    var cx = (e.clientX - r.left) / r.width * W;
+    var cx = svgPos(e, W, H).x;
     var best = 0, bd = Infinity;
     for (var mi = 0; mi < data.length; mi++) { var dd2 = Math.abs(tx(mi) - cx); if (dd2 < bd) { bd = dd2; best = mi; } }
     setHoverI(best);
@@ -101,8 +120,7 @@ function SvgBarChart({ data, dataKey, color, height }) {
     yLabels.push(h('text',{key:'y'+yi,x:PL-4,y:yyy+4,textAnchor:'end',fontSize:10,fill:'#9ca3af'},yv>=1000?Math.round(yv/1000)+'k':yv));
   }
   var onMove = function(e){
-    var r = e.currentTarget.getBoundingClientRect();
-    var cx = (e.clientX - r.left) / r.width * W;
+    var cx = svgPos(e, W, H).x;
     var i = Math.floor((cx - PL) / chartW * data.length);
     setHoverI(Math.max(0, Math.min(data.length - 1, i)));
   };
@@ -142,8 +160,7 @@ function SvgScatter({ points, xName, yName, color, height }) {
   var zero=(minY<0&&maxY>0)?h('line',{x1:PL,y1:ty(0),x2:PL+chartW,y2:ty(0),stroke:'#d1d5db',strokeWidth:1}):null;
   var dots=points.map(function(p,i){return h('circle',{key:i,cx:tx(p.x),cy:ty(p.y),r:3.5,fill:color,fillOpacity:0.45});});
   var onMove = function(e){
-    var r = e.currentTarget.getBoundingClientRect();
-    var mx = (e.clientX - r.left) / r.width * W, my = (e.clientY - r.top) / r.height * H;
+    var pos = svgPos(e, W, H), mx = pos.x, my = pos.y;
     var best = null, bd = 400;
     points.forEach(function(p){ var d = Math.pow(tx(p.x)-mx,2) + Math.pow(ty(p.y)-my,2); if (d < bd) { bd = d; best = p; } });
     setHoverP(best);
