@@ -1717,7 +1717,7 @@ function WeightStepTracker() {
           h(SvgLineChart, { data: chartData, height: 280, lines: [
             { key: 'vikt',    color: '#a5b4fc', width: 1.5, name: 'Vikt (kg)' },
             { key: 'snitt7',  color: '#4f46e5', width: 2.5, name: '7-dagars snitt' },
-            { key: 'målvikt', color: '#10b981', width: 1.5, name: 'Målvikt', dashed: true }
+            { key: 'målvikt', color: '#10b981', width: 1.5, name: 'Målvikt', dashed: true, ref: true }
           ]})
         )
       ),
@@ -3249,7 +3249,7 @@ function WeightStepTracker() {
             h(SvgLineChart, { data: doseResponse.chart, height: 230, lines: [
               { key: 'vikt', color: '#db2777', width: 2.5, name: 'Vikt (kg)' },
               { key: 'prognos', color: '#a855f7', width: 2, name: 'Prognos', dashed: true },
-              { key: 'mål', color: '#10b981', width: 1.5, name: 'Målvikt', dashed: true }
+              { key: 'mål', color: '#10b981', width: 1.5, name: 'Målvikt', dashed: true, ref: true }
             ]})
           ) : null,
           h('p', { className: 'text-xs text-gray-400 mt-2' }, 'Prognosen är en enkel trendframskrivning — viktresan är sällan linjär.')

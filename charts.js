@@ -31,7 +31,10 @@ function SvgLineChart({ data, lines, height, markers }) {
   var PL=50,PR=20,PT=20,PB=36,W=800,H=height;
   var chartW=W-PL-PR, chartH=H-PT-PB;
   var allVals=[];
-  lines.forEach(function(l){ data.forEach(function(d){ if(d[l.key]!=null) allVals.push(d[l.key]); }); });
+  // Linjer märkta ref:true (t.ex. målvikt) ska INTE styra y-skalan. Annars
+  // sträcks axeln till målvärdet och den faktiska variationen plattas ut.
+  var domLines = lines.filter(function(l){ return !l.ref; });
+  (domLines.length ? domLines : lines).forEach(function(l){ data.forEach(function(d){ if(d[l.key]!=null) allVals.push(d[l.key]); }); });
   var minV=Math.min.apply(null,allVals)-0.5, maxV=Math.max.apply(null,allVals)+0.5;
   var rng=maxV-minV||1;
   var timed = data[0] && data[0].t != null;
@@ -40,6 +43,7 @@ function SvgLineChart({ data, lines, height, markers }) {
   var fx=function(i){ return timed ? (data[i].t - tmin)/((tmax-tmin)||1) : (i/(data.length-1)); };
   var tx=function(i){ return PL+fx(i)*chartW; };
   var ty=function(v){ return PT+chartH-((v-minV)/rng)*chartH; };
+  var tyc=function(v){ return Math.max(PT, Math.min(PT+chartH, ty(v))); };   // klamrad — för referenslinjer utanför skalan
   var gridEls=[];
   for(var gi=0;gi<=4;gi++){
     var gv=minV+(rng/4)*gi, gy=ty(gv);
@@ -52,8 +56,9 @@ function SvgLineChart({ data, lines, height, markers }) {
     return h('text',{key:'xl'+i,x:tx(i),y:PT+chartH+18,textAnchor:'middle',fontSize:9,fill:'#9ca3af'},d.datum);
   });
   var lineEls=lines.map(function(l){
+    var yf = l.ref ? tyc : ty;
     var pts=data.filter(function(d){return d[l.key]!=null;}).map(function(d,_,arr){
-      var i=data.indexOf(d); return tx(i)+','+ty(d[l.key]);
+      var i=data.indexOf(d); return tx(i)+','+yf(d[l.key]);
     }).join(' ');
     return h('polyline',{key:l.key,points:pts,fill:'none',stroke:l.color,strokeWidth:l.width||1.5,strokeDasharray:l.dashed?'5,5':undefined});
   });
@@ -81,7 +86,7 @@ function SvgLineChart({ data, lines, height, markers }) {
       var bx = (hx + 12 + boxW > W - PR) ? hx - 12 - boxW : hx + 12;
       tipEls = h('g', { style: { pointerEvents: 'none' } },
         h('line', { x1: hx, y1: PT, x2: hx, y2: PT + chartH, stroke: '#94a3b8', strokeWidth: 1, strokeDasharray: '2,2' }),
-        ...rows.map(function(l){ return h('circle', { key: 'hc'+l.key, cx: hx, cy: ty(dd[l.key]), r: 4, fill: l.color, stroke: 'white', strokeWidth: 1.5 }); }),
+        ...rows.map(function(l){ return h('circle', { key: 'hc'+l.key, cx: hx, cy: (l.ref ? tyc : ty)(dd[l.key]), r: 4, fill: l.color, stroke: 'white', strokeWidth: 1.5 }); }),
         h('rect', { x: bx, y: PT + 4, width: boxW, height: boxH, rx: 6, fill: 'rgba(17,24,39,0.92)' }),
         h('text', { x: bx + 9, y: PT + 20, fontSize: 11, fontWeight: 'bold', fill: 'white' }, dd.datum),
         ...rows.map(function(l, ri){ return h('text', { key: 'ht'+l.key, x: bx + 9, y: PT + 34 + ri*14, fontSize: 10, fill: l.color }, l.name + ': ' + dd[l.key]); })
