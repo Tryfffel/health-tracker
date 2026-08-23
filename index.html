@@ -1241,8 +1241,29 @@ function WeightStepTracker() {
         var mkeys = [['midja','Midja','#db2777'],['brost','Bröst','#8b5cf6'],['lar','Lår','#0ea5e9'],['arm','Arm','#f59e0b'],['hals','Hals','#10b981']];
         var mdates = Object.keys(dayLogs).filter(function(k){ return mkeys.some(function(m){ return dayLogs[k][m[0]] != null; }); }).sort();
         if (mdates.length < 2) return null;
-        var mseries = mdates.map(function(k){ var o = { datum: new Date(k).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}), t: new Date(k).getTime() }; mkeys.forEach(function(m){ o[m[0]] = dayLogs[k][m[0]] != null ? dayLogs[k][m[0]] : null; }); return o; });
+        // Absoluta cm på samma axel gör små förändringar osynliga (bröst ~102 vs
+        // arm ~35 tvingar axeln att spänna 70 cm). Vi plottar därför FÖRÄNDRING
+        // sedan första mätningen — då spänner axeln bara det som faktiskt hänt.
+        var mbase = {};
+        mkeys.forEach(function(m){
+          for (var i = 0; i < mdates.length; i++) { var v = dayLogs[mdates[i]][m[0]]; if (v != null) { mbase[m[0]] = v; break; } }
+        });
+        var mseries = mdates.map(function(k){
+          var o = { datum: new Date(k).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}), t: new Date(k).getTime() };
+          mkeys.forEach(function(m){
+            var v = dayLogs[k][m[0]];
+            o[m[0]] = (v != null && mbase[m[0]] != null) ? Math.round((v - mbase[m[0]]) * 10) / 10 : null;
+          });
+          return o;
+        });
         var activeLines = mkeys.filter(function(m){ return mseries.filter(function(pp){ return pp[m[0]] != null; }).length >= 2; }).map(function(m){ return { key:m[0], name:m[1], color:m[2], width:2 }; });
+        var mNow = mkeys.map(function(m){
+          var v = null;
+          for (var i = mdates.length - 1; i >= 0; i--) { if (dayLogs[mdates[i]][m[0]] != null) { v = dayLogs[mdates[i]][m[0]]; break; } }
+          if (v == null) return null;
+          var delta = (mbase[m[0]] != null) ? Math.round((v - mbase[m[0]]) * 10) / 10 : null;
+          return { name: m[1], color: m[2], v: v, delta: delta };
+        }).filter(function(x){ return x; });
         var fdates = mdates.filter(function(k){ return dayLogs[k].midja != null && dayLogs[k].hals != null; });
         var fseries = fdates.map(function(k){ return { datum: new Date(k).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}), t: new Date(k).getTime(), fett: bodyFatPct(dayLogs[k].midja, dayLogs[k].hals, height) }; });
         var wdatesAll = mdates.filter(function(k){ return dayLogs[k].midja != null; });
@@ -1258,7 +1279,19 @@ function WeightStepTracker() {
               h('p', { className: 'text-xs text-gray-400' }, mdates.length + ' mätningar · söndagsmått i cm')
             )
           ),
-          activeLines.length ? h('div', { className: 'px-4 pt-3' }, h(SvgLineChart, { data: mseries, lines: activeLines, height: 240 })) : null,
+          mNow.length ? h('div', { className: 'flex flex-wrap gap-x-5 gap-y-1 px-6 pt-3' },
+            mNow.map(function(x, i){
+              return h('div', { key: i, className: 'flex items-baseline gap-1' },
+                h('span', { className: 'text-xs', style: { color: x.color } }, x.name),
+                h('span', { className: 'text-sm font-black text-gray-800' }, x.v + ' cm'),
+                x.delta != null && x.delta !== 0 ? h('span', { className: 'text-xs font-bold ' + (x.delta < 0 ? 'text-emerald-600' : 'text-amber-600') }, (x.delta > 0 ? '+' : '') + String(x.delta).replace('.', ',')) : null
+              );
+            })
+          ) : null,
+          activeLines.length ? h('div', null,
+            h('p', { className: 'text-xs font-semibold text-gray-500 px-6 pt-3' }, 'Förändring sedan första mätningen (cm)'),
+            h('div', { className: 'px-4' }, h(SvgLineChart, { data: mseries, lines: activeLines, height: 240 }))
+          ) : null,
           fseries.length >= 2 ? h('div', null,
             h('p', { className: 'text-xs font-semibold text-gray-500 px-6 pt-2' }, 'Kroppsfett % (US Navy-est.)'),
             h('div', { className: 'px-4 pb-3' }, h(SvgLineChart, { data: fseries, lines: [{ key:'fett', name:'Kroppsfett %', color:'#059669', width:2.5 }], height: 200 }))
@@ -1268,7 +1301,7 @@ function WeightStepTracker() {
             h('p', { className: 'text-base font-black ' + whtrCol }, String(lastWhtr).replace('.',',')),
             h('p', { className: 'text-xs text-gray-400' }, whtrTxt)
           ) : null,
-          h('p', { className: 'text-xs text-gray-400 px-6 pb-4' }, 'Mät på samma ställe varje söndag. Fett% = midja + hals + längd (halsen bär mest brus). WHtR = midja/längd, behöver inget halsmått.')
+          h('p', { className: 'text-xs text-gray-400 px-6 pb-4' }, 'Grafen visar förändring sedan din första mätning — därför syns även små skillnader. Absoluta värden står överst. Mät på samma ställe varje söndag. Fett% = midja + hals + längd (halsen bär mest brus).')
         );
       })(),
       // ── Tvillingdagar ──
