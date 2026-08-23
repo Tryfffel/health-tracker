@@ -1,6 +1,6 @@
 # HANDOFF — health-tracker (Hälsodagbok)
 
-Senast uppdaterad: 2026-07-07. Läs detta innan du ändrar något.
+Senast uppdaterad: 2026-08-23. Läs detta innan du ändrar något.
 
 ## Status just nu (2026-07-06)
 
@@ -26,6 +26,59 @@ Grundproblemet återkom: GitHubs cron hoppade över ALLA morgonkörningar 2026-0
 ## Deploy denna session
 
 Gjordes via Claude in Chrome mot användarens inloggade GitHub: `/upload/main` → dra in index.html/analytics.js/sw.js → Commit directly to main. Oura-workflowen kördes också manuellt via Actions → Run workflow (gav 7 juli-datan).
+
+## Byggt 2026-07-13 → 08-23
+
+**Kroppsmått.** Söndagsmätning i "Dagens taggar" utökad med Bröst/Lår/Arm (utöver Midja/Hals). Kort under Insikter: `📏 Mått & kroppsfett över tid`.
+- Grafen plottar **förändring sedan första mätningen**, inte absoluta cm. Skälet: bröst ~102 och arm ~35 på samma axel tvingar spannet till 70 cm, då blir 2 cm midja 3 % av grafhöjden. Med delta blir samma 2 cm ~40 % (≈14× tydligare).
+- Varje mått är en **klickbar filterknapp**: `startvärde → nuvarande` + samlad förändring. Klick döljer/visar linjen; y-skalan anpassas efter det som visas. Valet sparas i `localStorage['matt-dold']`.
+- **WHtR** (midja/längd) med trafikljus, <0,50 grönt. Robustare än US Navy-fett%, som är känsligt för halsmåttet (1 cm hals ≈ 0,7 procentenheter).
+
+**Taggar tillagda:** `spikmatta`, `situps`, `powerwalk` (dayLogs, Övrigt-raden).
+
+**Toppblock v2** — `A.getTopSignals(ctx)`, renderas överst i Insikter som "🎯 Vad betyder det här idag". Rankar max 4 signaler på avvikelse mot egen baslinje × momentum × konfidens.
+- Källor: kroppslarm, hälsoflaggor, sömnskuld/-överskott, största baslinjeavvikelsen, veckotrend, viktplatå/Wegovy-takt, WHtR, spikmatta, alkohol, sömnrytm, stillasittande, powerwalk.
+- **Dedup sker på MÅTT, inte rubrik** — HRV kan aldrig visas två gånger.
+- Konfidensviktning: n<8 → ×0,65, n<14 → ×0,8, n<30 → ×0,92.
+- Säger uttryckligen "inget sticker ut" i stället för att hitta på.
+
+**n-dämpning i korrelationskort.** `N_WEAK=14, N_OK=30`. Under 14 punkter gråas r-värdet och märks "prel. n=X"; 14–29 märks "tunt".
+
+**Dubbelriktad molnsynk.** `A.mergeBackup(local, remote)` — UNION-merge, lokala poster kan ALDRIG raderas av molnet. Konflikt löses av den sida vars snapshot är nyast (`updatedAt`). dayLogs mergas **per fält**, så taggar från två enheter samma dag överlever båda. 22 enhetstester.
+- `cloudSync()` körs vid appstart och 45 s efter senaste ändring (tidigare bara veckovis och bara uppåt).
+- Alla blanka överskrivningar borttagna: "Hämta från molnet" och båda filimporterna mergar nu. Snapshot i `localStorage['sync-snapshot-before']` före applicering.
+- **KRÄVER både GitHub-token OCH krypteringslösenord.** Per 2026-08-23 finns ingen `backup.enc` i repot → synken har aldrig kört → lösenordet är sannolikt tomt. Verifiera först av allt.
+
+**Diagramfixar (charts.js)** — samma rot: viewBox stämde inte med elementet.
+1. `svgPos()` — hover använder SVG:ns egen koordinattransform. Förut mappades musen linjärt över hela elementbredden trots att preserveAspectRatio centrerar ritytan; vid viewBox-x 700 behövde man peka ~75 px för långt höger.
+2. `useBoxWidth()` — viewBox sätts till uppmätt bredd (ResizeObserver) i stället för fast 800, så diagrammen fyller hela bredden.
+3. `ref: true` på linjer — referenslinjer (målvikt) styr inte y-skalan. Viktkurvan blev ~1,9× brantare.
+4. Legenden radbryts (`LEGW=130`) — förut trunkerades poster på smal skärm.
+5. Tidsproportionell x-axel när datapunkter har `t` (timestamp).
+
+**Wegovy-fixar.**
+- Monte Carlo: veckodeltan normaliseras mot faktiskt antal veckor. Buggen bokförde en flerveckorslucka (juli utan våg) som EN veckas nedgång → för optimistisk prognos (−0,68 mot sanna −0,55).
+- Dossteg under 14 dagar gråas med "för kort period" — 5 dagars data drunknar i vätskebrus.
+- Takten visar sitt underlag: "−0,39 kg/v · 25 vägningar över 27 dagar", gult vid tunt underlag.
+- Veckocoachen: >4 kg/vecka rapporteras som datafel, inte trend.
+
+**Service worker.** `halsa-v6`. Navigations-fetch använder `cache:'no-cache'` — utan det gick den via HTTP-cachen och Pages max-age serverade gammal index.html i upp till 10 min, vilket tvingade fram hård omladdning trots "network-first".
+
+## Deploy — lärdomar (viktigt)
+
+- **`file_upload`-verktyget fungerar inte** i Cowork-sessioner: klienten konverterar sökvägarna innan de når värden.
+- **Fungerande metod:** styr webbläsaren, hämta filen, patcha i sidan, lämna in via DataTransfer:
+  1. Hämta ALLTID via GitHubs API med `Accept: application/vnd.github.raw` — `raw.githubusercontent.com` är CDN-cachad och har serverat filer utan nyss gjorda commits. Det höll på att radera en fix.
+  2. Exakt strängmatchning, **verifiera att varje ersättning träffar precis en gång** före commit.
+  3. `input.files = dt.files` + dispatcha **bara** `change` (drop + change ger dubbletter).
+  4. Base64-avkodning av 270 KB index.html i sidan tajmar ut — använd raw-headern.
+- Pages-bygget kan misslyckas på "Set up job" (GitHubs infra, inte koden) — kör om via Actions → Re-run all jobs.
+
+## Öppna frågor
+
+1. Krypteringslösenordet för molnsynken (se ovan) — högsta prioritet.
+2. Vilopuls +16 slag och HRV −72 % sedan januari. Troligen Wegovy + långvarigt kaloriunderskott; David uppmanad att ta upp det med förskrivaren. Morgonbriefen är instruerad att behandla detta som känt, inte som nytt mysterium.
+3. Batteribaslinjen — ska den rulla långsammare nu när HRV skiftat nivå?
 
 ## Grundfakta
 

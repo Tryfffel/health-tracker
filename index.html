@@ -173,7 +173,10 @@ function WeightStepTracker() {
   const [ouraSyncing, setOuraSyncing] = useState(false);
   const [ouraRange, setOuraRange] = useState(90);
   const [ouraOpen, setOuraOpen] = useState({ status: true });
-  const [mattDold, setMattDold] = useState({});   // vilka mått som är bortfiltrerade i måttgrafen
+  const [mattDold, setMattDold] = useState(function(){
+    try { return JSON.parse(localStorage.getItem('matt-dold') || '{}'); } catch(e) { return {}; }
+  });   // vilka mått som är bortfiltrerade i måttgrafen — sparas mellan besök
+  const setMattDoldSparat = function(o){ setMattDold(o); try { localStorage.setItem('matt-dold', JSON.stringify(o)); } catch(e){} };
   const [showAllInsights, setShowAllInsights] = useState(false);
 
   useEffect(function() {
@@ -1286,7 +1289,7 @@ function WeightStepTracker() {
               mNow.map(function(x, i){
                 var dold = !!mattDold[x.key];
                 return h('button', { key: i, title: dold ? 'Visa ' + x.name : 'Dölj ' + x.name,
-                  onClick: function(){ var o = Object.assign({}, mattDold); if (o[x.key]) delete o[x.key]; else o[x.key] = true; setMattDold(o); },
+                  onClick: function(){ var o = Object.assign({}, mattDold); if (o[x.key]) delete o[x.key]; else o[x.key] = true; setMattDoldSparat(o); },
                   className: 'flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border transition-colors ' + (dold ? 'border-gray-100 bg-gray-50 opacity-50' : 'border-gray-200 bg-white') },
                   h('span', { className: 'w-2.5 h-2.5 rounded-full inline-block', style: { backgroundColor: dold ? '#d1d5db' : x.color } }),
                   h('span', { className: 'text-xs ' + (dold ? 'text-gray-400' : 'text-gray-600') }, x.name),
@@ -1296,7 +1299,7 @@ function WeightStepTracker() {
                 );
               })
             ),
-            Object.keys(mattDold).length ? h('button', { onClick: function(){ setMattDold({}); }, className: 'text-xs text-indigo-500 px-6 pt-1' }, 'Visa alla') : null
+            Object.keys(mattDold).length ? h('button', { onClick: function(){ setMattDoldSparat({}); }, className: 'text-xs text-indigo-500 px-6 pt-1' }, 'Visa alla') : null
           ) : null,
           activeLines.length ? h('div', null,
             h('p', { className: 'text-xs font-semibold text-gray-500 px-6 pt-3' }, 'Förändring sedan första mätningen (cm)' + (shownLines.length < activeLines.length ? ' · ' + shownLines.length + ' av ' + activeLines.length + ' visas' : '')),

@@ -1,4 +1,4 @@
-const CACHE = 'halsa-v5';
+const CACHE = 'halsa-v6';
 const ASSETS = [
   './', './index.html', './charts.js', './analytics.js', './manifest.json', './icon-192.png', './icon-512.png',
   'https://unpkg.com/react@18/umd/react.production.min.js',
@@ -25,7 +25,10 @@ self.addEventListener('fetch', function(e){
     return;
   }
   if (req.mode === 'navigate') {
-    e.respondWith(fetch(req).catch(function(){ return caches.match('./index.html'); }));
+    // no-cache krävs: utan det går fetch via webbläsarens HTTP-cache och
+    // GitHub Pages max-age gör att en gammal index.html serveras i upp till
+    // 10 min — då hjälper inte "network-first", och användaren måste ladda om hårt.
+    e.respondWith(fetch(req, { cache: 'no-cache' }).catch(function(){ return caches.match('./index.html'); }));
     return;
   }
   e.respondWith(caches.match(req).then(function(c){ return c || fetch(req).then(function(r){ if(r && r.ok && url.origin===location.origin){ var cp=r.clone(); caches.open(CACHE).then(function(ca){ca.put(req,cp);}); } return r; }); }));

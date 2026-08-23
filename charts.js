@@ -52,7 +52,10 @@ function SvgLineChart({ data, lines, height, markers }) {
   var bw = useBoxWidth(800); var boxRef = bw[0], boxW = bw[1];
   height = height || 260;
   if (!data || data.length < 2) return h('div', {ref: boxRef}, h('p', {className:'text-gray-400 text-sm text-center py-8'}, 'Lägg till fler mätningar för att se grafen'));
-  var PL=50,PR=20,PT=20,PB=36,W=Math.max(320, boxW),H=height;
+  var PL=50,PR=20,W0=Math.max(320, boxW);
+  // Legenden radbryts på smala skärmar — annars trunkeras poster utanför ytan.
+  var LEGW=130, legPerRow=Math.max(1, Math.floor((W0-PL-PR)/LEGW)), legRows=Math.ceil(lines.length/legPerRow);
+  var PT=20,PB=36+(legRows-1)*14,W=W0,H=height;
   var chartW=W-PL-PR, chartH=H-PT-PB;
   var allVals=[];
   // Linjer märkta ref:true (t.ex. målvikt) ska INTE styra y-skalan. Annars
@@ -89,10 +92,11 @@ function SvgLineChart({ data, lines, height, markers }) {
   var markerEls=[];
   if(markers){ markers.forEach(function(m,mi){ if(m.i==null||m.i<0||m.i>=data.length) return; var mx=tx(m.i); markerEls.push(h('line',{key:'mk'+mi,x1:mx,y1:PT,x2:mx,y2:PT+chartH,stroke:'#db2777',strokeWidth:1,strokeDasharray:'3,3',opacity:0.6})); if(m.label) markerEls.push(h('text',{key:'mkl'+mi,x:mx,y:PT-4,textAnchor:'middle',fontSize:9,fill:'#db2777'},m.label)); }); }
   var legendEls=lines.map(function(l,i){
-    var lx=PL+i*140;
+    var lx=PL+(i%legPerRow)*LEGW;
+    var ly=H-8-(legRows-1-Math.floor(i/legPerRow))*14;
     return h('g',{key:'leg'+i},
-      h('line',{x1:lx,y1:H-8,x2:lx+20,y2:H-8,stroke:l.color,strokeWidth:l.width||1.5,strokeDasharray:l.dashed?'5,5':undefined}),
-      h('text',{x:lx+24,y:H-4,fontSize:10,fill:'#6b7280'},l.name)
+      h('line',{x1:lx,y1:ly,x2:lx+18,y2:ly,stroke:l.color,strokeWidth:l.width||1.5,strokeDasharray:l.dashed?'5,5':undefined}),
+      h('text',{x:lx+22,y:ly+4,fontSize:10,fill:'#6b7280'},l.name)
     );
   });
   var onMove = function(e){
