@@ -182,6 +182,17 @@ function WeightStepTracker() {
   });   // egna målnivåer i cm — null betyder "kör på standardmålen i analytics.js"
   const setMattMalSparat = function(o){ setMattMal(o); try { localStorage.setItem('matt-mal', JSON.stringify(o)); } catch(e){} };
   const [malEdit, setMalEdit] = useState(false);
+  const [mattLage, setMattLage] = useState(function(){
+    try { return localStorage.getItem('matt-lage') === 'cm' ? 'cm' : 'delta'; } catch(e) { return 'delta'; }
+  });   // 'delta' = förändring sedan start, 'cm' = faktiska mått
+  const setMattLageSparat = function(v){ setMattLage(v); try { localStorage.setItem('matt-lage', v); } catch(e){} };
+  const [visaMal, setVisaMal] = useState(function(){
+    try { return localStorage.getItem('matt-visa-mal') !== '0'; } catch(e) { return true; }
+  });   // mållinjerna sträcker y-axeln — därför går de att stänga av
+  const setVisaMalSparat = function(v){ setVisaMal(v); try { localStorage.setItem('matt-visa-mal', v ? '1' : '0'); } catch(e){} };
+  const [backupModal, setBackupModal] = useState(false);
+  const [syncCheck, setSyncCheck] = useState(null);   // resultat av "Testa synken"
+  const [syncTesting, setSyncTesting] = useState(false);
   const [showAllInsights, setShowAllInsights] = useState(false);
 
   useEffect(function() {
@@ -634,6 +645,34 @@ function WeightStepTracker() {
     return function(){ clearTimeout(id); };
   }, [entries, workouts, dayLogs, wegovyDoses, experiments, checkups, goalWeight, height, yearlyGoal, targetRate]);
 
+  // Skriver, läser tillbaka OCH avkrypterar — annars vet man inte om synken
+  // faktiskt fungerar, bara att ett anrop inte kraschade.
+  const testaSynken = async function() {
+    var t = appSettings.ghToken, pw = appSettings.backupPassword;
+    if (!t || !pw) { setSyncCheck({ ok: false, steg: 'saknas', text: 'Fyll i både GitHub-token och krypteringslösenord först.' }); return; }
+    setSyncTesting(true); setSyncCheck(null);
+    try {
+      // Kör den vanliga synken — den MERGAR (union, raderar aldrig) istället för
+      // att skriva över molnet med den här enhetens data.
+      await cloudSync(true);
+      var got = await fetchCloudBackup(t);
+      if (!got.txt) throw new Error('Filen kunde inte läsas tillbaka från repot');
+      var obj = await CryptoBox.dec(got.txt, pw);
+      var n = (obj && obj.entries ? obj.entries.length : 0);
+      var now = new Date().toISOString();
+      window.storage.set('last-cloud-backup', now); setLastCloudBackup(now);
+      window.storage.set('last-backup', now); setLastBackup(now);
+      setSyncCheck({ ok: true, text: 'Verifierad. backup.enc ligger i repot, gick att avkryptera och innehåller ' + n + ' vägningar.' });
+      showToast('☁️ Synken fungerar — verifierad');
+    } catch (e) {
+      var m = String(e.message || e);
+      var tips = /401|403/.test(m) ? ' Tokenen saknar behörighet — den behöver Contents: write på health-tracker.'
+               : /avkryptera|decrypt|OperationError/i.test(m) ? ' Filen finns men lösenordet matchar inte det som användes när den skrevs.'
+               : '';
+      setSyncCheck({ ok: false, text: 'Misslyckades: ' + m + '.' + tips });
+    }
+    setSyncTesting(false);
+  };
   const runCloudBackup = async function(manual) {
     var t = appSettings.ghToken, p = appSettings.backupPassword;
     if (!t || !p) { if (manual) showToast('Fyll i GitHub-token och lösenord under Inställningar', 'error'); return; }
@@ -663,6 +702,51 @@ function WeightStepTracker() {
     var last = lastCloudBackup ? new Date(lastCloudBackup).getTime() : 0;
     if (Date.now() - last > 7*86400000 && entries.length >= 5) cloudSync(false);
   }, [loading]);
+  // Safari raderar allt script-skrivbart lagringsutrymme (localStorage, IndexedDB,
+  // service workers) efter sju dagars webbläsaranvändning UTAN besök på sajten —
+  // Apples ITP sedan Safari 13.1. Daglig användning nollställer räknaren, men en
+  // semester räcker för att radera hela historiken. Därför en modal som inte går
+  // att klicka bort av misstag, inte bara en banner i listan.
+  const behoverBackup = function() {
+    if (entries.length < 5) return false;
+    if (!lastBackup) return true;
+    return (Date.now() - new Date(lastBackup).getTime()) > 7*86400000;
+  };
+  const snoozaBackup = function() {
+    try { localStorage.setItem('backup-modal-snooze', todayStr()); } catch(e){}
+    setBackupModal(false);
+  };
+  const laddaNerBackupNu = async function() {
+    // Krypterad om lösenord finns, annars vanlig JSON — hellre en oskyddad
+    // kopia än ingen kopia alls.
+    if (appSettings.backupPassword) { await exportEncrypted(); var n = new Date().toISOString(); window.storage.set('last-backup', n); setLastBackup(n); }
+    else exportData();
+    setBackupModal(false);
+  };
+  useEffect(function() {
+    if (loading) return;
+    var snooze = null;
+    try { snooze = localStorage.getItem('backup-modal-snooze'); } catch(e){}
+    if (snooze === todayStr()) return;
+    var id = setTimeout(function(){ if (behoverBackup()) setBackupModal(true); }, 2500);
+    return function(){ clearTimeout(id); };
+  }, [loading, entries.length, lastBackup]);
+  const renderBackupModal = function() {
+    if (!backupModal) return null;
+    var dagar = lastBackup ? Math.floor((Date.now() - new Date(lastBackup).getTime())/86400000) : null;
+    return h('div', { className: 'fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4' },
+      h('div', { className: 'bg-white rounded-2xl shadow-xl max-w-md w-full p-6' },
+        h('div', { className: 'text-4xl mb-2' }, '💾'),
+        h('h2', { className: 'text-lg font-bold text-gray-800 mb-2' }, dagar == null ? 'Du har aldrig tagit en backup' : ('Det var ' + dagar + ' dagar sedan din senaste backup')),
+        h('p', { className: 'text-sm text-gray-600 mb-3' }, 'All din data ligger bara i den här webbläsaren. Det finns ingen kopia någon annanstans.'),
+        h('p', { className: 'text-xs text-gray-500 mb-4' }, 'Safari raderar dessutom sajtens lagring efter sju dagars användning utan att du besökt den. Öppnar du appen dagligen händer inget, men en semester räcker för att allt ska försvinna.'),
+        h('button', { onClick: laddaNerBackupNu, className: 'w-full bg-green-600 text-white px-5 py-3 rounded-xl font-bold mb-2' },
+          appSettings.backupPassword ? '🔐 Ladda ner krypterad backup' : '💾 Ladda ner backup nu'),
+        h('button', { onClick: function(){ setView('settings'); setBackupModal(false); }, className: 'w-full border border-gray-200 text-gray-600 px-5 py-2.5 rounded-xl text-sm mb-2' }, 'Sätt upp automatisk molnbackup istället'),
+        h('button', { onClick: snoozaBackup, className: 'w-full text-gray-400 text-xs py-1' }, 'Inte nu — påminn mig imorgon')
+      )
+    );
+  };
   const importFromFile = function(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -790,6 +874,7 @@ function WeightStepTracker() {
   const ouraLongTerm = useMemo(function(){ return Analytics.getOuraLongTerm ? Analytics.getOuraLongTerm(ouraData) : null; }, [ouraData]);
   const ouraSleepBank = useMemo(function(){ return Analytics.getOuraSleepBank ? Analytics.getOuraSleepBank(ouraData, appSettings.sleepNeed) : null; }, [ouraData, appSettings.sleepNeed]);
   const ouraDaylight = useMemo(function(){ return Analytics.getOuraDaylight ? Analytics.getOuraDaylight(ouraData, entries, appSettings.latitude) : null; }, [ouraData, entries, appSettings.latitude]);
+  const recovery = useMemo(function(){ return Analytics.getRecovery ? Analytics.getRecovery(ouraData, dayLogs) : null; }, [ouraData, dayLogs]);
   const topSignals = useMemo(function(){ return Analytics.getTopSignals ? Analytics.getTopSignals({
     ouraHealth: ouraHealth, sleepBank: ouraSleepBank, sleepReg: ouraSleepReg, plateau: plateau,
     ouraData: ouraData, entries: entries, dayLogs: dayLogs, height: height,
@@ -1214,39 +1299,97 @@ function WeightStepTracker() {
           h('p', { className: 'text-xs text-gray-400 px-6 py-3 border-t border-gray-50' }, 'Rankas på avvikelse mot din egen baslinje, momentum (förvärras/vänder) och hur mycket data signalen vilar på.')
         );
       })(),
-      // ── Spikmatta & HRV ──
+      // ── Återhämtning: HRV & vilopuls mot insatserna ──
       (function(){
-        if (!ouraData.length) return null;
-        var latest = ouraData[0];
-        var latestSpik = !!(dayLogs[latest.date] && dayLogs[latest.date].spikmatta);
-        var spikDates = Object.keys(dayLogs).filter(function(k){ return dayLogs[k] && dayLogs[k].spikmatta; }).sort();
-        var firstSpik = spikDates.length ? spikDates[0] : null;
-        var series = ouraData.slice(0, 90).reverse().map(function(d){ return { datum: new Date(d.date).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}), date: d.date, hrv: d.hrv_avg }; });
-        series.forEach(function(p, i){ var w = series.slice(Math.max(0,i-6), i+1).map(function(x){ return x.hrv; }).filter(function(v){ return v!=null; }); p.hrv7 = w.length ? Math.round(w.reduce(function(a,b){ return a+b; },0)/w.length*10)/10 : null; });
-        var markers = [];
-        if (firstSpik) { var mi = series.findIndex(function(x){ return x.date >= firstSpik; }); if (mi >= 0) markers.push({ i: mi, label: '🪡 start' }); }
+        if (!recovery) return null;
+        var hrvM = recovery.metrics.filter(function(m){ return m.key === 'hrv_avg'; })[0];
+        var rhrM = recovery.metrics.filter(function(m){ return m.key === 'resting_hr'; })[0];
+        var nf = function(v){ return v == null ? '–' : String(v).replace('.', ','); };
+        var pilTon = function(m){ return m.riktning === 'battre' ? 'text-emerald-600' : m.riktning === 'samre' ? 'text-red-500' : 'text-gray-400'; };
+        var pilTecken = function(m){ return m.riktning === 'platt' ? '→' : (m.trendPerV > 0 ? '▲' : '▼'); };
+        // Två separata grafer: HRV ligger kring 20, vilopulsen kring 60. Samma
+        // y-axel skulle klämma ihop HRV-kurvan till en rak linje.
+        var serie = ouraData.slice(0, 120).reverse().map(function(d){
+          return { datum: new Date(d.date).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}), date: d.date, hrv: d.hrv_avg, rhr: d.resting_hr };
+        });
+        var glid = function(key, ut){
+          serie.forEach(function(pt, ix){
+            var w = serie.slice(Math.max(0, ix-6), ix+1).map(function(x){ return x[key]; }).filter(function(v){ return v != null; });
+            pt[ut] = w.length ? Math.round(w.reduce(function(a,b){ return a+b; },0)/w.length*10)/10 : null;
+          });
+        };
+        glid('hrv', 'hrv7'); glid('rhr', 'rhr7');
+        var markers = recovery.taggar.map(function(t){
+          var mi = serie.findIndex(function(x){ return x.date >= t.start; });
+          return mi >= 0 ? { i: mi, label: t.name.split(' ')[0] } : null;
+        }).filter(function(x){ return x; });
+
+        var metricRuta = function(m, i){
+          if (!m) return null;
+          return h('div', { key: i, className: 'flex-1 min-w-[9rem]' },
+            h('p', { className: 'text-xs text-gray-400' }, m.name),
+            h('p', { className: 'text-2xl font-black text-gray-800' }, nf(m.nu) + m.unit),
+            h('p', { className: 'text-xs text-gray-400' }, '7d ' + nf(m.snitt7) + ' · 30d ' + nf(m.snitt30)),
+            m.trendPerV != null
+              ? h('p', { className: 'text-xs font-bold ' + pilTon(m) },
+                  pilTecken(m) + ' ' + (m.riktning === 'platt' ? 'ligger stilla' : (nf(Math.abs(m.trendPerV)) + m.unit + '/vecka')) )
+              : h('p', { className: 'text-xs text-gray-300' }, 'för lite data för trend')
+          );
+        };
+
+        var effektRad = function(t, i){
+          var bitar = t.effekt.map(function(e){
+            if (e.svag) return h('span', { key: e.key, className: 'text-xs text-gray-300' }, e.name + ' –');
+            return h('span', { key: e.key, className: 'text-xs font-bold ' + (e.battre ? 'text-emerald-600' : 'text-red-500') },
+              e.name + ' ' + (e.diff > 0 ? '+' : '') + nf(e.diff) + e.unit);
+          });
+          var svag = t.effekt.some(function(e){ return e.svag; }) || t.dagar < 10;
+          return h('div', { key: i, className: 'py-2 border-t border-gray-50' },
+            h('div', { className: 'flex items-baseline justify-between gap-3 flex-wrap' },
+              h('p', { className: 'text-sm text-gray-700' }, t.name),
+              h('div', { className: 'flex items-center gap-3' }, bitar)
+            ),
+            h('p', { className: 'text-xs text-gray-400 mt-0.5' },
+              t.dagar + ' dagar sedan ' + new Date(t.start).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}) +
+              ' · natten efter jämfört med natten efter en dag utan' + (svag ? ' · för tunt underlag för att lita på' : ''))
+          );
+        };
+
         return h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
           h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
             h('div', { className: 'w-1 h-8 rounded-full bg-violet-500' }),
             h('div', { className: 'flex-1' },
-              h('h2', { className: 'font-bold text-gray-800' }, '🪡 Spikmatta & HRV'),
-              h('p', { className: 'text-xs text-gray-400' }, spikDates.length ? (spikDates.length + ' dagar loggade sedan ' + firstSpik) : 'Tagga 🪡 Spikmatta på Lägg till vikt så börjar mätningen')
+              h('h2', { className: 'font-bold text-gray-800' }, '🫀 Återhämtning — HRV & vilopuls'),
+              h('p', { className: 'text-xs text-gray-400' }, recovery.start
+                ? ('Följer dina insatser sedan ' + new Date(recovery.start).toLocaleDateString('sv-SE',{day:'numeric',month:'long'}))
+                : 'Tagga 🚶 Powerwalk, 🪡 Spikmatta eller 💪 100 situps på Lägg till vikt så börjar mätningen')
             )
           ),
-          h('div', { className: 'px-6 pt-4 flex items-center gap-8' },
-            h('div', null,
-              h('p', { className: 'text-xs text-gray-400' }, new Date(latest.date).toLocaleDateString('sv-SE',{day:'numeric',month:'long'})),
-              h('p', { className: 'text-lg font-black ' + (latestSpik ? 'text-violet-600' : 'text-gray-400') }, latestSpik ? '🪡 Spikmatta: Ja' : 'Spikmatta: Nej')
-            ),
-            h('div', null,
-              h('p', { className: 'text-xs text-gray-400' }, 'HRV den natten'),
-              h('p', { className: 'text-lg font-black text-gray-800' }, latest.hrv_avg != null ? (latest.hrv_avg + ' ms') : '–')
-            )
+          h('div', { className: 'px-6 pt-4 flex flex-wrap gap-6' }, recovery.metrics.map(metricRuta)),
+          (function(){
+            var senaste = ouraData.length ? ouraData[0] : null;
+            if (!senaste) return null;
+            var dlSen = dayLogs[senaste.date] || {};
+            var idag = (Analytics.RECOVERY_TAGS || []).filter(function(t){ return dlSen[t.key]; }).map(function(t){ return t.name; });
+            return h('div', { className: 'px-6 pt-3' },
+              h('p', { className: 'text-xs text-gray-400' }, new Date(senaste.date).toLocaleDateString('sv-SE',{day:'numeric',month:'long'})),
+              h('p', { className: 'text-sm font-bold ' + (idag.length ? 'text-violet-600' : 'text-gray-400') },
+                idag.length ? idag.join(' · ') : 'Ingen insats taggad den dagen')
+            );
+          })(),
+          h('p', { className: 'text-xs font-semibold text-gray-500 px-6 pt-4' }, 'HRV (ms) · 7-dagars snitt'),
+          h('div', { className: 'px-4' },
+            h(SvgLineChart, { data: serie, lines: [{ key:'hrv', name:'HRV', color:'#c4b5fd', width:1.5 }, { key:'hrv7', name:'7-dagars snitt', color:'#7c3aed', width:2.5 }], height: 200, markers: markers })
           ),
-          h('div', { className: 'px-4 pb-2 pt-2' },
-            h(SvgLineChart, { data: series, lines: [{ key:'hrv', name:'HRV (ms)', color:'#c4b5fd', width:1.5 }, { key:'hrv7', name:'7-dagars snitt', color:'#7c3aed', width:2.5 }], height: 240, markers: markers })
+          h('p', { className: 'text-xs font-semibold text-gray-500 px-6 pt-2' }, 'Vilopuls · 7-dagars snitt'),
+          h('div', { className: 'px-4' },
+            h(SvgLineChart, { data: serie, lines: [{ key:'rhr', name:'Vilopuls', color:'#fca5a5', width:1.5 }, { key:'rhr7', name:'7-dagars snitt', color:'#dc2626', width:2.5 }], height: 200, markers: markers })
           ),
-          h('p', { className: 'text-xs text-gray-400 px-6 pb-4' }, firstSpik ? 'Lila streck = dagen du började med spikmattan. Följ om HRV-linjen trendar uppåt efter det.' : 'När du taggat spikmatta-dagar markeras startdagen här så du ser HRV-utvecklingen.')
+          recovery.taggar.length ? h('div', { className: 'px-6 pt-3' },
+            h('p', { className: 'text-xs font-semibold text-gray-500 mb-1' }, 'Effekt per insats'),
+            recovery.taggar.map(effektRad)
+          ) : null,
+          h('p', { className: 'text-xs text-gray-400 px-6 py-3' }, 'Oura daterar natten efter morgonen den slutar, så en insats på måndag syns i tisdagens siffra — det är den jämförelsen som görs här. Jämförelsen sker bara inom perioden efter att du började, annars hade halva Wegovy-resan räknats som effekt av spikmattan.')
         );
       })(),
       // ── Mått & kroppsfett över tid ──
@@ -1261,11 +1404,13 @@ function WeightStepTracker() {
         mkeys.forEach(function(m){
           for (var i = 0; i < mdates.length; i++) { var v = dayLogs[mdates[i]][m[0]]; if (v != null) { mbase[m[0]] = v; break; } }
         });
+        var deltaLage = mattLage !== 'cm';
         var mseries = mdates.map(function(k){
           var o = { datum: new Date(k).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}), t: new Date(k).getTime() };
           mkeys.forEach(function(m){
             var v = dayLogs[k][m[0]];
-            o[m[0]] = (v != null && mbase[m[0]] != null) ? Math.round((v - mbase[m[0]]) * 10) / 10 : null;
+            if (v == null) { o[m[0]] = null; return; }
+            o[m[0]] = deltaLage ? ((mbase[m[0]] != null) ? Math.round((v - mbase[m[0]]) * 10) / 10 : null) : v;
           });
           return o;
         });
@@ -1289,7 +1434,7 @@ function WeightStepTracker() {
         var malUtanData = mkeys.filter(function(m){ return malAktiv[m[0]] != null && !malMap[m[0]]; });
         var nf = function(v){ return (v == null || isNaN(v)) ? '–' : String(Math.round(v*10)/10).replace('.', ','); };
         var chartData = mseries, progLines = [], futureRows = [];
-        shownLines.forEach(function(l){
+        if (visaMal) shownLines.forEach(function(l){
           var g = malMap[l.key];
           if (!g || g.projT == null || mbase[l.key] == null) return;
           var anchor = null;
@@ -1298,7 +1443,7 @@ function WeightStepTracker() {
           var pk = 'p_' + l.key;
           anchor[pk] = anchor[l.key];
           var row = { datum: new Date(g.projT).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}), t: g.projT };
-          row[pk] = Math.round((g.projV - mbase[l.key]) * 10) / 10;
+          row[pk] = deltaLage ? Math.round((g.projV - mbase[l.key]) * 10) / 10 : g.projV;
           futureRows.push(row);
           progLines.push({ key: pk, name: l.name + ' \u2192 m\u00e5l', color: l.color, width: 1.5, dashed: true, noLegend: true });
         });
@@ -1336,7 +1481,22 @@ function WeightStepTracker() {
             Object.keys(mattDold).length ? h('button', { onClick: function(){ setMattDoldSparat({}); }, className: 'text-xs text-indigo-500 px-6 pt-1' }, 'Visa alla') : null
           ) : null,
           activeLines.length ? h('div', null,
-            h('p', { className: 'text-xs font-semibold text-gray-500 px-6 pt-3' }, 'Förändring sedan första mätningen (cm)' + (shownLines.length < activeLines.length ? ' · ' + shownLines.length + ' av ' + activeLines.length + ' visas' : '')),
+            h('div', { className: 'flex items-center justify-between gap-3 px-6 pt-3 flex-wrap' },
+              h('p', { className: 'text-xs font-semibold text-gray-500' },
+                (deltaLage ? 'Förändring sedan första mätningen (cm)' : 'Faktiska mått (cm)') +
+                (shownLines.length < activeLines.length ? ' · ' + shownLines.length + ' av ' + activeLines.length + ' visas' : '')),
+              h('div', { className: 'flex items-center gap-2' },
+                h('div', { className: 'flex rounded-lg border border-gray-200 overflow-hidden' },
+                  h('button', { onClick: function(){ setMattLageSparat('delta'); },
+                    className: 'text-xs px-2.5 py-1 ' + (deltaLage ? 'bg-gray-800 text-white' : 'bg-white text-gray-500') }, 'Förändring'),
+                  h('button', { onClick: function(){ setMattLageSparat('cm'); },
+                    className: 'text-xs px-2.5 py-1 ' + (!deltaLage ? 'bg-gray-800 text-white' : 'bg-white text-gray-500') }, 'Faktiska cm')
+                ),
+                h('button', { onClick: function(){ setVisaMalSparat(!visaMal); },
+                  title: 'Mållinjen sträcker y-axeln — stäng av den om kurvorna ser platta ut',
+                  className: 'text-xs px-2.5 py-1 rounded-lg border ' + (visaMal ? 'border-gray-800 bg-gray-800 text-white' : 'border-gray-200 bg-white text-gray-500') }, '🎯 Mål')
+              )
+            ),
             shownLines.length
               ? h('div', { className: 'px-4' }, h(SvgLineChart, { data: chartData, lines: shownLines.concat(progLines), height: 240 }))
               : h('p', { className: 'text-sm text-gray-400 px-6 py-8 text-center' }, 'Alla mått är dolda — klicka på ett mått ovan för att visa det igen.')
@@ -1400,7 +1560,13 @@ function WeightStepTracker() {
             h('p', { className: 'text-base font-black ' + whtrCol }, String(lastWhtr).replace('.',',')),
             h('p', { className: 'text-xs text-gray-400' }, whtrTxt)
           ) : null,
-          h('p', { className: 'text-xs text-gray-400 px-6 pb-4' }, 'Grafen visar förändring sedan din första mätning — därför syns även små skillnader. Streckad linje = prognos fram till målet, framräknad ur din egen takt (regression, inte första-mot-sista). Överst står startvärde → nuvarande. Mät på samma ställe varje söndag. Fett% = midja + hals + längd (halsen bär mest brus).')
+          h('p', { className: 'text-xs text-gray-400 px-6 pb-4' }, (deltaLage
+              ? 'Grafen visar förändring sedan din första mätning — därför syns även små skillnader. '
+              : 'Grafen visar faktiska cm. Måtten ligger på olika nivåer, så små förändringar syns sämre här — växla till Förändring för det. ') +
+            (visaMal
+              ? 'Streckad linje = prognos fram till målet, framräknad ur din egen takt (regression, inte första-mot-sista). Mållinjen sträcker y-axeln; stäng av 🎯 Mål om kurvorna ser platta ut. '
+              : 'Mållinjerna är avstängda, så y-axeln spänner bara det som faktiskt hänt. ') +
+            'Överst står startvärde → nuvarande. Mät på samma ställe varje söndag. Fett% = midja + hals + längd (halsen bär mest brus).')
         );
       })(),
       // ── Tvillingdagar ──
@@ -2397,7 +2563,30 @@ function WeightStepTracker() {
                 h('input', { type:'password', value:appSettings.ghToken || '', placeholder:'github_pat_…', onChange:function(e){setAppSettings(Object.assign({},appSettings,{ghToken:e.target.value}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1 mb-2' }),
                 h('label', { className: 'text-xs text-gray-500' }, 'Krypteringslösenord (glöm inte detta — utan det kan backupen aldrig läsas)'),
                 h('input', { type:'password', value:appSettings.backupPassword || '', onChange:function(e){setAppSettings(Object.assign({},appSettings,{backupPassword:e.target.value}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1' }),
-                h('p', { className: 'text-xs text-gray-400 mt-1' }, 'Datan AES-krypteras på telefonen innan uppladdning — repot ser bara oläsbar text. Skapa token på github.com → Settings → Developer settings → Fine-grained tokens.')
+                h('p', { className: 'text-xs text-gray-400 mt-1' }, 'Datan AES-krypteras på telefonen innan uppladdning — repot ser bara oläsbar text. Skapa token på github.com → Settings → Developer settings → Fine-grained tokens.'),
+                (function(){
+                  var harToken = !!appSettings.ghToken, harPw = !!appSettings.backupPassword;
+                  var steg = function(klar, txt, i){
+                    return h('div', { key: i, className: 'flex items-start gap-2 py-1' },
+                      h('span', { className: 'text-sm ' + (klar ? 'text-emerald-600' : 'text-gray-300') }, klar ? '✓' : '○'),
+                      h('p', { className: 'text-xs ' + (klar ? 'text-gray-500' : 'text-gray-700') }, txt)
+                    );
+                  };
+                  return h('div', { className: 'mt-4 rounded-xl border border-gray-100 bg-gray-50 p-4' },
+                    h('p', { className: 'text-sm font-semibold text-gray-700 mb-2' }, '🔐 Så aktiverar du synken'),
+                    steg(harToken, '1. Skapa en fine-grained token på GitHub med Contents: write på repot health-tracker (lägg gärna till Actions: write så kan Synka-knappen även hämta färsk Oura-data). Klistra in den ovan.', 0),
+                    steg(harPw, '2. Välj ett krypteringslösenord ovan. Det lagras bara på den här enheten och kan inte återskapas — skriv ner det i din lösenordshanterare. Utan det går backupen aldrig att läsa.', 1),
+                    steg(!!(syncCheck && syncCheck.ok), '3. Tryck Testa synken nedan. Då skrivs backup.enc till repot, hämtas tillbaka och avkrypteras — först då vet vi att det faktiskt fungerar.', 2),
+                    h('button', { onClick: testaSynken, disabled: syncTesting,
+                      className: 'mt-3 w-full px-4 py-2.5 rounded-lg text-sm font-bold ' + (syncTesting ? 'bg-gray-200 text-gray-400' : 'bg-indigo-600 text-white') },
+                      syncTesting ? 'Testar…' : 'Testa synken'),
+                    syncCheck ? h('p', { className: 'text-xs mt-2 ' + (syncCheck.ok ? 'text-emerald-700' : 'text-red-600') }, (syncCheck.ok ? '✅ ' : '⚠️ ') + syncCheck.text) : null,
+                    lastCloudBackup ? h('p', { className: 'text-xs text-gray-400 mt-2' }, 'Senaste molnsynk: ' + new Date(lastCloudBackup).toLocaleString('sv-SE')) : h('p', { className: 'text-xs text-amber-600 mt-2' }, 'Molnsynken har aldrig körts — din data finns bara på den här enheten.'),
+                    h('p', { className: 'text-xs text-gray-500 mt-3 pt-3 border-t border-gray-200' },
+                      '🧭 Kör du Safari: lägg sajten i Dock via Arkiv → Lägg till i Dock. Safari raderar annars all sajtlagring efter sju dagars användning utan besök, och då är historiken borta. Webbappar i Dock omfattas inte av den regeln.')
+                  );
+                })(),
+                h('p', { className: 'text-xs text-gray-400 mt-2' }, 'Synken mergar — poster läggs till och uppdateras, ingenting raderas någonsin.')
               ),
               h('p', { className: 'text-xs text-gray-400' }, 'Stegmålet används i insikter och coach. "Full poäng" är nivån som ger 100 i veckoscorens aktivitetsdel.')
             )
@@ -3882,6 +4071,7 @@ function WeightStepTracker() {
   ) : null;
   return h('div', { className: 'min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100' },
     h(Toast, { toast: toast, onClose: function(){ setToast(null); } }),
+    renderBackupModal(),
     renderDayModal(),
     h('div', { className: 'md:hidden bg-white shadow-sm px-4 pt-4 pb-2' },
       h('h1', { className: 'text-xl font-bold text-gray-800 mb-2' }, 'Hälsodagbok'),

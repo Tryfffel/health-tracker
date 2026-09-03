@@ -1240,6 +1240,108 @@
     });
     return out;
   };
+  // ── Återhämtningsprojektet: HRV & vilopuls mot de egna insatserna ───────
+  // Oura daterar en natt efter morgonen den slutar. En insats som taggas på dag
+  // d syns därför i natten som får datum d+1 — därav lag 1 överallt här.
+  // Jämförelsen "med tagg vs utan tagg" görs BARA inom perioden efter första
+  // taggen, annars jämförs dagens kropp med en kropp från ett halvår sedan och
+  // hela Wegovy-resan läcker in i effekten.
+  A.RECOVERY_METRICS = [
+    { key: 'hrv_avg', name: 'HRV', unit: ' ms', bra: 1 },
+    { key: 'resting_hr', name: 'Vilopuls', unit: '', bra: -1 }
+  ];
+  A.RECOVERY_TAGS = [
+    { key: 'powerwalk', name: '🚶 Powerwalk' },
+    { key: 'spikmatta', name: '🪡 Spikmatta' },
+    { key: 'situps', name: '💪 100 situps' }
+  ];
+  A.getRecovery = function(ouraData, dayLogs, trendDagar) {
+    if (!ouraData || ouraData.length < 14) return null;
+    dayLogs = dayLogs || {};
+    var DAG = 86400000;
+    var addDays = function(ds, n){ var dd = new Date(ds); dd.setDate(dd.getDate()+n); return dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0'); };
+    var byDate = {}; ouraData.forEach(function(d){ byDate[d.date] = d; });
+    var dates = Object.keys(byDate).sort();                    // stigande
+    var senaste = dates[dates.length-1];
+    var TREND = trendDagar || 60;
+
+    var snitt = function(arr){ return arr.length ? arr.reduce(function(a,b){return a+b;},0)/arr.length : null; };
+    var r1 = function(v){ return v == null ? null : Math.round(v*10)/10; };
+    var vals = function(key, from, to){
+      var out = [];
+      dates.forEach(function(ds){
+        if (from && ds < from) return;
+        if (to && ds > to) return;
+        var v = byDate[ds][key];
+        if (v != null && !isNaN(v)) out.push(+v);
+      });
+      return out;
+    };
+
+    var metrics = A.RECOVERY_METRICS.map(function(m){
+      var senasteV = null;
+      for (var i = dates.length-1; i >= 0; i--) { var v = byDate[dates[i]][m.key]; if (v != null) { senasteV = +v; break; } }
+      var fran7 = addDays(senaste, -6), fran30 = addDays(senaste, -29), franT = addDays(senaste, -(TREND-1));
+      var v7 = vals(m.key, fran7), v30 = vals(m.key, fran30), vT = [];
+      dates.forEach(function(ds){
+        if (ds < franT) return;
+        var v = byDate[ds][m.key];
+        if (v != null && !isNaN(v)) vT.push([ (new Date(ds) - new Date(franT)) / (7*DAG), +v ]);
+      });
+      var lut = null;
+      if (vT.length >= 10) {
+        var n = vT.length, sx=0, sy=0, sxy=0, sxx=0;
+        vT.forEach(function(p){ sx+=p[0]; sy+=p[1]; sxy+=p[0]*p[1]; sxx+=p[0]*p[0]; });
+        var den = n*sxx - sx*sx;
+        if (den) lut = (n*sxy - sx*sy)/den;
+      }
+      // brusgräns: en lutning mindre än 5 % av spridningen per vecka är inte en trend
+      var sd = null;
+      if (vT.length >= 10) {
+        var mv = snitt(vT.map(function(p){ return p[1]; }));
+        sd = Math.sqrt(snitt(vT.map(function(p){ return (p[1]-mv)*(p[1]-mv); })));
+      }
+      var riktning = 'platt';
+      if (lut != null && sd && Math.abs(lut) > sd * 0.08) riktning = ((lut > 0 ? 1 : -1) === m.bra) ? 'battre' : 'samre';
+      return { key: m.key, name: m.name, unit: m.unit, bra: m.bra, nu: r1(senasteV),
+               snitt7: r1(snitt(v7)), snitt30: r1(snitt(v30)),
+               trendPerV: lut == null ? null : Math.round(lut*100)/100, riktning: riktning, nTrend: vT.length, trendDagar: TREND };
+    });
+
+    var taggar = A.RECOVERY_TAGS.map(function(t){
+      var taggade = Object.keys(dayLogs).filter(function(k){ return dayLogs[k] && dayLogs[k][t.key]; }).sort();
+      if (!taggade.length) return null;
+      var start = taggade[0];
+      var effekt = A.RECOVERY_METRICS.map(function(m){
+        var med = [], utan = [];
+        dates.forEach(function(ds){
+          if (ds <= start) return;                       // bara perioden efter start
+          var v = byDate[ds][m.key];
+          if (v == null) return;
+          var dagFore = addDays(ds, -1);
+          if (dayLogs[dagFore] && dayLogs[dagFore][t.key]) med.push(+v); else utan.push(+v);
+        });
+        if (med.length < 5 || utan.length < 5) return { key: m.key, name: m.name, unit: m.unit, svag: true, n1: med.length, n0: utan.length };
+        var mm = snitt(med), mu = snitt(utan);
+        return { key: m.key, name: m.name, unit: m.unit, med: r1(mm), utan: r1(mu),
+                 diff: Math.round((mm-mu)*10)/10, battre: ((mm-mu > 0 ? 1 : -1) === m.bra), n1: med.length, n0: utan.length };
+      });
+      var foreEfter = A.RECOVERY_METRICS.map(function(m){
+        var fore = vals(m.key, addDays(start, -14), addDays(start, -1));
+        var efter = vals(m.key, addDays(senaste, -13), senaste);
+        if (fore.length < 5 || efter.length < 5) return { key: m.key, svag: true };
+        var f = snitt(fore), e = snitt(efter);
+        return { key: m.key, name: m.name, unit: m.unit, fore: r1(f), efter: r1(e),
+                 diff: Math.round((e-f)*10)/10, battre: ((e-f > 0 ? 1 : -1) === m.bra), nFore: fore.length, nEfter: efter.length };
+      });
+      return { key: t.key, name: t.name, start: start, dagar: taggade.length,
+               dagarSedanStart: Math.round((new Date(senaste) - new Date(start)) / DAG),
+               effekt: effekt, foreEfter: foreEfter };
+    }).filter(function(x){ return x; });
+
+    return { metrics: metrics, taggar: taggar, senaste: senaste,
+             start: taggar.length ? taggar.map(function(t){ return t.start; }).sort()[0] : null };
+  };
   A.getTopSignals = function(ctx) {
     ctx = ctx || {};
     var oh = ctx.ouraHealth, sb = ctx.sleepBank, sr = ctx.sleepReg;
