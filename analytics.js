@@ -1158,6 +1158,88 @@
   // Rankar på (a) hur mycket måttet avviker från DIN baslinje, (b) momentum
   // (förvärras/återhämtar), (c) konfidens (hur mycket data signalen vilar på).
   // Deduplicerar på mått, inte rubrik — HRV kan aldrig visas två gånger.
+  // ── Mål & prognos för kroppsmått ────────────────────────────────────────
+  // Målen är cm-nivåer användaren satt själv. Prognosen är en OLS-regression av
+  // måttet mot tid (veckor) — inte "senaste minus första", som blir extremt
+  // brusigt när en enskild söndagsmätning råkar bli snedmätt. Vi projicerar bara
+  // framåt när takten faktiskt pekar mot målet; annars säger vi det rent ut
+  // istället för att låtsas att ett måldatum finns.
+  A.MATT_MAL = { midja: 79, brost: 95, lar: 54, arm: 30, vad: 37.5 };
+  A.MATT_HORISONT_V = 26;   // projicerar max ett halvår framåt — bortom det är takten ren fantasi
+  A.getMattMal = function(dayLogs, mkeys, mal, horisontVeckor) {
+    mal = mal || A.MATT_MAL;
+    var HOR = horisontVeckor || A.MATT_HORISONT_V;
+    var VECKA = 7 * 86400000;
+    var out = [];
+    (mkeys || []).forEach(function(m) {
+      var key = m[0], pts = [];
+      Object.keys(dayLogs).sort().forEach(function(d) {
+        var v = dayLogs[d][key];
+        if (v != null && v !== '' && !isNaN(+v)) pts.push({ t: new Date(d).getTime(), v: +v });
+      });
+      if (!pts.length) return;
+      var start = pts[0], nu = pts[pts.length - 1];
+      var target = (mal[key] == null ? null : +mal[key]);
+      var o = {
+        key: key, name: m[1], color: m[2], n: pts.length,
+        start: start.v, startT: start.t, nu: nu.v, nuT: nu.t,
+        spanV: Math.round(((nu.t - start.t) / VECKA) * 10) / 10,
+        mal: target
+      };
+      if (target == null) { out.push(o); return; }
+
+      // riktning: -1 = målet ligger under startvärdet (minska), +1 = öka
+      var riktning = target < start.v ? -1 : 1;
+      o.riktning = riktning;
+      o.klar = riktning < 0 ? (nu.v <= target) : (nu.v >= target);
+      o.kvar = Math.round(Math.abs(nu.v - target) * 10) / 10;
+
+      var total = Math.abs(start.v - target);
+      var gjort = (start.v - nu.v) * -riktning;   // positivt = rört sig mot målet
+      o.total = Math.round(total * 10) / 10;
+      o.gjort = Math.round(gjort * 10) / 10;
+      o.pct = total > 0 ? Math.max(-1, Math.min(1, gjort / total)) : 1;
+
+      // takt: OLS när vi har ≥3 punkter, annars rå lutning mellan ändpunkterna
+      var lut = null;
+      if (pts.length >= 3) {
+        var t0 = pts[0].t, n = pts.length, sx = 0, sy = 0, sxy = 0, sxx = 0, xy = [];
+        pts.forEach(function(p) {
+          var x = (p.t - t0) / VECKA;
+          sx += x; sy += p.v; sxy += x * p.v; sxx += x * x; xy.push([x, p.v]);
+        });
+        var den = n * sxx - sx * sx;
+        if (den) lut = (n * sxy - sx * sy) / den;
+        o.r = A.calcPearson(xy);
+      } else if (pts.length === 2) {
+        var wk = (nu.t - start.t) / VECKA;
+        if (wk > 0) lut = (nu.v - start.v) / wk;
+      }
+      o.takt = lut == null ? null : Math.round(lut * 100) / 100;   // cm per vecka, tecknat
+
+      // konfidens: få mätningar eller kort spann → säg det istället för att låta säker
+      o.konf = (pts.length < 4 || o.spanV < 3) ? 'svag' : (pts.length < 7 ? 'ok' : 'bra');
+
+      if (o.klar) { o.status = 'klar'; out.push(o); return; }
+      if (lut == null || Math.abs(lut) < 0.02) { o.status = 'platt'; out.push(o); return; }
+      if ((lut < 0 ? -1 : 1) !== riktning) { o.status = 'felriktning'; out.push(o); return; }
+
+      var veckorKvar = o.kvar / Math.abs(lut);
+      o.veckorKvar = Math.round(veckorKvar * 10) / 10;
+      if (veckorKvar > HOR) {
+        o.status = 'bortom';
+        o.projT = nu.t + HOR * VECKA;
+        o.projV = Math.round((nu.v + lut * HOR) * 10) / 10;
+      } else {
+        o.status = 'pa_vag';
+        o.projT = nu.t + veckorKvar * VECKA;
+        o.projV = target;
+        o.malDatum = new Date(o.projT);
+      }
+      out.push(o);
+    });
+    return out;
+  };
   A.getTopSignals = function(ctx) {
     ctx = ctx || {};
     var oh = ctx.ouraHealth, sb = ctx.sleepBank, sr = ctx.sleepReg;

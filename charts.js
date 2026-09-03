@@ -54,7 +54,10 @@ function SvgLineChart({ data, lines, height, markers }) {
   if (!data || data.length < 2) return h('div', {ref: boxRef}, h('p', {className:'text-gray-400 text-sm text-center py-8'}, 'Lägg till fler mätningar för att se grafen'));
   var PL=50,PR=20,W0=Math.max(320, boxW);
   // Legenden radbryts på smala skärmar — annars trunkeras poster utanför ytan.
-  var LEGW=130, legPerRow=Math.max(1, Math.floor((W0-PL-PR)/LEGW)), legRows=Math.ceil(lines.length/legPerRow);
+  // Linjer märkta noLegend (t.ex. prognoslinjer som speglar en befintlig färg)
+  // tar ingen egen legendplats — annars fördubblas legenden utan ny information.
+  var legLines = lines.filter(function(l){ return !l.noLegend; });
+  var LEGW=130, legPerRow=Math.max(1, Math.floor((W0-PL-PR)/LEGW)), legRows=Math.max(1, Math.ceil(legLines.length/legPerRow));
   var PT=20,PB=36+(legRows-1)*14,W=W0,H=height;
   var chartW=W-PL-PR, chartH=H-PT-PB;
   var allVals=[];
@@ -91,7 +94,7 @@ function SvgLineChart({ data, lines, height, markers }) {
   });
   var markerEls=[];
   if(markers){ markers.forEach(function(m,mi){ if(m.i==null||m.i<0||m.i>=data.length) return; var mx=tx(m.i); markerEls.push(h('line',{key:'mk'+mi,x1:mx,y1:PT,x2:mx,y2:PT+chartH,stroke:'#db2777',strokeWidth:1,strokeDasharray:'3,3',opacity:0.6})); if(m.label) markerEls.push(h('text',{key:'mkl'+mi,x:mx,y:PT-4,textAnchor:'middle',fontSize:9,fill:'#db2777'},m.label)); }); }
-  var legendEls=lines.map(function(l,i){
+  var legendEls=legLines.map(function(l,i){
     var lx=PL+(i%legPerRow)*LEGW;
     var ly=H-8-(legRows-1-Math.floor(i/legPerRow))*14;
     return h('g',{key:'leg'+i},
@@ -109,6 +112,9 @@ function SvgLineChart({ data, lines, height, markers }) {
   if (hoverI != null && data[hoverI]) {
     var dd = data[hoverI], hx = tx(hoverI);
     var rows = lines.filter(function(l){ return dd[l.key] != null; });
+    // På en historisk punkt ligger prognoslinjens ankare ovanpå det verkliga
+    // värdet — visa då bara det verkliga, annars står samma siffra två gånger.
+    if (rows.some(function(l){ return !l.noLegend; })) rows = rows.filter(function(l){ return !l.noLegend; });
     if (rows.length) {
       var boxW = 160, boxH = 22 + rows.length*14;
       var bx = (hx + 12 + boxW > W - PR) ? hx - 12 - boxW : hx + 12;
