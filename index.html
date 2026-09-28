@@ -15,6 +15,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.48.0/dist/tabler-icons.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
   <script>
   // ── Designtema "Havre, blå ton" ──────────────────────────────────────────
@@ -27,10 +28,13 @@
   var SALVIA = {50:'#EFF4EF',100:'#DCE8DD',200:'#BFD4C2',300:'#9DBBA2',400:'#7FA386',500:'#688E70',600:'#56775D',700:'#46604C',800:'#394D3E',900:'#2D3C31'};
   var TERRAKOTTA = {50:'#FAF0EA',100:'#F5E0D5',200:'#EBC6B4',300:'#DDA78F',400:'#D0906F',500:'#C07A5A',600:'#A4644A',700:'#85503C',800:'#6A4031',900:'#533328'};
   var TEGEL = {50:'#FBEFEC',100:'#F6DCD6',200:'#EDBDB3',300:'#E0998B',400:'#D17A6A',500:'#BE5F4F',600:'#A24C3E',700:'#833E33',800:'#68322A',900:'#512821'};
+  var OCKRA = {50:'#FBF5E8',100:'#F5E8C8',200:'#EBD49A',300:'#DDBC6E',400:'#CFA64E',500:'#B98F3A',600:'#9A752F',700:'#7B5D27',800:'#5F4820',900:'#4A381A'};
   var VARMGRA = {50:'#F8F5F0',100:'#F0EBE3',200:'#E4DDD2',300:'#CFC6B9',400:'#A89E91',500:'#8A8178',600:'#6E665E',700:'#57504A',800:'#3B3631',900:'#2A2622'};
   tailwind.config = { theme: { extend: {
-    colors: { blue: BLA, indigo: BLA, violet: BLA, purple: BLA, gray: VARMGRA,
-              emerald: SALVIA, green: SALVIA, pink: TERRAKOTTA, rose: TERRAKOTTA, red: TEGEL },
+    colors: { blue: BLA, indigo: BLA, violet: BLA, purple: BLA, sky: BLA, gray: VARMGRA, slate: VARMGRA,
+              emerald: SALVIA, green: SALVIA, teal: SALVIA, cyan: SALVIA, lime: SALVIA,
+              pink: TERRAKOTTA, rose: TERRAKOTTA, fuchsia: TERRAKOTTA, orange: TERRAKOTTA,
+              amber: OCKRA, yellow: OCKRA, red: TEGEL },
     fontFamily: { sans: ['"DM Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
     borderRadius: { xl: '1rem', '2xl': '1.25rem' }
   } } };
@@ -42,6 +46,33 @@
     .shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl { box-shadow: 0 0 0 1px #EAE2D6 !important; }
     .font-black { font-family: 'Fraunces', Georgia, serif; font-weight: 500; letter-spacing: -0.01em; }
     h1, h2 { font-family: 'Fraunces', Georgia, serif; font-weight: 500 !important; letter-spacing: -0.005em; }
+    /* Hero-korten (tidigare mörka gradienter med vit text) blir ljusa, lugna ytor */
+    .bg-gradient-to-br.shadow-xl { background: #E3EAF1 !important; color: #3B3631 !important; box-shadow: none !important; }
+    .bg-gradient-to-br.shadow-xl.from-emerald-500 { background: #DCE8DD !important; }
+    .bg-gradient-to-br.shadow-xl.from-amber-500 { background: #F5E6DC !important; }
+    .bg-gradient-to-br.shadow-xl [class*="text-white"] { color: #3B3631 !important; }
+    .bg-gradient-to-br.shadow-xl [class*="text-blue-100"], .bg-gradient-to-br.shadow-xl [class*="text-blue-200"], .bg-gradient-to-br.shadow-xl [class*="text-blue-300"], .bg-gradient-to-br.shadow-xl [class*="text-indigo-100"], .bg-gradient-to-br.shadow-xl [class*="text-indigo-200"], .bg-gradient-to-br.shadow-xl [class*="text-indigo-300"], .bg-gradient-to-br.shadow-xl [class*="text-purple-100"], .bg-gradient-to-br.shadow-xl [class*="text-purple-200"], .bg-gradient-to-br.shadow-xl [class*="text-purple-300"], .bg-gradient-to-br.shadow-xl [class*="text-violet-100"], .bg-gradient-to-br.shadow-xl [class*="text-violet-200"], .bg-gradient-to-br.shadow-xl [class*="text-violet-300"], .bg-gradient-to-br.shadow-xl [class*="text-pink-100"], .bg-gradient-to-br.shadow-xl [class*="text-pink-200"], .bg-gradient-to-br.shadow-xl [class*="text-pink-300"], .bg-gradient-to-br.shadow-xl [class*="text-teal-100"], .bg-gradient-to-br.shadow-xl [class*="text-teal-200"], .bg-gradient-to-br.shadow-xl [class*="text-teal-300"], .bg-gradient-to-br.shadow-xl [class*="text-cyan-100"], .bg-gradient-to-br.shadow-xl [class*="text-cyan-200"], .bg-gradient-to-br.shadow-xl [class*="text-cyan-300"], .bg-gradient-to-br.shadow-xl [class*="text-sky-100"], .bg-gradient-to-br.shadow-xl [class*="text-sky-200"], .bg-gradient-to-br.shadow-xl [class*="text-sky-300"], .bg-gradient-to-br.shadow-xl [class*="text-rose-100"], .bg-gradient-to-br.shadow-xl [class*="text-rose-200"], .bg-gradient-to-br.shadow-xl [class*="text-rose-300"], .bg-gradient-to-br.shadow-xl [class*="text-fuchsia-100"], .bg-gradient-to-br.shadow-xl [class*="text-fuchsia-200"], .bg-gradient-to-br.shadow-xl [class*="text-fuchsia-300"] { color: #6E665E !important; }
+    .bg-gradient-to-br.shadow-xl [class*="text-emerald-100"], .bg-gradient-to-br.shadow-xl [class*="text-emerald-200"], .bg-gradient-to-br.shadow-xl [class*="text-emerald-300"], .bg-gradient-to-br.shadow-xl [class*="text-green-100"], .bg-gradient-to-br.shadow-xl [class*="text-green-200"], .bg-gradient-to-br.shadow-xl [class*="text-green-300"] { color: #56775D !important; }
+    .bg-gradient-to-br.shadow-xl [class*="text-red-100"], .bg-gradient-to-br.shadow-xl [class*="text-red-200"], .bg-gradient-to-br.shadow-xl [class*="text-red-300"] { color: #A24C3E !important; }
+    .bg-gradient-to-br.shadow-xl [class*="text-amber-100"], .bg-gradient-to-br.shadow-xl [class*="text-amber-200"], .bg-gradient-to-br.shadow-xl [class*="text-amber-300"], .bg-gradient-to-br.shadow-xl [class*="text-yellow-100"], .bg-gradient-to-br.shadow-xl [class*="text-yellow-200"], .bg-gradient-to-br.shadow-xl [class*="text-yellow-300"], .bg-gradient-to-br.shadow-xl [class*="text-orange-100"], .bg-gradient-to-br.shadow-xl [class*="text-orange-200"], .bg-gradient-to-br.shadow-xl [class*="text-orange-300"] { color: #9A752F !important; }
+    .bg-gradient-to-br.shadow-xl [class*="bg-white"] { background-color: rgba(255,253,249,0.75) !important; }
+    .bg-gradient-to-br.shadow-xl [class*="border-white"] { border-color: #D5DEE8 !important; }
+    .bg-gradient-to-br.shadow-xl .bg-gradient-to-r { background: #6F8FAF !important; }
+    .bg-gradient-to-br.shadow-xl svg [stroke="white"] { stroke: #6F8FAF; }
+    .bg-gradient-to-br.shadow-xl svg [stroke^="rgba(255,255,255"] { stroke: #FFFDF9; }
+    .bg-gradient-to-br.shadow-xl svg [fill="white"] { fill: #3B3631; }
+    .bg-gradient-to-br.shadow-xl svg [fill^="rgba(255,255,255"] { fill: #8A8178; }
+    /* Knappar: en lugn, platt accent istället för tvåfärgade gradienter */
+    button.bg-gradient-to-r, a.bg-gradient-to-r { background-image: none !important; background-color: #5A7898 !important; box-shadow: none !important; }
+    button.bg-gradient-to-r:hover, a.bg-gradient-to-r:hover { background-color: #4A627D !important; }
+    /* Ljusa infoboxar: platta, utan gradient */
+    div.bg-gradient-to-r:not(.rounded-full), div.bg-gradient-to-br:not(.shadow-xl) { background-image: none !important; }
+    div.bg-gradient-to-r.from-amber-50 { background-color: #FBF5E8; }
+    div.bg-gradient-to-r.from-green-50 { background-color: #EFF4EF; }
+    div.bg-gradient-to-br.from-violet-50 { background-color: #EEF3F7; }
+    /* Linjeikoner som ersätter emoji */
+    .tema-ikon { font-size: 1.05em; vertical-align: -0.12em; margin-right: 0.3em; line-height: 1; }
+    .tema-prick { display: inline-block; width: 0.6em; height: 0.6em; border-radius: 99px; vertical-align: 0.05em; margin: 0 0.2em; }
   </style>
   <script src="charts.js"></script>
   <script src="analytics.js"></script>
@@ -56,7 +87,49 @@ window.storage = {
   get: async (key) => ({ value: localStorage.getItem(key) }),
   set: async (key, value) => { localStorage.setItem(key, value); }
 };
-const h = React.createElement;
+// Emoji ersätts av Tabler-linjeikoner vid rendering. Det görs här, i ett tunt
+// omslag runt createElement, så att ingen text eller data i appen behöver
+// ändras. Bara DOM-element påverkas (inte <option>, SVG-text eller egna
+// komponenter), och bara strängbarn — attribut som title lämnas orörda.
+const _ce = React.createElement;
+const IKON = {"💪": "barbell", "🔥": "flame", "👟": "shoe", "🌙": "moon", "🎯": "target", "💍": "circle-dot", "📏": "ruler-measure", "⚡": "bolt", "📊": "chart-bar", "💉": "vaccine", "⚖": "scale", "☁": "cloud", "🚶": "walk", "⚠": "alert-triangle", "💾": "device-floppy", "✅": "circle-check", "💗": "heart-rate-monitor", "⏰": "alarm", "📅": "calendar", "🩺": "stethoscope", "🔐": "lock", "🤒": "thermometer", "❤": "heart", "😊": "mood-smile", "🏅": "medal", "🏆": "trophy", "🔗": "link", "📈": "trending-up", "😞": "mood-sad", "😄": "mood-happy", "🍷": "glass-full", "🪡": "needle", "🫀": "heartbeat", "🎉": "confetti", "🧪": "flask", "😴": "zzz", "🧭": "compass", "✨": "sparkles", "⌚": "device-watch", "🏥": "building-hospital", "🏷": "tag", "🍽": "tools-kitchen-2", "🔋": "battery-3", "🏃": "run", "➕": "plus", "💡": "bulb", "⏱": "stopwatch", "🧠": "brain", "⭐": "star", "🏋": "barbell", "🚴": "bike", "📋": "clipboard-list", "⚙": "settings", "🛌": "bed", "🛏": "bed", "🔄": "refresh", "📉": "trending-down", "😕": "mood-confuzed", "😐": "mood-empty", "🙂": "mood-smile", "⏳": "hourglass", "🤢": "mood-sick", "🧖": "droplet", "🧊": "snowflake", "💤": "zzz", "🌊": "ripple", "🥩": "meat", "🪞": "arrows-exchange", "🤔": "help-circle", "🛋": "armchair", "📜": "file-text", "💬": "message-circle", "🏊": "swimming", "🧘": "yoga", "🤸": "stretching", "⚽": "ball-football", "🎾": "ball-tennis", "⚾": "ball-baseball", "⛳": "golf", "⛷": "ski-jumping", "🏒": "ice-skating", "💃": "music", "🥊": "karate", "🧗": "mountain", "👥": "users", "🍩": "cookie", "🎨": "palette", "📍": "map-pin", "🛡": "shield", "🚨": "urgent", "👍": "thumb-up", "👀": "eye", "🏦": "building-bank", "🕐": "clock", "☀": "sun", "🌗": "sun-moon", "🪑": "armchair", "🔀": "arrows-shuffle", "🔮": "crystal-ball", "🎲": "dice", "🏁": "flag", "🔒": "lock", "🔬": "microscope", "🔓": "lock-open", "⬇": "arrow-down"};
+const PRICK = { '🟢': '#7FA386', '🟩': '#7FA386', '🟡': '#DDBC6E', '🔴': '#D17A6A' };
+const IKON_RE = new RegExp('(' + Object.keys(IKON).concat(Object.keys(PRICK)).sort(function(a, b){ return b.length - a.length; })
+  .map(function(k){ return k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }).join('|') + ')\uFE0F? ?', 'gu');
+const UTAN_IKON = { option: 1, text: 1, tspan: 1, title: 1, textarea: 1, style: 1, script: 1 };
+const ikonisera = function(str) {
+  IKON_RE.lastIndex = 0;
+  if (!IKON_RE.test(str)) return null;
+  IKON_RE.lastIndex = 0;
+  var ut = [], last = 0, m;
+  while ((m = IKON_RE.exec(str))) {
+    if (m.index > last) ut.push(str.slice(last, m.index));
+    var e = m[1];
+    if (PRICK[e]) ut.push(_ce('span', { className: 'tema-prick', style: { backgroundColor: PRICK[e] }, 'aria-hidden': true }));
+    else ut.push(_ce('i', { className: 'ti ti-' + IKON[e] + ' tema-ikon', 'aria-hidden': true }));
+    last = m.index + m[0].length;
+  }
+  if (last < str.length) ut.push(str.slice(last));
+  return ut;
+};
+const h = function(type, props) {
+  var n = arguments.length;
+  if (type === 'option' && n > 2) {
+    // <option> kan inte rymma ikoner — där plockas emojin bara bort
+    var oa = Array.prototype.slice.call(arguments);
+    for (var k = 2; k < oa.length; k++) if (typeof oa[k] === 'string') { IKON_RE.lastIndex = 0; oa[k] = oa[k].replace(IKON_RE, ''); }
+    return _ce.apply(null, oa);
+  }
+  if (n <= 2 || typeof type !== 'string' || UTAN_IKON[type]) return _ce.apply(null, arguments);
+  var args = null;
+  for (var i = 2; i < n; i++) {
+    var c = arguments[i];
+    var d = (typeof c === 'string' && c.length) ? ikonisera(c) : null;
+    if (d && !args) { args = Array.prototype.slice.call(arguments, 0, i); }
+    if (args) { if (d) { for (var j = 0; j < d.length; j++) args.push(d[j]); } else args.push(c); }
+  }
+  return _ce.apply(null, args || arguments);
+};
 const { useState, useEffect, useMemo, useRef } = React;
 // ─── Sub-components ──────────────────────────────────────────────────────────
 const Toast = ({ toast, onClose }) => {
@@ -1044,7 +1117,7 @@ function WeightStepTracker() {
       var bb = bodyBattery;
       var hasBb = bb && bb.today != null;
       if (!hasBb && !dagensForm) return null;
-      var col = function(v){ return v >= 70 ? '#22c55e' : v >= 45 ? '#f59e0b' : '#ef4444'; };
+      var col = function(v){ return v >= 70 ? '#688E70' : v >= 45 ? '#CFA64E' : '#BE5F4F'; };
       var frame = dagensForm ? (dagensForm.level === 'green' ? 'bg-emerald-50 border-emerald-200' : dagensForm.level === 'yellow' ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200') : 'bg-white border-gray-100';
       return h('div', { className: 'rounded-2xl shadow-md mb-4 p-5 border-2 ' + frame },
         h('div', { className: 'flex items-center gap-5 flex-wrap' },
@@ -1076,7 +1149,7 @@ function WeightStepTracker() {
                 return h('button', { key: i, onClick: d.v != null ? function(){ setBbDay(bbDay === d.date ? null : d.date); } : undefined,
                   className: 'flex-1 rounded-t' + (d.v != null ? ' cursor-pointer hover:opacity-100' : '') + (bbDay === d.date ? ' ring-2 ring-indigo-400' : ''),
                   title: d.date + (d.v != null ? ': ' + d.v + '%' : ''),
-                  style: { height: (d.v != null ? Math.max(d.v, 4) : 4) + '%', backgroundColor: d.v != null ? col(d.v) : '#e5e7eb', opacity: (i === bb.days.length-1 || bbDay === d.date) ? 1 : 0.65 } });
+                  style: { height: (d.v != null ? Math.max(d.v, 4) : 4) + '%', backgroundColor: d.v != null ? col(d.v) : '#E4DDD2', opacity: (i === bb.days.length-1 || bbDay === d.date) ? 1 : 0.65 } });
               })
           ),
           h('p', { className: 'text-xs text-gray-400 mt-1' }, '14 dagar · klicka en stapel för att se exakt varifrån poängen kom — öppen formel, ingen magi')
@@ -1373,7 +1446,7 @@ function WeightStepTracker() {
         glid('hrv', 'hrv7'); glid('rhr', 'rhr7');
         var markers = recovery.taggar.map(function(t){
           var mi = serie.findIndex(function(x){ return x.date >= t.start; });
-          return mi >= 0 ? { i: mi, label: t.name.split(' ')[0] } : null;
+          return mi >= 0 ? { i: mi, label: t.name.replace(/^\S+\s+/, '') } : null;
         }).filter(function(x){ return x; });
 
         var metricRuta = function(m, i){
@@ -1431,11 +1504,11 @@ function WeightStepTracker() {
           })(),
           h('p', { className: 'text-xs font-semibold text-gray-500 px-6 pt-4' }, 'HRV (ms) · 7-dagars snitt'),
           h('div', { className: 'px-4' },
-            h(SvgLineChart, { data: serie, lines: [{ key:'hrv', name:'HRV', color:'#c4b5fd', width:1.5 }, { key:'hrv7', name:'7-dagars snitt', color:'#7c3aed', width:2.5 }], height: 200, markers: markers })
+            h(SvgLineChart, { data: serie, lines: [{ key:'hrv', name:'HRV', color:'#A2BACF', width:1.5 }, { key:'hrv7', name:'7-dagars snitt', color:'#5A7898', width:2.5 }], height: 200, markers: markers })
           ),
           h('p', { className: 'text-xs font-semibold text-gray-500 px-6 pt-2' }, 'Vilopuls · 7-dagars snitt'),
           h('div', { className: 'px-4' },
-            h(SvgLineChart, { data: serie, lines: [{ key:'rhr', name:'Vilopuls', color:'#fca5a5', width:1.5 }, { key:'rhr7', name:'7-dagars snitt', color:'#dc2626', width:2.5 }], height: 200, markers: markers })
+            h(SvgLineChart, { data: serie, lines: [{ key:'rhr', name:'Vilopuls', color:'#E0998B', width:1.5 }, { key:'rhr7', name:'7-dagars snitt', color:'#A24C3E', width:2.5 }], height: 200, markers: markers })
           ),
           recovery.taggar.length ? h('div', { className: 'px-6 pt-3' },
             h('p', { className: 'text-xs font-semibold text-gray-500 mb-1' }, 'Effekt per insats'),
@@ -1446,7 +1519,7 @@ function WeightStepTracker() {
       })(),
       // ── Mått & kroppsfett över tid ──
       (function(){
-        var mkeys = [['midja','Midja','#db2777'],['brost','Bröst','#8b5cf6'],['lar','Lår','#0ea5e9'],['arm','Arm','#f59e0b'],['vad','Vad','#475569'],['hals','Hals','#10b981']];
+        var mkeys = [['midja','Midja','#C07A5A'],['brost','Bröst','#6F8FAF'],['lar','Lår','#7FA386'],['arm','Arm','#CFA64E'],['vad','Vad','#6E665E'],['hals','Hals','#B08C9E']];
         var mdates = Object.keys(dayLogs).filter(function(k){ return mkeys.some(function(m){ return dayLogs[k][m[0]] != null; }); }).sort();
         if (mdates.length < 2) return null;
         // Absoluta cm på samma axel gör små förändringar osynliga (bröst ~102 vs
@@ -1522,7 +1595,7 @@ function WeightStepTracker() {
                 return h('button', { key: i, title: dold ? 'Visa ' + x.name : 'Dölj ' + x.name,
                   onClick: function(){ var o = Object.assign({}, mattDold); if (o[x.key]) delete o[x.key]; else o[x.key] = true; setMattDoldSparat(o); },
                   className: 'flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border transition-colors ' + (dold ? 'border-gray-100 bg-gray-50 opacity-50' : 'border-gray-200 bg-white') },
-                  h('span', { className: 'w-2.5 h-2.5 rounded-full inline-block', style: { backgroundColor: dold ? '#d1d5db' : x.color } }),
+                  h('span', { className: 'w-2.5 h-2.5 rounded-full inline-block', style: { backgroundColor: dold ? '#CFC6B9' : x.color } }),
                   h('span', { className: 'text-xs ' + (dold ? 'text-gray-400' : 'text-gray-600') }, x.name),
                   (x.start != null && x.start !== x.v) ? h('span', { className: 'text-xs ' + (dold ? 'text-gray-300' : 'text-gray-400') }, x.start + ' →') : null,
                   h('span', { className: 'text-sm font-black ' + (dold ? 'text-gray-400' : 'text-gray-800') }, x.v + ' cm'),
@@ -1605,7 +1678,7 @@ function WeightStepTracker() {
           ) : null,
           fseries.length >= 2 ? h('div', null,
             h('p', { className: 'text-xs font-semibold text-gray-500 px-6 pt-2' }, 'Kroppsfett % (US Navy-est.)'),
-            h('div', { className: 'px-4 pb-3' }, h(SvgLineChart, { data: fseries, lines: [{ key:'fett', name:'Kroppsfett %', color:'#059669', width:2.5 }], height: 200 }))
+            h('div', { className: 'px-4 pb-3' }, h(SvgLineChart, { data: fseries, lines: [{ key:'fett', name:'Kroppsfett %', color:'#56775D', width:2.5 }], height: 200 }))
           ) : null,
           rawWhtr != null ? h('div', { className: 'flex items-baseline gap-2 px-6 pt-1 pb-2' },
             h('p', { className: 'text-xs font-semibold text-gray-500' }, 'Midja/längd-kvot (WHtR):'),
@@ -1948,7 +2021,7 @@ function WeightStepTracker() {
             ),
             moodAnalysis.top && Math.abs(moodAnalysis.top.r) >= 0.15 && moodAnalysis.top.pairs.length >= 5 ? h('div', { className: 'mt-3' },
               h('p', { className: 'text-xs font-semibold text-gray-500 mb-1' }, 'Starkast: ' + moodAnalysis.top.name),
-              h(SvgScatter, { points: moodAnalysis.top.pairs.map(function(p){ return { x: p[0], y: p[1] }; }), xName: moodAnalysis.top.xName, yName: moodAnalysis.top.name.indexOf('viktändring') > -1 ? 'Viktändring (kg)' : 'Humör (1–5)', color: '#ec4899', height: 220 })
+              h(SvgScatter, { points: moodAnalysis.top.pairs.map(function(p){ return { x: p[0], y: p[1] }; }), xName: moodAnalysis.top.xName, yName: moodAnalysis.top.name.indexOf('viktändring') > -1 ? 'Viktändring (kg)' : 'Humör (1–5)', color: '#D0906F', height: 220 })
             ) : null,
             h('p', { className: 'text-xs text-gray-400 mt-2' }, 'Samband = inte nödvändigtvis orsak. Värden nära 0 = inget tydligt mönster.')
           ) : null
@@ -2076,9 +2149,9 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: chartData, height: 280, lines: [
-            { key: 'vikt',    color: '#a5b4fc', width: 1.5, name: 'Vikt (kg)' },
-            { key: 'snitt7',  color: '#4f46e5', width: 2.5, name: '7-dagars snitt' },
-            { key: 'målvikt', color: '#10b981', width: 1.5, name: 'Målvikt', dashed: true, ref: true }
+            { key: 'vikt',    color: '#A2BACF', width: 1.5, name: 'Vikt (kg)' },
+            { key: 'snitt7',  color: '#5A7898', width: 2.5, name: '7-dagars snitt' },
+            { key: 'målvikt', color: '#688E70', width: 1.5, name: 'Målvikt', dashed: true, ref: true }
           ]})
         )
       ),
@@ -2093,7 +2166,7 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: chartData, height: 180, lines: [
-            { key: 'bmi', color: '#f59e0b', width: 2, name: 'BMI' }
+            { key: 'bmi', color: '#CFA64E', width: 2, name: 'BMI' }
           ]})
         )
       ) : null,
@@ -2108,7 +2181,7 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: chartData, height: 160, lines: [
-            { key: 'humör', color: '#ec4899', width: 2, name: 'Humör (1–5)' }
+            { key: 'humör', color: '#D0906F', width: 2, name: 'Humör (1–5)' }
           ]})
         )
       ) : null,
@@ -2194,7 +2267,7 @@ function WeightStepTracker() {
       weekChartData.push({ datum: new Date(wMonday).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}), pass: wCount });
     }
     // ── Träningsanalys ──
-    var TYPE_COLORS=['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1','#14b8a6','#a855f7'];
+    var TYPE_COLORS=['#6F8FAF','#688E70','#CFA64E','#C07A5A','#85A2BD','#D0906F','#9DBBA2','#B98F3A','#A4644A','#5A7898','#7FA386','#B08C9E'];
     var byType={}; workouts.forEach(function(w){ byType[w.type]=(byType[w.type]||0)+w.duration; });
     var typeSegs = Object.keys(byType).map(function(k){ return {label:k, value:byType[k]}; }).sort(function(a,b){return b.value-a.value;}).map(function(seg,i){ seg.color=TYPE_COLORS[i%TYPE_COLORS.length]; return seg; });
     var typeTotal = typeSegs.reduce(function(s,x){return s+x.value;},0);
@@ -2211,7 +2284,7 @@ function WeightStepTracker() {
     var thCorr=null; if(trainHrvPts.length>=3){ var n=trainHrvPts.length,sx=0,sy=0,sxy=0,sxx=0,syy=0; trainHrvPts.forEach(function(p){sx+=p.x;sy+=p.y;sxy+=p.x*p.y;sxx+=p.x*p.x;syy+=p.y*p.y;}); var den=Math.sqrt((n*sxx-sx*sx)*(n*syy-sy*sy)); thCorr=den?(n*sxy-sx*sy)/den:null; }
     // heatmap (17 veckor)
     var hmWeeks=[]; for(var hw=-16; hw<=0; hw++){ var hM=new Date(todayD); hM.setDate(todayD.getDate()-(dow===0?6:dow-1)+hw*7); var col=[]; for(var hd=0; hd<7; hd++){ var cD=new Date(hM); cD.setDate(hM.getDate()+hd); var cs=cD.getFullYear()+'-'+String(cD.getMonth()+1).padStart(2,'0')+'-'+String(cD.getDate()).padStart(2,'0'); col.push({date:cs, min:(minByDate[cs]||0), future: cD>todayD}); } hmWeeks.push(col); }
-    var hmColor=function(m){ return m===0?'#eef2f7':m<=20?'#bbf7d0':m<=45?'#4ade80':m<=80?'#22c55e':'#15803d'; };
+    var hmColor=function(m){ return m===0?'#F0EBE3':m<=20?'#DCE8DD':m<=45?'#7FA386':m<=80?'#688E70':'#46604C'; };
     return h('div', null,
       // ── HERO WEEK CARD ──────────────────────────────────────────────────────
       h('div', { className: 'bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-6 mb-6 text-white shadow-xl' },
@@ -2283,7 +2356,7 @@ function WeightStepTracker() {
         ),
         weekChartData.some(function(d){return d.pass>0;}) ? h('div', { className:'mt-5 pt-5 border-t' },
           h('p', { className:'text-xs text-gray-400 mb-2' }, 'Pass per vecka (senaste 8 veckorna)'),
-          h(SvgBarChart, { data: weekChartData, dataKey: 'pass', color: '#3b82f6', height: 100 })
+          h(SvgBarChart, { data: weekChartData, dataKey: 'pass', color: '#6F8FAF', height: 100 })
         ) : null
       ),
       // ── TRÄNINGSANALYS ──────────────────────────────────────────────────────
@@ -2308,14 +2381,14 @@ function WeightStepTracker() {
         h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
           h('h2', { className:'text-lg font-bold text-gray-800 mb-1' }, '📊 Veckovolym'),
           h('p', { className:'text-xs text-gray-400 mb-4' }, 'Träningsminuter per vecka · senaste 16 veckorna'),
-          h(SvgBarChart, { data: volData, dataKey:'min', color:'#6366f1', height: 180 })
+          h(SvgBarChart, { data: volData, dataKey:'min', color:'#6F8FAF', height: 180 })
         ),
         // Intensitetsfördelning
         h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
           h('h2', { className:'text-lg font-bold text-gray-800 mb-1' }, '🔥 Intensitetsfördelning'),
           h('p', { className:'text-xs text-gray-400 mb-4' }, 'Antal pass per intensitetsnivå (1 = mycket lätt, 5 = mycket hård)'),
           h('div', { className:'space-y-2' },
-            intCounts.map(function(c,i){ var pct=intTotal?Math.round(c/intTotal*100):0; var cols=['#a7f3d0','#86efac','#fbbf24','#fb923c','#ef4444']; return h('div', { key:i, className:'flex items-center gap-3' },
+            intCounts.map(function(c,i){ var pct=intTotal?Math.round(c/intTotal*100):0; var cols=['#DCE8DD','#BFD4C2','#DDBC6E','#D0906F','#BE5F4F']; return h('div', { key:i, className:'flex items-center gap-3' },
               h('span', { className:'text-xs text-gray-500 w-24 shrink-0' }, (i+1)+' · '+intLabels[i]),
               h('div', { className:'flex-1 bg-gray-100 rounded-full h-4 overflow-hidden' }, h('div', { className:'h-4 rounded-full', style:{ width:(intTotal?Math.max(pct,c>0?4:0):0)+'%', backgroundColor:cols[i] } })),
               h('span', { className:'text-sm font-semibold text-gray-700 w-12 text-right' }, c+' st')
@@ -2326,7 +2399,7 @@ function WeightStepTracker() {
         trainHrvPts.length>=3 ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
           h('h2', { className:'text-lg font-bold text-gray-800 mb-1' }, '🔗 Träning vs återhämtning'),
           h('p', { className:'text-xs text-gray-400 mb-3' }, 'Träningsminuter en dag vs HRV nästa morgon' + (thCorr!=null ? ' · samband ' + (thCorr>0?'+':'') + thCorr.toFixed(2) : '')),
-          h(SvgScatter, { points: trainHrvPts, xName:'Träningsminuter', yName:'HRV nästa dag (ms)', color:'#6366f1', height: 230 }),
+          h(SvgScatter, { points: trainHrvPts, xName:'Träningsminuter', yName:'HRV nästa dag (ms)', color:'#6F8FAF', height: 230 }),
           thCorr!=null && thCorr < -0.3 ? h('p', { className:'text-xs text-amber-600 mt-2' }, 'Hård träning verkar sänka nästa dags HRV — se till att varva med återhämtning.') : null
         ) : null,
         // Heatmap
@@ -2457,10 +2530,10 @@ function WeightStepTracker() {
       ouraData.forEach(function(d){ if (d.sleep_score != null) sleepBD[d.date] = d.sleep_score; });
       var src = pixelMetric === 'mood' ? moodBD : sleepBD;
       if (Object.keys(src).length < 14) return null;
-      var moodCols = ['#f87171','#fb923c','#facc15','#a3e635','#22c55e'];
+      var moodCols = ['#D17A6A','#D0906F','#DDBC6E','#9DBBA2','#688E70'];
       var colorOf = function(v){
         if (pixelMetric === 'mood') return moodCols[Math.max(0, Math.min(4, v-1))];
-        return v >= 90 ? '#22c55e' : v >= 80 ? '#a3e635' : v >= 70 ? '#facc15' : v >= 60 ? '#fb923c' : '#f87171';
+        return v >= 90 ? '#688E70' : v >= 80 ? '#9DBBA2' : v >= 70 ? '#DDBC6E' : v >= 60 ? '#D0906F' : '#D17A6A';
       };
       var today = new Date(); today.setHours(0,0,0,0);
       var dow = today.getDay();
@@ -2499,7 +2572,7 @@ function WeightStepTracker() {
                     onClick: cell.v != null ? function(){ setSelectedDay(cell.ds); } : undefined,
                     title: cell.ds + (cell.v != null ? ': ' + cell.v : ''),
                     className: 'w-3 h-3 rounded-sm' + (cell.v != null ? ' cursor-pointer hover:ring-2 hover:ring-emerald-400' : ''),
-                    style: { backgroundColor: cell.future ? 'transparent' : (cell.v != null ? colorOf(cell.v) : '#f1f5f9') }
+                    style: { backgroundColor: cell.future ? 'transparent' : (cell.v != null ? colorOf(cell.v) : '#F0EBE3') }
                   });
                 })
               );
@@ -3064,10 +3137,10 @@ function WeightStepTracker() {
         h('div', { className: 'p-5' },
           (function(){
             var parts = [
-              ['Stillasittande', activityBalance.sed, '#cbd5e1'],
-              ['Låg aktivitet', activityBalance.lo, '#86efac'],
-              ['Medel', activityBalance.me, '#4ade80'],
-              ['Hög', activityBalance.hi, '#16a34a']
+              ['Stillasittande', activityBalance.sed, '#CFC6B9'],
+              ['Låg aktivitet', activityBalance.lo, '#BFD4C2'],
+              ['Medel', activityBalance.me, '#7FA386'],
+              ['Hög', activityBalance.hi, '#56775D']
             ].filter(function(p){ return p[1] != null; });
             var tot = parts.reduce(function(s,p){ return s+p[1]; },0);
             if (!tot) return null;
@@ -3130,7 +3203,7 @@ function WeightStepTracker() {
                     var a = Math.abs(c.r);
                     var bg = c.r > 0 ? 'rgba(99,102,241,' + Math.min(0.85, a).toFixed(2) + ')' : 'rgba(244,63,94,' + Math.min(0.85, a).toFixed(2) + ')';
                     return h('td', { key: ci, className: 'text-center px-1 py-1' },
-                      h('div', { className: 'rounded-lg py-2 text-xs font-bold', style: { backgroundColor: bg, color: a > 0.35 ? 'white' : '#374151' }, title: 'n=' + c.n },
+                      h('div', { className: 'rounded-lg py-2 text-xs font-bold', style: { backgroundColor: bg, color: a > 0.35 ? 'white' : '#3B3631' }, title: 'n=' + c.n },
                         (c.r > 0 ? '+' : '') + c.r.toFixed(2))
                     );
                   })
@@ -3171,7 +3244,7 @@ function WeightStepTracker() {
               ),
               topCorr ? h('div', null,
                 h('p', { className:'text-xs font-semibold text-gray-500 mb-1 px-2' }, 'Starkast: ' + topCorr.name + ' vs viktförändring (kg) nästa dag'),
-                h(SvgScatter, { points: scatterPoints, xName: topCorr.name, yName: 'Viktändring (kg)', color: '#8b5cf6', height: 240 })
+                h(SvgScatter, { points: scatterPoints, xName: topCorr.name, yName: 'Viktändring (kg)', color: '#6F8FAF', height: 240 })
               ) : null,
               (corr[0] && corr[0].n < 14) ? h('p', { className:'text-xs text-amber-600 mt-2 px-2' }, '⚠ Få datapunkter ännu — tolka försiktigt.') : null,
               h('p', { className:'text-xs text-gray-400 mt-2 px-2' }, 'Samband = inte nödvändigtvis orsak. Värden nära 0 betyder inget tydligt mönster.')
@@ -3191,7 +3264,7 @@ function WeightStepTracker() {
             )
           ),
           h('div', { className: 'px-4 py-4' },
-            h(SvgScatter, { points: batteryVsForm.points, xName: 'Kroppsbatteri (%)', yName: 'Dagsform', color: '#10b981', height: 240 }),
+            h(SvgScatter, { points: batteryVsForm.points, xName: 'Kroppsbatteri (%)', yName: 'Dagsform', color: '#688E70', height: 240 }),
             h('p', { className: 'text-xs text-gray-400 px-2 mt-1' }, 'Punkter långt från trendlinjen = dagar då måtten var oense. Lågt batteri men hög dagsform brukar betyda att HRV/vilopuls avviker från långtidsbaslinjen men att Oura hunnit vänja sig — eller att stress, träning eller alkohol dragit ner batteriet.')
           )
         ) : null,
@@ -3209,10 +3282,10 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: overlayData, height: 240, lines: [
-            hasWeightOverlay ? { key:'nvikt', color:'#2563eb', width:2.5, name:'Vikt' } : null,
-            { key:'nhrv', color:'#ec4899', width:1.5, name:'HRV' },
-            { key:'nsomn', color:'#7c3aed', width:1.5, name:'Sömn' },
-            { key:'nsteg', color:'#f59e0b', width:1.5, name:'Steg' }
+            hasWeightOverlay ? { key:'nvikt', color:'#5A7898', width:2.5, name:'Vikt' } : null,
+            { key:'nhrv', color:'#D0906F', width:1.5, name:'HRV' },
+            { key:'nsomn', color:'#5A7898', width:1.5, name:'Sömn' },
+            { key:'nsteg', color:'#CFA64E', width:1.5, name:'Steg' }
           ].filter(function(x){return x;}) })
         )
       ),
@@ -3232,8 +3305,8 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: chartData, height: 220, lines: [
-            { key: 'sömn', color: '#7c3aed', width: 2, name: 'Sömnpoäng' },
-            { key: 'readiness', color: '#10b981', width: 2, name: 'Dagsform' }
+            { key: 'sömn', color: '#5A7898', width: 2, name: 'Sömnpoäng' },
+            { key: 'readiness', color: '#688E70', width: 2, name: 'Dagsform' }
           ]})
         )
       ),
@@ -3247,7 +3320,7 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: chartData, height: 200, lines: [
-            { key: 'hrv', color: '#ec4899', width: 2, name: 'HRV (ms)' }
+            { key: 'hrv', color: '#D0906F', width: 2, name: 'HRV (ms)' }
           ]})
         )
       ),
@@ -3261,8 +3334,8 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: chartData, height: 180, lines: [
-            { key: 'vilohjärtfrekvens', color: '#ef4444', width: 2, name: 'Vilopuls (slag/min)' },
-            { key: 'sömnpuls', color: '#f97316', width: 1.5, name: 'Sömnpuls snitt (slag/min)' }
+            { key: 'vilohjärtfrekvens', color: '#BE5F4F', width: 2, name: 'Vilopuls (slag/min)' },
+            { key: 'sömnpuls', color: '#C07A5A', width: 1.5, name: 'Sömnpuls snitt (slag/min)' }
           ]})
         )
       ),
@@ -3275,7 +3348,7 @@ function WeightStepTracker() {
           )
         ),
         h('div', { className: 'px-4 py-4' },
-          h(SvgBarChart, { data: chartData, dataKey: 'sömntimmar', color: '#3b82f6', height: 180 })
+          h(SvgBarChart, { data: chartData, dataKey: 'sömntimmar', color: '#6F8FAF', height: 180 })
         )
       ),
       // ── Sömnstadier över tid ──
@@ -3289,8 +3362,8 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: chartData, height: 200, lines: [
-            { key:'djup', color:'#4f46e5', width:2, name:'Djupsömn (min)' },
-            { key:'rem', color:'#a78bfa', width:2, name:'REM (min)' }
+            { key:'djup', color:'#5A7898', width:2, name:'Djupsömn (min)' },
+            { key:'rem', color:'#85A2BD', width:2, name:'REM (min)' }
           ]})
         )
       ),
@@ -3305,8 +3378,8 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: chartData, height: 200, lines: [
-            { key: 'tot_kcal', color: '#f97316', width: 2, name: 'Totalt (kcal)' },
-            { key: 'akt_kcal', color: '#fbbf24', width: 2, name: 'Aktivt (kcal)' }
+            { key: 'tot_kcal', color: '#C07A5A', width: 2, name: 'Totalt (kcal)' },
+            { key: 'akt_kcal', color: '#DDBC6E', width: 2, name: 'Aktivt (kcal)' }
           ]})
         )
       ),
@@ -3319,7 +3392,7 @@ function WeightStepTracker() {
           )
         ),
         h('div', { className: 'px-4 py-4' },
-          h(SvgBarChart, { data: chartData, dataKey: 'steg', color: '#f59e0b', height: 180 })
+          h(SvgBarChart, { data: chartData, dataKey: 'steg', color: '#CFA64E', height: 180 })
         )
       ),
       // ── Sömnkvalitet ──
@@ -3333,7 +3406,7 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: chartData, height: 180, lines: [
-            { key: 'effektivitet', color: '#6366f1', width: 2, name: 'Effektivitet (%)' }
+            { key: 'effektivitet', color: '#6F8FAF', width: 2, name: 'Effektivitet (%)' }
           ]})
         )
       ),
@@ -3349,11 +3422,11 @@ function WeightStepTracker() {
         h('div', { className: 'px-4 py-2' },
           h('p', { className: 'text-xs text-gray-400 px-2 pt-2' }, 'Syresättning SpO2 (%)'),
           h(SvgLineChart, { data: chartData, height: 150, lines: [
-            { key: 'spo2', color: '#06b6d4', width: 2, name: 'SpO2 (%)' }
+            { key: 'spo2', color: '#85A2BD', width: 2, name: 'SpO2 (%)' }
           ]}),
           h('p', { className: 'text-xs text-gray-400 px-2 pt-3' }, 'Andningsfrekvens (andetag/min)'),
           h(SvgLineChart, { data: chartData, height: 150, lines: [
-            { key: 'andning', color: '#0ea5e9', width: 2, name: 'Andning' }
+            { key: 'andning', color: '#85A2BD', width: 2, name: 'Andning' }
           ]})
         )
       ),
@@ -3368,8 +3441,8 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: chartData, height: 180, lines: [
-            { key: 'stress', color: '#f43f5e', width: 2, name: 'Stress (min)' },
-            { key: 'aterhamtning', color: '#10b981', width: 2, name: 'Återhämtning (min)' }
+            { key: 'stress', color: '#BE5F4F', width: 2, name: 'Stress (min)' },
+            { key: 'aterhamtning', color: '#688E70', width: 2, name: 'Återhämtning (min)' }
           ]})
         )
       ),
@@ -3384,7 +3457,7 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: chartData, height: 160, lines: [
-            { key: 'temp', color: '#14b8a6', width: 2, name: 'Temp-avvikelse (°C)' }
+            { key: 'temp', color: '#7FA386', width: 2, name: 'Temp-avvikelse (°C)' }
           ]})
         )
       ),
@@ -3581,7 +3654,7 @@ function WeightStepTracker() {
           )
         ),
         h('div', { className: 'px-4 py-4' },
-          h(SvgLineChart, { data: respData, height: 230, lines: [ { key:'vikt', color:'#db2777', width:2.5, name:'Vikt (kg)' } ], markers: escMarkers })
+          h(SvgLineChart, { data: respData, height: 230, lines: [ { key:'vikt', color:'#C07A5A', width:2.5, name:'Vikt (kg)' } ], markers: escMarkers })
         )
       ) : null,
       // ── Respons per dossteg + prognos ──
@@ -3633,9 +3706,9 @@ function WeightStepTracker() {
           doseResponse.chart ? h('div', { className: 'mt-3' },
             h('p', { className: 'text-xs font-semibold text-gray-500 mb-1' }, 'Din väg till målet (streckad linje = prognos)'),
             h(SvgLineChart, { data: doseResponse.chart, height: 230, lines: [
-              { key: 'vikt', color: '#db2777', width: 2.5, name: 'Vikt (kg)' },
-              { key: 'prognos', color: '#a855f7', width: 2, name: 'Prognos', dashed: true },
-              { key: 'mål', color: '#10b981', width: 1.5, name: 'Målvikt', dashed: true, ref: true }
+              { key: 'vikt', color: '#C07A5A', width: 2.5, name: 'Vikt (kg)' },
+              { key: 'prognos', color: '#85A2BD', width: 2, name: 'Prognos', dashed: true },
+              { key: 'mål', color: '#688E70', width: 1.5, name: 'Målvikt', dashed: true, ref: true }
             ]})
           ) : null,
           h('p', { className: 'text-xs text-gray-400 mt-2' }, 'Prognosen är en enkel trendframskrivning — viktresan är sällan linjär.')
