@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hälsodagbok</title>
-  <meta name="theme-color" content="#4f46e5">
+  <meta name="theme-color" content="#F6F1EA">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Hälsodagbok">
@@ -13,10 +13,40 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+  <script>
+  // ── Designtema "Havre, blå ton" ──────────────────────────────────────────
+  // Hela temat ligger HÄR, inte utspritt i koden: Tailwinds färgskalor mappas
+  // om så att alla befintliga klasser (indigo/blå/lila = dämpad blå, grått =
+  // varmt grått, grönt = salvia, rosa = terrakotta) automatiskt får nya toner.
+  // Vill man tillbaka till gamla utseendet räcker det att ta bort detta block
+  // och <style id="tema"> nedan.
+  var BLA = {50:'#EEF3F7',100:'#DDE7EF',200:'#C3D3E1',300:'#A2BACF',400:'#85A2BD',500:'#6F8FAF',600:'#5A7898',700:'#4A627D',800:'#3C5065',900:'#2F3F50'};
+  var SALVIA = {50:'#EFF4EF',100:'#DCE8DD',200:'#BFD4C2',300:'#9DBBA2',400:'#7FA386',500:'#688E70',600:'#56775D',700:'#46604C',800:'#394D3E',900:'#2D3C31'};
+  var TERRAKOTTA = {50:'#FAF0EA',100:'#F5E0D5',200:'#EBC6B4',300:'#DDA78F',400:'#D0906F',500:'#C07A5A',600:'#A4644A',700:'#85503C',800:'#6A4031',900:'#533328'};
+  var TEGEL = {50:'#FBEFEC',100:'#F6DCD6',200:'#EDBDB3',300:'#E0998B',400:'#D17A6A',500:'#BE5F4F',600:'#A24C3E',700:'#833E33',800:'#68322A',900:'#512821'};
+  var VARMGRA = {50:'#F8F5F0',100:'#F0EBE3',200:'#E4DDD2',300:'#CFC6B9',400:'#A89E91',500:'#8A8178',600:'#6E665E',700:'#57504A',800:'#3B3631',900:'#2A2622'};
+  tailwind.config = { theme: { extend: {
+    colors: { blue: BLA, indigo: BLA, violet: BLA, purple: BLA, gray: VARMGRA,
+              emerald: SALVIA, green: SALVIA, pink: TERRAKOTTA, rose: TERRAKOTTA, red: TEGEL },
+    fontFamily: { sans: ['"DM Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+    borderRadius: { xl: '1rem', '2xl': '1.25rem' }
+  } } };
+  </script>
+  <style id="tema">
+    body { background: #F6F1EA; color: #3B3631; }
+    .from-blue-50.to-indigo-100 { background: #F6F1EA !important; }
+    .bg-white { background-color: #FFFDF9; }
+    .shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl { box-shadow: 0 0 0 1px #EAE2D6 !important; }
+    .font-black { font-family: 'Fraunces', Georgia, serif; font-weight: 500; letter-spacing: -0.01em; }
+    h1, h2 { font-family: 'Fraunces', Georgia, serif; font-weight: 500 !important; letter-spacing: -0.005em; }
+  </style>
   <script src="charts.js"></script>
   <script src="analytics.js"></script>
 </head>
-<body class="bg-gray-100">
+<body>
 <div id="root"></div>
 
 
