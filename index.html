@@ -190,6 +190,10 @@ function WeightStepTracker() {
     try { return localStorage.getItem('matt-visa-mal') !== '0'; } catch(e) { return true; }
   });   // mållinjerna sträcker y-axeln — därför går de att stänga av
   const setVisaMalSparat = function(v){ setVisaMal(v); try { localStorage.setItem('matt-visa-mal', v ? '1' : '0'); } catch(e){} };
+  const [insOpen, setInsOpen] = useState(function(){
+    try { var o = JSON.parse(localStorage.getItem('insikter-open') || 'null'); return (o && typeof o === 'object') ? o : { kropp: true }; } catch(e) { return { kropp: true }; }
+  });   // vilka grupper i Insikter som är utfällda — "Kropp & återhämtning" öppen som standard
+  const setInsOpenSparat = function(o){ setInsOpen(o); try { localStorage.setItem('insikter-open', JSON.stringify(o)); } catch(e){} };
   const [backupModal, setBackupModal] = useState(false);
   const [syncCheck, setSyncCheck] = useState(null);   // resultat av "Testa synken"
   const [syncTesting, setSyncTesting] = useState(false);
@@ -1257,6 +1261,23 @@ function WeightStepTracker() {
     var scParts = [['Sömn',scAvg('sleep_score')],['Återhämtning',scAvg('dagsform_score')],['Aktivitet',aktSc],['Lugn (låg stress)',stressSc],['Vikttrend',viktSc]].filter(function(p){return p[1]!=null;});
     var scOverall = scParts.length ? Math.round(scParts.reduce(function(a,b){return a+b[1];},0)/scParts.length) : null;
     var scGrade = scOverall==null?'–':scOverall>=85?'A':scOverall>=70?'B':scOverall>=55?'C':scOverall>=40?'D':'E';
+    // Hopfällbara grupper — samma mönster som Oura-vyn. Innehållet skickas som
+    // funktion så att stängda grupper inte räknas ut alls. Inga hooks får ligga
+    // i innehållet (det gör det inte — allt tungt är memoiserat på topplevel).
+    var insGroup = function(id, emoji, title, sub, content) {
+      var open = !!insOpen[id];
+      return h('div', { className: 'mb-4' },
+        h('button', { onClick: function(){ var o = Object.assign({}, insOpen); o[id] = !open; setInsOpenSparat(o); },
+          className: 'w-full flex items-center justify-between bg-white rounded-2xl shadow-md px-6 py-4 text-left hover:bg-indigo-50 transition-colors' },
+          h('div', null,
+            h('h2', { className: 'font-bold text-gray-800' }, emoji + ' ' + title),
+            h('p', { className: 'text-xs text-gray-400' }, sub)
+          ),
+          h('span', { className: 'text-indigo-500 text-xl font-black ml-3' }, open ? '\u2212' : '+')
+        ),
+        open ? h('div', { className: 'mt-4' }, content()) : null
+      );
+    };
     return h('div', null,
       // ── Vad betyder det här idag (prioriterat) ──
       (function(){
@@ -1299,6 +1320,7 @@ function WeightStepTracker() {
           h('p', { className: 'text-xs text-gray-400 px-6 py-3 border-t border-gray-50' }, 'Rankas på avvikelse mot din egen baslinje, momentum (förvärras/vänder) och hur mycket data signalen vilar på.')
         );
       })(),
+      insGroup('kropp', '🫀', 'Kropp & återhämtning', 'HRV & vilopuls · effekt av insatserna · mått, mål & kroppsfett', function(){ return h('div', null,
       // ── Återhämtning: HRV & vilopuls mot insatserna ──
       (function(){
         if (!recovery) return null;
@@ -1569,6 +1591,9 @@ function WeightStepTracker() {
             'Överst står startvärde → nuvarande. Mät på samma ställe varje söndag. Fett% = midja + hals + längd (halsen bär mest brus).')
         );
       })(),
+        null
+      ); }),
+      insGroup('dag', '📅', 'Dagen, veckan & målet', 'Dagar som idag · veckokortet · statistik · prognos till målvikten', function(){ return h('div', null,
       // ── Tvillingdagar ──
       twinDays ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
@@ -1738,6 +1763,9 @@ function WeightStepTracker() {
           })() : h('p', { className: 'text-gray-400 text-sm' }, 'Lägg till mätningar för att se prognos')
         )
       ),
+        null
+      ); }),
+      insGroup('samband', '🔗', 'Samband & mönster', 'Träning ↔ vikt · smarta insikter · humör & samband · receptet på dina bästa dagar', function(){ return h('div', null,
       // Workout Correlation card
       workoutCorr ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
@@ -1939,6 +1967,9 @@ function WeightStepTracker() {
         ),
         h('p', { className: 'text-xs text-gray-400 px-6 py-3' }, 'Vill du ha fler toppdagar? Härma vänsterkolumnen.')
       ) : null,
+        null
+      ); }),
+      insGroup('experiment', '🧪', 'Experiment', 'Dina pågående och avslutade experiment', function(){ return h('div', null,
       // ── Experiment ──
       h('div', { className: 'bg-white rounded-2xl shadow-md mb-6 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
@@ -2001,7 +2032,9 @@ function WeightStepTracker() {
           experiments.length ? h('p', { className: 'text-xs text-gray-400 mt-3' }, 'Cohen\'s d: ±0,2 liten · ±0,5 medel · ±0,8 stor effekt. Grönt = förändring åt rätt håll. Kom ihåg: annat kan ha ändrats samtidigt.') : null
         )
       ),
-      h('h2', { className: 'text-sm font-bold text-gray-400 uppercase tracking-wider mt-6 mb-2 px-1' }, 'Grafer'),
+        null
+      ); }),
+      insGroup('grafer', '📈', 'Grafer', 'Vikt · BMI · energi & humör', function(){ return h('div', null,
       // Weight chart
       h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
@@ -2049,6 +2082,8 @@ function WeightStepTracker() {
           ]})
         )
       ) : null,
+        null
+      ); }),
       null
     );
   }
