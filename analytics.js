@@ -638,7 +638,23 @@
       return { date: d.date, v: Math.round(clamp(v, 0, 100)), parts: parts };
     }).reverse();
     var today = days[days.length-1];
-    return { days: days, today: today && today.v != null ? today.v : null };
+    // Långsiktig nivå: batteriet jämför mot senaste månaden, vilket gör att en
+    // långsam nedgång normaliseras. Här jämförs senaste 30 nätterna med 30 nätter
+    // för 3–4 månader sedan, så att en stor förskjutning syns bredvid poängen.
+    var lang = null;
+    var medel = function(key, fr, til){ var v = ouraData.slice(fr, til).map(function(d){ return d[key]; }).filter(function(x){ return x != null; }); return v.length >= 15 ? v.reduce(function(a,b){ return a+b; },0)/v.length : null; };
+    var hN = medel('hrv_avg', 0, 30), hF = medel('hrv_avg', 90, 120), rN = medel('resting_hr', 0, 30), rF = medel('resting_hr', 90, 120);
+    if (hN != null && hF != null) {
+      var hPct = Math.round((hN - hF) / hF * 100);
+      var rDiff = (rN != null && rF != null) ? Math.round((rN - rF) * 10) / 10 : null;
+      var refDatum = ouraData[Math.min(ouraData.length - 1, 105)].date;
+      lang = { hrvNu: Math.round(hN * 10) / 10, hrvDa: Math.round(hF * 10) / 10, hrvPct: hPct,
+               rhrNu: rN == null ? null : Math.round(rN * 10) / 10, rhrDa: rF == null ? null : Math.round(rF * 10) / 10, rhrDiff: rDiff,
+               refDatum: refDatum,
+               varning: hPct <= -20 || (rDiff != null && rDiff >= 5),
+               battre: hPct >= 10 && (rDiff == null || rDiff <= 0) };
+    }
+    return { days: days, today: today && today.v != null ? today.v : null, lang: lang };
   };
   A.computeOuraStats = function(ouraData) {
     if (ouraData.length < 7) return null;

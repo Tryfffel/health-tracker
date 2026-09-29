@@ -1153,7 +1153,19 @@ function WeightStepTracker() {
                   style: { height: (d.v != null ? Math.max(d.v, 4) : 4) + '%', backgroundColor: d.v != null ? col(d.v) : '#E7E2DA', opacity: (i === bb.days.length-1 || bbDay === d.date) ? 1 : 0.65 } });
               })
           ),
-          h('p', { className: 'text-xs text-gray-400 mt-1' }, '14 dagar · klicka en stapel för att se exakt varifrån poängen kom — öppen formel, ingen magi')
+          h('p', { className: 'text-xs text-gray-400 mt-1' }, '14 dagar · klicka en stapel för att se exakt varifrån poängen kom — öppen formel, ingen magi'),
+          (bb.lang && (bb.lang.varning || bb.lang.battre)) ? (function(){
+            var L = bb.lang, nf = function(v){ return String(v).replace('.', ','); };
+            var manad = new Date(L.refDatum).toLocaleDateString('sv-SE', { month: 'long' });
+            var rhrTxt = (L.rhrDiff != null && Math.abs(L.rhrDiff) >= 2) ? (' · vilopuls ' + nf(L.rhrNu) + ' mot ' + nf(L.rhrDa) + ' (' + (L.rhrDiff > 0 ? '+' : '') + nf(L.rhrDiff) + ')') : '';
+            return h('div', { className: 'mt-3 rounded-xl px-3 py-2 ' + (L.varning ? 'bg-amber-50 border border-amber-200' : 'bg-emerald-50 border border-emerald-200') },
+              h('p', { className: 'text-xs font-bold ' + (L.varning ? 'text-amber-800' : 'text-emerald-800') },
+                (L.varning ? '⚠️ ' : '📈 ') + 'Långsiktig nivå: HRV ' + nf(L.hrvNu) + ' ms, i ' + manad + ' ' + nf(L.hrvDa) + ' ms (' + (L.hrvPct > 0 ? '+' : '') + L.hrvPct + ' %)' + rhrTxt),
+              h('p', { className: 'text-xs ' + (L.varning ? 'text-amber-700' : 'text-emerald-700') + ' mt-0.5' },
+                L.varning ? 'Batteriet jämför mot din senaste månad, så dagens poäng säger inget om den här nedgången. Den är värd att ta upp med din förskrivare.'
+                          : 'Din nivå har återhämtat sig jämfört med då. Batteriet jämför fortfarande mot senaste månaden.')
+            );
+          })() : null
         ) : null,
         hasBb ? 
         (function(){
