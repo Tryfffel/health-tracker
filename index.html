@@ -3672,9 +3672,16 @@ function WeightStepTracker() {
     var sortedDoses = wegovyDoses.slice().sort(function(a,b){ return new Date(b.date)-new Date(a.date); });
     var latestDose = sortedDoses[0] || null;
     var weeksOn = getWeeksOn(wegovyProtocol);
-    var stepIdx = getCurrentStepIdx(wegovyProtocol, weeksOn);
-    var currentStep = wegovyProtocol.titration_plan[stepIdx] || wegovyProtocol.titration_plan[0];
-    var nextStep = wegovyProtocol.titration_plan[stepIdx + 1] || null;
+    // Maxdos: David går troligen aldrig upp till 2,4 mg, så planen kapas vid
+    // vald maxdos (standard 1,7). Sista steget blir då öppet ("15+").
+    var MAXDOS = wegovyProtocol.max_dose || 1.7;
+    var plan = (wegovyProtocol.titration_plan || []).filter(function(st){ return st.dose <= MAXDOS + 1e-9; });
+    if (!plan.length) plan = (wegovyProtocol.titration_plan || []).slice(0, 1);
+    plan = plan.map(function(st, i){ return i === plan.length - 1 ? { dose: st.dose, weeks: String(st.weeks).split('-')[0].replace('+', '') + '+' } : st; });
+    var stepIdx = getCurrentStepIdx({ titration_plan: plan }, weeksOn);
+    var currentStep = plan[stepIdx] || plan[0];
+    var nextStep = plan[stepIdx + 1] || null;
+    var aktuellDos = latestDose && latestDose.dose ? latestDose.dose : currentStep.dose;
     var streak = getDoseStreak(wegovyDoses);
     var today = new Date(); today.setHours(0,0,0,0);
     var todayStr = toDateStr(today);
@@ -3725,38 +3732,43 @@ function WeightStepTracker() {
     var taktData = wegovyTakt;
     var monteCarlo = wegovyMonteCarlo;
     var cycleData = wegovyCycle;
-    return h('div', null,
-      h('div', { className: 'bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600 rounded-2xl shadow-xl mb-5 p-6 text-white' },
-        h('div', { className: 'flex items-start justify-between mb-4' },
+    // Hopfällbara grupper, samma mönster som Insikter (delar öppet-läget).
+    var vmGroup = function(id, emoji, title, sub, content) {
+      var open = !!insOpen[id];
+      return h('div', { className: 'mb-4' },
+        h('button', { onClick: function(){ var o = Object.assign({}, insOpen); o[id] = !open; setInsOpenSparat(o); },
+          className: 'w-full flex items-center justify-between bg-white rounded-2xl shadow-md px-6 py-4 text-left hover:bg-indigo-50 transition-colors' },
           h('div', null,
-            h('p', { className: 'text-pink-200 text-xs font-semibold uppercase tracking-widest mb-1' }, '💉 Wegovy-protokollet'),
-            h('p', { className: 'text-3xl font-black' }, 'Vecka ' + weeksOn + ' på ' + currentStep.dose + ' mg'),
-            h('p', { className: 'text-pink-200 text-sm mt-1' }, 'Start: ' + wegovyProtocol.start_date)
+            h('h2', { className: 'font-bold text-gray-800' }, emoji + ' ' + title),
+            h('p', { className: 'text-xs text-gray-400' }, sub)
           ),
-          h('button', { onClick: openDoseForm, className: 'bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl text-sm' }, '+ Logga dos')
+          h('span', { className: 'text-indigo-500 text-xl font-black ml-3' }, open ? '−' : '+')
         ),
-        h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-3' },
+        open ? h('div', { className: 'mt-4' }, content()) : null
+      );
+    };
+    var nfv = function(v, d){ if (v == null || isNaN(v)) return '–'; var m = Math.pow(10, d == null ? 1 : d); return String(Math.round(v * m) / m).replace('.', ','); };
+    return h('div', null,
+      // ── Dosstatus ──
+      h('div', { className: 'bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600 rounded-2xl shadow-xl mb-4 p-6 text-white' },
+        h('div', { className: 'flex items-start justify-between gap-4' },
+          h('div', null,
+            h('p', { className: 'text-pink-200 text-xs font-semibold uppercase tracking-widest mb-1' }, '💉 Wegovy · vecka ' + weeksOn),
+            h('p', { className: 'text-3xl font-black' }, nfv(aktuellDos, 2) + ' mg'),
+            h('p', { className: 'text-pink-200 text-sm mt-1' }, 'Nästa dos ' + new Date(nextTue).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'short' }) + ' · ' + (daysToNext === 0 ? 'idag' : 'om ' + daysToNext + (daysToNext === 1 ? ' dag' : ' dagar')))
+          ),
+          h('button', { onClick: openDoseForm, className: 'bg-white text-indigo-700 border border-indigo-200 font-bold px-4 py-2.5 rounded-xl text-sm flex-shrink-0' }, '➕ Logga dos')
+        ),
+        h('div', { className: 'grid grid-cols-3 gap-3 mt-4' },
+          h('div', { className: 'bg-white/15 rounded-xl p-3' },
+            h('p', { className: 'text-pink-200 text-xs' }, 'I rad'),
+            h('p', { className: 'text-xl font-black' }, streak + (streak === 1 ? ' dos' : ' doser'))),
           h('div', { className: 'bg-white/15 rounded-xl p-3' },
             h('p', { className: 'text-pink-200 text-xs' }, 'Senaste dos'),
-            h('p', { className: 'text-xl font-black' }, latestDose ? new Date(latestDose.date).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}) : '–'),
-            h('p', { className: 'text-xs text-pink-200' }, daysSinceLast !== null ? daysSinceLast + ' dagar sen' : '–')
-          ),
+            h('p', { className: 'text-xl font-black' }, latestDose ? new Date(latestDose.date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' }) : '–')),
           h('div', { className: 'bg-white/15 rounded-xl p-3' },
-            h('p', { className: 'text-pink-200 text-xs' }, 'Nästa dos'),
-            h('p', { className: 'text-xl font-black' }, new Date(nextTue).toLocaleDateString('sv-SE',{day:'numeric',month:'short'})),
-            h('p', { className: 'text-xs text-pink-200' }, daysToNext === 0 ? 'Idag!' : 'om ' + daysToNext + ' dagar')
-          ),
-          h('div', { className: 'bg-white/15 rounded-xl p-3' },
-            h('p', { className: 'text-pink-200 text-xs' }, 'Streak'),
-            h('p', { className: 'text-xl font-black' }, streak + ' 💉'),
-            h('p', { className: 'text-xs text-pink-200' }, WEEKDAY_NAMES[appSettings.injectionDay] + (streak === 1 ? ' i rad' : 'ar i rad'))
-          ),
-          h('div', { className: 'bg-white/15 rounded-xl p-3' },
-            h('p', { className: 'text-pink-200 text-xs' }, 'Viktändring'),
-            h('p', { className: 'text-xl font-black ' + (weightChange !== null && parseFloat(weightChange) < 0 ? 'text-green-300' : 'text-red-300') },
-              weightChange !== null ? (parseFloat(weightChange) > 0 ? '+' : '') + weightChange + ' kg' : '–'),
-            h('p', { className: 'text-xs text-pink-200' }, weightAtStart ? 'från ' + weightAtStart + ' kg' : 'logga vikt vid dos')
-          )
+            h('p', { className: 'text-pink-200 text-xs' }, 'Totalt'),
+            h('p', { className: 'text-xl font-black' }, nfv(parseFloat(totalMg), 2) + ' mg'))
         )
       ),
       showDoseForm ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 p-6' },
@@ -3790,18 +3802,149 @@ function WeightStepTracker() {
         ),
         h('button', { onClick: submitDose, className: 'w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold py-3 rounded-xl' }, 'Spara dos')
       ) : null,
-      respData.length >= 2 ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+      // ── Resultat ──
+      (function(){
+        var dr = doseResponse;
+        var kg = dr ? dr.startW - dr.lastW : (weightChange != null ? -parseFloat(weightChange) : null);
+        var startKg = dr ? dr.startW : weightAtStart;
+        var pct = dr ? dr.pctLoss : (kg != null && startKg ? kg / startKg * 100 : null);
+        var pace = dr ? dr.pace : null;
+        if (kg == null) return null;
+        var bredd = Math.max(0, Math.min(100, (pct || 0) / 20 * 100));
+        return h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 p-5' },
+          h('h2', { className: 'font-bold text-gray-800 mb-3' }, '📉 Resultat'),
+          h('div', { className: 'flex flex-wrap gap-x-8 gap-y-3 items-baseline' },
+            h('div', null, h('p', { className: 'text-3xl font-black ' + (kg >= 0 ? 'text-gray-800' : 'text-red-600') }, (kg >= 0 ? '−' : '+') + nfv(Math.abs(kg)) + ' kg'), h('p', { className: 'text-xs text-gray-500' }, 'från ' + nfv(startKg) + ' kg vid start')),
+            pct != null ? h('div', null, h('p', { className: 'text-3xl font-black text-gray-800' }, (pct >= 0 ? '−' : '+') + nfv(Math.abs(pct)) + ' %'), h('p', { className: 'text-xs text-gray-500' }, 'av startvikten')) : null,
+            pace != null ? h('div', null, h('p', { className: 'text-3xl font-black ' + (pace < 0 ? 'text-gray-800' : 'text-red-600') }, (pace > 0 ? '+' : '−') + nfv(Math.abs(pace), 2)), h('p', { className: 'text-xs text-gray-500' }, 'kg/vecka senaste 4 v')) : null
+          ),
+          dr && dr.milestones ? h('div', { className: 'mt-5' },
+            h('div', { className: 'relative h-2 rounded-full bg-gray-100' },
+              h('div', { className: 'h-full rounded-full bg-indigo-500', style: { width: bredd + '%' } }),
+              dr.milestones.map(function(m, i){ return h('span', { key: i, className: 'absolute top-[-4px] w-0.5 h-4 ' + (m.reached ? 'bg-emerald-600' : 'bg-gray-300'), style: { left: Math.min(100, m.pct / 20 * 100) + '%' } }); })
+            ),
+            h('div', { className: 'relative h-4 mt-1 text-xs' },
+              dr.milestones.map(function(m, i){ return h('span', { key: i, className: 'absolute -translate-x-1/2 ' + (m.reached ? 'text-emerald-700 font-bold' : 'text-gray-400'), style: { left: Math.min(100, m.pct / 20 * 100) + '%' } }, m.pct + ' %' + (m.reached ? ' ✓' : '')); })
+            )
+          ) : null,
+          (dr && dr.typicalPct != null) ? h('p', { className: 'text-sm text-gray-600 mt-3' },
+            'Typiskt i STEP 1-studien vid vecka ' + Math.min(dr.weeksOn, 68) + ': −' + nfv(dr.typicalPct) + ' %. ' +
+            (dr.pctLoss >= dr.typicalPct ? 'Du ligger före den kurvan.' : 'Du ligger något efter, vilket är vanligt på lägre doser. Studien gäller 2,4 mg.')) : null
+        );
+      })(),
+      // ── Prognos ──
+      (function(){
+        var dr = doseResponse, mc = monteCarlo;
+        var rubrik = null, under = null;
+        if (stats && stats.latest.weight <= goalWeight) { rubrik = '🎉 Du har nått ' + goalWeight + ' kg'; }
+        else if (mc && mc.pReach > 0) { rubrik = goalWeight + ' kg nås troligen kring ' + mc.d50; under = (mc.d10 === mc.d90 ? '80 % av simuleringarna hamnar i ' + mc.d50 : '80 % av simuleringarna: ' + mc.d10 + ' – ' + mc.d90) + ' · bygger på dina egna veckor'; }
+        else if (dr && dr.forecast) { rubrik = goalWeight + ' kg nås om ca ' + dr.forecast.weeks + ' veckor'; under = 'ca ' + dr.forecast.date.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long' }) + ' med nuvarande takt'; }
+        else if (dr) { rubrik = 'Ingen prognos just nu'; under = 'Vikten står still eller ökar, prognosen visas när trenden pekar nedåt igen.'; }
+        if (!rubrik) return null;
+        return h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 p-5' },
+          h('h2', { className: 'font-bold text-gray-800 mb-2' }, '🎯 Prognos'),
+          h('p', { className: 'text-base text-gray-800 font-medium' }, rubrik),
+          under ? h('p', { className: 'text-xs text-gray-500 mt-0.5' }, under) : null,
+          (dr && dr.chart) ? h('div', { className: 'mt-3' }, h(SvgLineChart, { data: dr.chart, height: 200, lines: [
+            { key: 'vikt', color: '#3F7BBF', width: 2.5, name: 'Vikt (kg)' },
+            { key: 'prognos', color: '#6497CF', width: 2, name: 'Prognos', dashed: true },
+            { key: 'mål', color: '#3E8B56', width: 1.5, name: 'Målvikt', dashed: true, ref: true } ] })) : null
+        );
+      })(),
+      h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center justify-between px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'flex items-center gap-3' },
+            h('div', { className: 'w-1 h-8 rounded-full bg-purple-500' }),
+            h('div', null,
+              h('h2', { className: 'font-bold text-gray-800' }, 'Titreringsplan'),
+              nextStepDate ? h('p', { className: 'text-xs text-gray-400' }, 'Nästa upptrappning: ' + nextStepDate.toLocaleDateString('sv-SE',{day:'numeric',month:'long',year:'numeric'}) + ' → ' + nextStep.dose + ' mg') : null
+            )
+          ),
+          h('button', { onClick: function(){ setEditProtocol(!editProtocol); }, className: 'text-xs text-indigo-600 hover:underline' }, editProtocol ? 'Stäng' : 'Redigera')
+        ),
+        editProtocol ? h('div', { className: 'px-6 py-4 border-b border-gray-50 space-y-3' },
+          h('div', null,
+            h('label', { className: 'text-xs font-medium text-gray-600 block mb-2' }, 'Veckor på första steget (0,25 mg)'),
+            h('div', { className: 'flex gap-2' },
+              [4,5,6,8].map(function(w) {
+                var firstW = wegovyProtocol.first_step_weeks || wegovyProtocol.weeks_per_step || 6;
+                return h('button', { key:w, onClick: function(){
+                  var stepW = wegovyProtocol.weeks_per_step || 4;
+                  saveProtocol(Object.assign({},wegovyProtocol,{first_step_weeks:w,titration_plan:buildTitrationPlan(w, stepW)}));
+                }, className: 'px-4 py-2 rounded-lg text-sm border-2 font-medium '+(firstW===w?'bg-purple-600 text-white border-purple-600':'border-gray-200 text-gray-600') }, w+'v');
+              })
+            )
+          ),
+          h('div', null,
+            h('label', { className: 'text-xs font-medium text-gray-600 block mb-2' }, 'Veckor per följande steg'),
+            h('div', { className: 'flex gap-2' },
+              [4,5,6,8].map(function(w) {
+                return h('button', { key:w, onClick: function(){
+                  var firstW = wegovyProtocol.first_step_weeks || 6;
+                  saveProtocol(Object.assign({},wegovyProtocol,{weeks_per_step:w,titration_plan:buildTitrationPlan(firstW, w)}));
+                }, className: 'px-4 py-2 rounded-lg text-sm border-2 font-medium '+((wegovyProtocol.weeks_per_step||4)===w?'bg-purple-600 text-white border-purple-600':'border-gray-200 text-gray-600') }, w+'v');
+              })
+            )
+          ),
+          h('div', null,
+            h('label', { className: 'text-xs font-medium text-gray-600 block mb-2' }, 'Högsta dos du planerar att gå upp till'),
+            h('div', { className: 'flex gap-2' },
+              [1.0, 1.7, 2.4].map(function(v) {
+                return h('button', { key: v, onClick: function(){ saveProtocol(Object.assign({}, wegovyProtocol, { max_dose: v })); },
+                  className: 'px-4 py-2 rounded-lg text-sm border-2 font-medium ' + (MAXDOS === v ? 'bg-purple-600 text-white border-purple-600' : 'border-gray-200 text-gray-600') }, String(v).replace('.', ',') + ' mg');
+              })
+            )
+          ),
+          h('p', { className: 'text-xs text-gray-400' }, 'Din plan: ' + (wegovyProtocol.first_step_weeks || 6) + ' veckor på 0,25 mg, sedan ' + (wegovyProtocol.weeks_per_step || 4) + '-veckorsintervall per steg. Upptrappningen sker alltid i samråd med läkare.')
+        ) : null,
+        h('div', { className: 'px-6 py-5' },
+          h('div', { className: 'flex gap-2 overflow-x-auto pb-2' },
+            plan.map(function(step, i) {
+              var isCurrent = i === stepIdx;
+              var isPast = i < stepIdx;
+              return h('div', { key:i, className: 'flex-shrink-0 rounded-xl px-4 py-3 text-center border-2 min-w-[90px] '+(isCurrent?'bg-purple-600 border-purple-600 text-white':isPast?'bg-gray-50 border-gray-200 text-gray-400':'bg-white border-gray-200 text-gray-600') },
+                h('p', { className: 'text-lg font-black' }, String(step.dose).replace('.', ',')+' mg'),
+                h('p', { className: 'text-xs mt-0.5 '+(isCurrent?'text-purple-200':'') }, 'v'+step.weeks),
+                isCurrent ? h('p', { className: 'text-xs text-purple-200 mt-1' }, '← Nu') : null
+              );
+            })
+          )
+        )
+      ),
+      vmGroup('vm_doser', '📋', 'Doshistorik', wegovyDoses.length + ' loggade doser · redigera eller ta bort', function(){ return h('div', null,
+      h('div', { className: 'bg-white rounded-2xl shadow-md overflow-hidden mb-4' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
           h('div', { className: 'w-1 h-8 rounded-full bg-pink-500' }),
-          h('div', null,
-            h('h2', { className: 'font-bold text-gray-800' }, 'Viktrespons på Wegovy'),
-            h('p', { className: 'text-xs text-gray-400' }, 'Vikt sedan start · rosa streck = dosökning')
-          )
+          h('h2', { className: 'font-bold text-gray-800' }, 'Doshistorik')
         ),
-        h('div', { className: 'px-4 py-4' },
-          h(SvgLineChart, { data: respData, height: 230, lines: [ { key:'vikt', color:'#CC6236', width:2.5, name:'Vikt (kg)' } ], markers: escMarkers })
-        )
-      ) : null,
+        sortedDoses.length === 0
+          ? h('p', { className: 'text-center text-gray-400 py-8' }, 'Ingen dos loggad ännu')
+          : h('div', { className: 'divide-y divide-gray-50' },
+              sortedDoses.map(function(dose) {
+                return h('div', { key: dose.id, className: 'flex items-center justify-between px-6 py-3 hover:bg-gray-50' },
+                  h('div', { className: 'flex items-center gap-4' },
+                    h('div', { className: 'text-center min-w-[60px]' },
+                      h('p', { className: 'font-bold text-gray-800 text-sm' }, new Date(dose.date).toLocaleDateString('sv-SE',{day:'numeric',month:'short'})),
+                      h('p', { className: 'text-xs text-gray-400' }, new Date(dose.date).toLocaleDateString('sv-SE',{weekday:'short'}))
+                    ),
+                    h('div', { className: 'bg-purple-100 text-purple-700 font-bold text-sm px-3 py-1 rounded-full' }, dose.dose+' mg'),
+                    h('div', null,
+                      dose.side_effects ? h('p', { className: 'text-xs text-gray-500' }, '⚠️ '+dose.side_effects) : null,
+                      dose.weight_at_dose ? h('p', { className: 'text-xs text-gray-400' }, '⚖️ '+dose.weight_at_dose+' kg') : null,
+                      dose.notes ? h('p', { className: 'text-xs text-gray-400 italic' }, dose.notes) : null
+                    )
+                  ),
+                  h('div', null,
+                    h('button', { onClick: function(){ var nd = window.prompt('Dos (mg):', dose.dose); if (nd === null) return; var v = parseFloat(String(nd).replace(',','.')); if (isNaN(v) || v <= 0 || v > 5) { showToast('Ogiltig dos', 'error'); return; } setWegovyDoses(function(prev){ var n = prev.map(function(x){ return x.id === dose.id ? Object.assign({}, x, { dose: v }) : x; }); window.storage.set('wegovy-doses', JSON.stringify(n)); return n; }); }, className: 'text-gray-300 hover:text-indigo-500 text-lg transition-colors mr-2', title:'Redigera dos' }, '✎'),
+                    h('button', { onClick: function(){ setWegovyDoses(function(prev){ var n=prev.filter(function(x){return x.id!==dose.id;}); window.storage.set('wegovy-doses',JSON.stringify(n)); return n; }); }, className: 'text-gray-300 hover:text-red-500 text-lg transition-colors' }, '✕')
+                  )
+                );
+              })
+            )
+      ),
+        null
+      ); }),
+      vmGroup('vm_ford', '📚', 'Fördjupning', 'Respons per dossteg och simulering · milstolpar och biverkningar · injektionscykeln · takt vecka för vecka · viktrespons · statistik', function(){ return h('div', null,
       // ── Respons per dossteg + prognos ──
       doseResponse ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
         h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
@@ -3997,57 +4140,18 @@ function WeightStepTracker() {
           ) : null
         )
       ) : null,
-      h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
-        h('div', { className: 'flex items-center justify-between px-6 py-4 border-b border-gray-50' },
-          h('div', { className: 'flex items-center gap-3' },
-            h('div', { className: 'w-1 h-8 rounded-full bg-purple-500' }),
-            h('div', null,
-              h('h2', { className: 'font-bold text-gray-800' }, 'Titreringsplan'),
-              nextStepDate ? h('p', { className: 'text-xs text-gray-400' }, 'Nästa upptrappning: ' + nextStepDate.toLocaleDateString('sv-SE',{day:'numeric',month:'long',year:'numeric'}) + ' → ' + nextStep.dose + ' mg') : null
-            )
-          ),
-          h('button', { onClick: function(){ setEditProtocol(!editProtocol); }, className: 'text-xs text-indigo-600 hover:underline' }, editProtocol ? 'Stäng' : 'Redigera')
-        ),
-        editProtocol ? h('div', { className: 'px-6 py-4 border-b border-gray-50 space-y-3' },
+      respData.length >= 2 ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+          h('div', { className: 'w-1 h-8 rounded-full bg-pink-500' }),
           h('div', null,
-            h('label', { className: 'text-xs font-medium text-gray-600 block mb-2' }, 'Veckor på första steget (0,25 mg)'),
-            h('div', { className: 'flex gap-2' },
-              [4,5,6,8].map(function(w) {
-                var firstW = wegovyProtocol.first_step_weeks || wegovyProtocol.weeks_per_step || 6;
-                return h('button', { key:w, onClick: function(){
-                  var stepW = wegovyProtocol.weeks_per_step || 4;
-                  saveProtocol(Object.assign({},wegovyProtocol,{first_step_weeks:w,titration_plan:buildTitrationPlan(w, stepW)}));
-                }, className: 'px-4 py-2 rounded-lg text-sm border-2 font-medium '+(firstW===w?'bg-purple-600 text-white border-purple-600':'border-gray-200 text-gray-600') }, w+'v');
-              })
-            )
-          ),
-          h('div', null,
-            h('label', { className: 'text-xs font-medium text-gray-600 block mb-2' }, 'Veckor per följande steg'),
-            h('div', { className: 'flex gap-2' },
-              [4,5,6,8].map(function(w) {
-                return h('button', { key:w, onClick: function(){
-                  var firstW = wegovyProtocol.first_step_weeks || 6;
-                  saveProtocol(Object.assign({},wegovyProtocol,{weeks_per_step:w,titration_plan:buildTitrationPlan(firstW, w)}));
-                }, className: 'px-4 py-2 rounded-lg text-sm border-2 font-medium '+((wegovyProtocol.weeks_per_step||4)===w?'bg-purple-600 text-white border-purple-600':'border-gray-200 text-gray-600') }, w+'v');
-              })
-            )
-          ),
-          h('p', { className: 'text-xs text-gray-400' }, 'Din plan: ' + (wegovyProtocol.first_step_weeks || 6) + ' veckor på 0,25 mg, sedan ' + (wegovyProtocol.weeks_per_step || 4) + '-veckorsintervall per steg. Upptrappningen sker alltid i samråd med läkare.')
-        ) : null,
-        h('div', { className: 'px-6 py-5' },
-          h('div', { className: 'flex gap-2 overflow-x-auto pb-2' },
-            wegovyProtocol.titration_plan.map(function(step, i) {
-              var isCurrent = i === stepIdx;
-              var isPast = i < stepIdx;
-              return h('div', { key:i, className: 'flex-shrink-0 rounded-xl px-4 py-3 text-center border-2 min-w-[90px] '+(isCurrent?'bg-purple-600 border-purple-600 text-white':isPast?'bg-gray-50 border-gray-200 text-gray-400':'bg-white border-gray-200 text-gray-600') },
-                h('p', { className: 'text-lg font-black' }, step.dose+' mg'),
-                h('p', { className: 'text-xs mt-0.5 '+(isCurrent?'text-purple-200':'') }, 'v'+step.weeks),
-                isCurrent ? h('p', { className: 'text-xs text-purple-200 mt-1' }, '← Nu') : null
-              );
-            })
+            h('h2', { className: 'font-bold text-gray-800' }, 'Viktrespons på Wegovy'),
+            h('p', { className: 'text-xs text-gray-400' }, 'Vikt sedan start · rosa streck = dosökning')
           )
+        ),
+        h('div', { className: 'px-4 py-4' },
+          h(SvgLineChart, { data: respData, height: 230, lines: [ { key:'vikt', color:'#CC6236', width:2.5, name:'Vikt (kg)' } ], markers: escMarkers })
         )
-      ),
+      ) : null,
       h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-4 mb-4' },
         h('div', { className: 'bg-white rounded-xl p-4 shadow-md border-l-4 border-pink-400' },
           h('p', { className: 'text-xs text-gray-500 uppercase tracking-wide font-medium' }, 'Antal doser'),
@@ -4071,36 +4175,9 @@ function WeightStepTracker() {
           h('p', { className: 'text-xs text-gray-400 mt-0.5' }, 'viktändring/vecka')
         )
       ),
-      h('div', { className: 'bg-white rounded-2xl shadow-md overflow-hidden mb-4' },
-        h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
-          h('div', { className: 'w-1 h-8 rounded-full bg-pink-500' }),
-          h('h2', { className: 'font-bold text-gray-800' }, 'Doshistorik')
-        ),
-        sortedDoses.length === 0
-          ? h('p', { className: 'text-center text-gray-400 py-8' }, 'Ingen dos loggad ännu')
-          : h('div', { className: 'divide-y divide-gray-50' },
-              sortedDoses.map(function(dose) {
-                return h('div', { key: dose.id, className: 'flex items-center justify-between px-6 py-3 hover:bg-gray-50' },
-                  h('div', { className: 'flex items-center gap-4' },
-                    h('div', { className: 'text-center min-w-[60px]' },
-                      h('p', { className: 'font-bold text-gray-800 text-sm' }, new Date(dose.date).toLocaleDateString('sv-SE',{day:'numeric',month:'short'})),
-                      h('p', { className: 'text-xs text-gray-400' }, new Date(dose.date).toLocaleDateString('sv-SE',{weekday:'short'}))
-                    ),
-                    h('div', { className: 'bg-purple-100 text-purple-700 font-bold text-sm px-3 py-1 rounded-full' }, dose.dose+' mg'),
-                    h('div', null,
-                      dose.side_effects ? h('p', { className: 'text-xs text-gray-500' }, '⚠️ '+dose.side_effects) : null,
-                      dose.weight_at_dose ? h('p', { className: 'text-xs text-gray-400' }, '⚖️ '+dose.weight_at_dose+' kg') : null,
-                      dose.notes ? h('p', { className: 'text-xs text-gray-400 italic' }, dose.notes) : null
-                    )
-                  ),
-                  h('div', null,
-                    h('button', { onClick: function(){ var nd = window.prompt('Dos (mg):', dose.dose); if (nd === null) return; var v = parseFloat(String(nd).replace(',','.')); if (isNaN(v) || v <= 0 || v > 5) { showToast('Ogiltig dos', 'error'); return; } setWegovyDoses(function(prev){ var n = prev.map(function(x){ return x.id === dose.id ? Object.assign({}, x, { dose: v }) : x; }); window.storage.set('wegovy-doses', JSON.stringify(n)); return n; }); }, className: 'text-gray-300 hover:text-indigo-500 text-lg transition-colors mr-2', title:'Redigera dos' }, '✎'),
-                    h('button', { onClick: function(){ setWegovyDoses(function(prev){ var n=prev.filter(function(x){return x.id!==dose.id;}); window.storage.set('wegovy-doses',JSON.stringify(n)); return n; }); }, className: 'text-gray-300 hover:text-red-500 text-lg transition-colors' }, '✕')
-                  )
-                );
-              })
-            )
-      )
+        null
+      ); }),
+      null
     );
   }
 
