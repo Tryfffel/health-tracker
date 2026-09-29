@@ -639,15 +639,19 @@
     }).reverse();
     var today = days[days.length-1];
     // Långsiktig nivå: batteriet jämför mot senaste månaden, vilket gör att en
-    // långsam nedgång normaliseras. Här jämförs senaste 30 nätterna med 30 nätter
-    // för 3–4 månader sedan, så att en stor förskjutning syns bredvid poängen.
+    // långsam nedgång normaliseras. Här jämförs senaste 30 nätterna med de ÄLDSTA
+    // 30 nätterna i historiken (ungefär ett halvår bakåt), så att en stor
+    // förskjutning syns bredvid poängen. Ett fast fönster 3–4 månader bakåt
+    // missade större delen av nedgången, som började redan i april.
     var lang = null;
     var medel = function(key, fr, til){ var v = ouraData.slice(fr, til).map(function(d){ return d[key]; }).filter(function(x){ return x != null; }); return v.length >= 15 ? v.reduce(function(a,b){ return a+b; },0)/v.length : null; };
-    var hN = medel('hrv_avg', 0, 30), hF = medel('hrv_avg', 90, 120), rN = medel('resting_hr', 0, 30), rF = medel('resting_hr', 90, 120);
+    var refSlut = ouraData.length, refStart = Math.max(90, refSlut - 30);
+    var hN = medel('hrv_avg', 0, 30), hF = refSlut >= 105 ? medel('hrv_avg', refStart, refSlut) : null;
+    var rN = medel('resting_hr', 0, 30), rF = refSlut >= 105 ? medel('resting_hr', refStart, refSlut) : null;
     if (hN != null && hF != null) {
       var hPct = Math.round((hN - hF) / hF * 100);
       var rDiff = (rN != null && rF != null) ? Math.round((rN - rF) * 10) / 10 : null;
-      var refDatum = ouraData[Math.min(ouraData.length - 1, 105)].date;
+      var refDatum = ouraData[Math.min(refSlut - 1, Math.round((refStart + refSlut) / 2))].date;
       lang = { hrvNu: Math.round(hN * 10) / 10, hrvDa: Math.round(hF * 10) / 10, hrvPct: hPct,
                rhrNu: rN == null ? null : Math.round(rN * 10) / 10, rhrDa: rF == null ? null : Math.round(rF * 10) / 10, rhrDiff: rDiff,
                refDatum: refDatum,
