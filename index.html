@@ -3015,6 +3015,7 @@ function WeightStepTracker() {
         };
         var chip = function(txt, key){ return txt ? h('span', { key: key, className: 'text-xs px-2.5 py-1 rounded-full bg-white text-gray-600' }, txt) : null; };
         var lightPct = Math.max(0, 100 - deepPct - remPct);
+        var igarO = ouraData.length > 1 ? ouraData[1] : null;
         return h('div', { className: 'bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700 rounded-2xl shadow-xl mb-4 p-5 text-white' },
           h('div', { className: 'flex items-start justify-between gap-3' },
             h('div', null,
@@ -3036,8 +3037,9 @@ function WeightStepTracker() {
           ),
           h('p', { className: 'text-xs text-purple-200 mt-1' }, 'Djup ' + deepPct + ' % · REM ' + remPct + ' % · lätt och vaken ' + lightPct + ' %'),
           h('div', { className: 'flex flex-wrap gap-2 mt-3' },
-            chip(ouraLatest.steps != null ? 'Steg igår ' + ouraLatest.steps.toLocaleString('sv-SE') : null, 'st'),
-            chip(ouraLatest.total_cal != null ? 'Kalorier ' + ouraLatest.total_cal.toLocaleString('sv-SE') : null, 'ka'),
+            // Aktivitet för dagens datum är bara påbörjad på morgonen — gårdagen är den hela dagen.
+            chip(igarO && igarO.steps != null ? 'Steg igår ' + igarO.steps.toLocaleString('sv-SE') : null, 'st'),
+            chip(igarO && igarO.total_cal != null ? 'Kalorier igår ' + igarO.total_cal.toLocaleString('sv-SE') : null, 'ka'),
             chip(ouraLatest.spo2_avg != null ? 'SpO2 ' + nf(ouraLatest.spo2_avg, 1) + ' %' : null, 'sp'),
             chip(ouraLatest.breath_avg != null ? 'Andning ' + nf(ouraLatest.breath_avg, 1) + '/min' : null, 'an'),
             chip(ouraLatest.temp_dev != null ? 'Temp ' + (ouraLatest.temp_dev > 0 ? '+' : '') + nf(ouraLatest.temp_dev, 1) + '°' : null, 'te'),
