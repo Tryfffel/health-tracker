@@ -609,9 +609,17 @@
   };
   A.getBodyBattery = function(ouraData, workouts, dayLogs) {
     if (ouraData.length < 10) return null;
-    var base = function(key){ var v = ouraData.slice(0,30).map(function(d){ return d[key]; }).filter(function(x){ return x != null; }); return v.length ? v.reduce(function(a,b){ return a+b; },0)/v.length : null; };
+    // Baslinjen = de 30 nätterna FÖRE den senaste (dagen själv ska inte jämföras med sig själv).
+    var base = function(key){ var v = ouraData.slice(1,31).map(function(d){ return d[key]; }).filter(function(x){ return x != null; }); return v.length ? v.reduce(function(a,b){ return a+b; },0)/v.length : null; };
     var hrvB = base('hrv_avg'), rhrB = base('resting_hr');
     var trainByDate = {}; workouts.forEach(function(w){ trainByDate[w.date] = (trainByDate[w.date]||0) + w.duration; });
+    // Tidslogik: Oura daterar natten efter morgonen den slutar, men stress och
+    // träning gäller dagtid. Morgonens batteri för dag d påverkas alltså av
+    // GÅRDAGENS stress, träning och alkohol, inte av dag d:s som inte har hänt
+    // än när man vaknar. (Förut användes samma dag, vilket gav dagens stapel 0 i
+    // stressavdrag medan alla historiska staplar fick hela dagens avdrag.)
+    var stressByDate = {}; ouraData.forEach(function(x){ if (x.stress_high_min != null) stressByDate[x.date] = x.stress_high_min; });
+    var igar = function(ds){ var dd = new Date(ds + 'T12:00:00'); dd.setDate(dd.getDate() - 1); return dd.getFullYear() + '-' + String(dd.getMonth()+1).padStart(2,'0') + '-' + String(dd.getDate()).padStart(2,'0'); };
     var clamp = function(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); };
     var days = ouraData.slice(0,14).map(function(d){
       if (d.sleep_score == null) return { date: d.date, v: null };
@@ -621,10 +629,11 @@
       var v = 50 + pS;
       if (d.hrv_avg != null && hrvB) { var pH = clamp((d.hrv_avg - hrvB)/hrvB*60, -15, 15); v += pH; parts.push({ n: '💗 HRV', v: pH, max: 15 }); }
       if (d.resting_hr != null && rhrB) { var pR = -clamp((d.resting_hr - rhrB)*2, -10, 10); v += pR; parts.push({ n: '❤️ Vilopuls', v: pR, max: 10 }); }
-      if (d.stress_high_min != null) { var pSt = -clamp(d.stress_high_min*0.1, 0, 20); v += pSt; parts.push({ n: '🔥 Stress', v: pSt, max: 20 }); }
-      var pT = -clamp((trainByDate[d.date]||0)*0.08, 0, 10); v += pT; parts.push({ n: '💪 Träning', v: pT, max: 10 });
-      var dl = dayLogs[d.date];
-      var pA = (dl && dl.alkohol) ? -clamp(dl.alkohol*5, 0, 20) : 0; v += pA; parts.push({ n: '🍷 Alkohol', v: pA, max: 20 });
+      var ig = igar(d.date);
+      if (stressByDate[ig] != null) { var pSt = -clamp(stressByDate[ig]*0.1, 0, 20); v += pSt; parts.push({ n: '🔥 Stress igår', v: pSt, max: 20 }); }
+      var pT = -clamp((trainByDate[ig]||0)*0.08, 0, 10); v += pT; parts.push({ n: '💪 Träning igår', v: pT, max: 10 });
+      var dl = dayLogs[d.date], dlIg = dayLogs[ig];
+      var pA = (dlIg && dlIg.alkohol) ? -clamp(dlIg.alkohol*5, 0, 20) : 0; v += pA; parts.push({ n: '🍷 Alkohol igår', v: pA, max: 20 });
       if (dl && dl.sjuk) { v -= 15; parts.push({ n: '🤒 Sjuk', v: -15, max: 15 }); }
       return { date: d.date, v: Math.round(clamp(v, 0, 100)), parts: parts };
     }).reverse();
