@@ -3631,8 +3631,10 @@ function WeightStepTracker() {
     function getNextTuesdayStr(fromDate) {
       var target = appSettings.injectionDay;
       var d = new Date(fromDate || Date.now());
+      // Idag räknas om det är injektionsdag — loopen nedan hoppar vidare en
+      // vecka om dagens dos redan är loggad. (Förut hoppade den alltid en vecka
+      // fram, så på själva injektionsdagen stod "nästa dos om 7 dagar".)
       var diff = (target - d.getDay() + 7) % 7;
-      if (diff === 0) diff = 7;
       d.setDate(d.getDate() + diff);
       return toDateStr(d);
     }
@@ -3660,6 +3662,7 @@ function WeightStepTracker() {
       for (var i = 0; i < 52; i++) {
         var ds = toDateStr(d);
         if (doses.find(function(x){ return x.date === ds; })) { streak++; d.setDate(d.getDate()-7); }
+        else if (i === 0 && back === 0) { d.setDate(d.getDate()-7); }   // dagens dos inte tagen än — bryter inte raden
         else break;
       }
       return streak;
@@ -3824,7 +3827,7 @@ function WeightStepTracker() {
               dr.milestones.map(function(m, i){ return h('span', { key: i, className: 'absolute top-[-4px] w-0.5 h-4 ' + (m.reached ? 'bg-emerald-600' : 'bg-gray-300'), style: { left: Math.min(100, m.pct / 20 * 100) + '%' } }); })
             ),
             h('div', { className: 'relative h-4 mt-1 text-xs' },
-              dr.milestones.map(function(m, i){ return h('span', { key: i, className: 'absolute -translate-x-1/2 ' + (m.reached ? 'text-emerald-700 font-bold' : 'text-gray-400'), style: { left: Math.min(100, m.pct / 20 * 100) + '%' } }, m.pct + ' %' + (m.reached ? ' ✓' : '')); })
+              dr.milestones.map(function(m, i){ return h('span', { key: i, className: 'absolute whitespace-nowrap ' + (m.pct >= 20 ? '-translate-x-full ' : '-translate-x-1/2 ') + (m.reached ? 'text-emerald-700 font-bold' : 'text-gray-400'), style: { left: Math.min(100, m.pct / 20 * 100) + '%' } }, m.pct + ' %' + (m.reached ? ' ✓' : '')); })
             )
           ) : null,
           (dr && dr.typicalPct != null) ? h('p', { className: 'text-sm text-gray-600 mt-3' },
