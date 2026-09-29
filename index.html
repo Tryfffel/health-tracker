@@ -298,6 +298,9 @@ function WeightStepTracker() {
     try { var o = JSON.parse(localStorage.getItem('insikter-open') || 'null'); return (o && typeof o === 'object') ? o : { kropp: true }; } catch(e) { return { kropp: true }; }
   });   // vilka grupper i Insikter som är utfällda — "Kropp & återhämtning" öppen som standard
   const setInsOpenSparat = function(o){ setInsOpen(o); try { localStorage.setItem('insikter-open', JSON.stringify(o)); } catch(e){} };
+  const [visaSignaler, setVisaSignaler] = useState(false);
+  const [trendVal, setTrendVal] = useState(function(){ try { return localStorage.getItem('insikter-trend') || 'vikt'; } catch(e) { return 'vikt'; } });
+  const setTrendValSparat = function(v){ setTrendVal(v); try { localStorage.setItem('insikter-trend', v); } catch(e){} };
   const [backupModal, setBackupModal] = useState(false);
   const [syncCheck, setSyncCheck] = useState(null);   // resultat av "Testa synken"
   const [syncTesting, setSyncTesting] = useState(false);
@@ -1394,7 +1397,7 @@ function WeightStepTracker() {
         open ? h('div', { className: 'mt-4' }, content()) : null
       );
     };
-    return h('div', null,
+    var signalKort = function(){ return (
       // ── Vad betyder det här idag (prioriterat) ──
       (function(){
         var SEV = {
@@ -1435,101 +1438,9 @@ function WeightStepTracker() {
           ),
           h('p', { className: 'text-xs text-gray-400 px-6 py-3 border-t border-gray-50' }, 'Rankas på avvikelse mot din egen baslinje, momentum (förvärras/vänder) och hur mycket data signalen vilar på.')
         );
-      })(),
-      insGroup('kropp', '🫀', 'Kropp & återhämtning', 'HRV & vilopuls · effekt av insatserna · mått, mål & kroppsfett', function(){ return h('div', null,
-      // ── Återhämtning: HRV & vilopuls mot insatserna ──
-      (function(){
-        if (!recovery) return null;
-        var hrvM = recovery.metrics.filter(function(m){ return m.key === 'hrv_avg'; })[0];
-        var rhrM = recovery.metrics.filter(function(m){ return m.key === 'resting_hr'; })[0];
-        var nf = function(v){ return v == null ? '–' : String(v).replace('.', ','); };
-        var pilTon = function(m){ return m.riktning === 'battre' ? 'text-emerald-600' : m.riktning === 'samre' ? 'text-red-500' : 'text-gray-400'; };
-        var pilTecken = function(m){ return m.riktning === 'platt' ? '→' : (m.trendPerV > 0 ? '▲' : '▼'); };
-        // Två separata grafer: HRV ligger kring 20, vilopulsen kring 60. Samma
-        // y-axel skulle klämma ihop HRV-kurvan till en rak linje.
-        var serie = ouraData.slice(0, 120).reverse().map(function(d){
-          return { datum: new Date(d.date).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}), date: d.date, hrv: d.hrv_avg, rhr: d.resting_hr };
-        });
-        var glid = function(key, ut){
-          serie.forEach(function(pt, ix){
-            var w = serie.slice(Math.max(0, ix-6), ix+1).map(function(x){ return x[key]; }).filter(function(v){ return v != null; });
-            pt[ut] = w.length ? Math.round(w.reduce(function(a,b){ return a+b; },0)/w.length*10)/10 : null;
-          });
-        };
-        glid('hrv', 'hrv7'); glid('rhr', 'rhr7');
-        var markers = recovery.taggar.map(function(t){
-          var mi = serie.findIndex(function(x){ return x.date >= t.start; });
-          return mi >= 0 ? { i: mi, label: t.name.replace(/^\S+\s+/, '') } : null;
-        }).filter(function(x){ return x; });
-
-        var metricRuta = function(m, i){
-          if (!m) return null;
-          return h('div', { key: i, className: 'flex-1 min-w-[9rem]' },
-            h('p', { className: 'text-xs text-gray-400' }, m.name),
-            h('p', { className: 'text-2xl font-black text-gray-800' }, nf(m.nu) + m.unit),
-            h('p', { className: 'text-xs text-gray-400' }, '7d ' + nf(m.snitt7) + ' · 30d ' + nf(m.snitt30)),
-            m.trendPerV != null
-              ? h('p', { className: 'text-xs font-bold ' + pilTon(m) },
-                  pilTecken(m) + ' ' + (m.riktning === 'platt' ? 'ligger stilla' : (nf(Math.abs(m.trendPerV)) + m.unit + '/vecka')) )
-              : h('p', { className: 'text-xs text-gray-300' }, 'för lite data för trend')
-          );
-        };
-
-        var effektRad = function(t, i){
-          var bitar = t.effekt.map(function(e){
-            if (e.svag) return h('span', { key: e.key, className: 'text-xs text-gray-300' }, e.name + ' –');
-            return h('span', { key: e.key, className: 'text-xs font-bold ' + (e.battre ? 'text-emerald-600' : 'text-red-500') },
-              e.name + ' ' + (e.diff > 0 ? '+' : '') + nf(e.diff) + e.unit);
-          });
-          var svag = t.effekt.some(function(e){ return e.svag; }) || t.dagar < 10;
-          return h('div', { key: i, className: 'py-2 border-t border-gray-50' },
-            h('div', { className: 'flex items-baseline justify-between gap-3 flex-wrap' },
-              h('p', { className: 'text-sm text-gray-700' }, t.name),
-              h('div', { className: 'flex items-center gap-3' }, bitar)
-            ),
-            h('p', { className: 'text-xs text-gray-400 mt-0.5' },
-              t.dagar + ' dagar sedan ' + new Date(t.start).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}) +
-              ' · natten efter jämfört med natten efter en dag utan' + (svag ? ' · för tunt underlag för att lita på' : ''))
-          );
-        };
-
-        return h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
-          h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
-            h('div', { className: 'w-1 h-8 rounded-full bg-violet-500' }),
-            h('div', { className: 'flex-1' },
-              h('h2', { className: 'font-bold text-gray-800' }, '🫀 Återhämtning — HRV & vilopuls'),
-              h('p', { className: 'text-xs text-gray-400' }, recovery.start
-                ? ('Följer dina insatser sedan ' + new Date(recovery.start).toLocaleDateString('sv-SE',{day:'numeric',month:'long'}))
-                : 'Tagga 🚶 Powerwalk, 🪡 Spikmatta eller 💪 100 situps på Lägg till vikt så börjar mätningen')
-            )
-          ),
-          h('div', { className: 'px-6 pt-4 flex flex-wrap gap-6' }, recovery.metrics.map(metricRuta)),
-          (function(){
-            var senaste = ouraData.length ? ouraData[0] : null;
-            if (!senaste) return null;
-            var dlSen = dayLogs[senaste.date] || {};
-            var idag = (Analytics.RECOVERY_TAGS || []).filter(function(t){ return dlSen[t.key]; }).map(function(t){ return t.name; });
-            return h('div', { className: 'px-6 pt-3' },
-              h('p', { className: 'text-xs text-gray-400' }, new Date(senaste.date).toLocaleDateString('sv-SE',{day:'numeric',month:'long'})),
-              h('p', { className: 'text-sm font-bold ' + (idag.length ? 'text-violet-600' : 'text-gray-400') },
-                idag.length ? idag.join(' · ') : 'Ingen insats taggad den dagen')
-            );
-          })(),
-          h('p', { className: 'text-xs font-semibold text-gray-500 px-6 pt-4' }, 'HRV (ms) · 7-dagars snitt'),
-          h('div', { className: 'px-4' },
-            h(SvgLineChart, { data: serie, lines: [{ key:'hrv', name:'HRV', color:'#8DB3DF', width:1.5 }, { key:'hrv7', name:'7-dagars snitt', color:'#2F66A6', width:2.5 }], height: 200, markers: markers })
-          ),
-          h('p', { className: 'text-xs font-semibold text-gray-500 px-6 pt-2' }, 'Vilopuls · 7-dagars snitt'),
-          h('div', { className: 'px-4' },
-            h(SvgLineChart, { data: serie, lines: [{ key:'rhr', name:'Vilopuls', color:'#EA8A7C', width:1.5 }, { key:'rhr7', name:'7-dagars snitt', color:'#A93C2F', width:2.5 }], height: 200, markers: markers })
-          ),
-          recovery.taggar.length ? h('div', { className: 'px-6 pt-3' },
-            h('p', { className: 'text-xs font-semibold text-gray-500 mb-1' }, 'Effekt per insats'),
-            recovery.taggar.map(effektRad)
-          ) : null,
-          h('p', { className: 'text-xs text-gray-400 px-6 py-3' }, 'Oura daterar natten efter morgonen den slutar, så en insats på måndag syns i tisdagens siffra — det är den jämförelsen som görs här. Jämförelsen sker bara inom perioden efter att du började, annars hade halva Wegovy-resan räknats som effekt av spikmattan.')
-        );
-      })(),
+      })()
+    ); };
+    var mattKort = function(){ return (
       // ── Mått & kroppsfett över tid ──
       (function(){
         var mkeys = [['midja','Midja','#CC6236'],['brost','Bröst','#3F7BBF'],['lar','Lår','#56A56D'],['arm','Arm','#E5A62B'],['vad','Vad','#5A534B'],['hals','Hals','#A8779A']];
@@ -1705,6 +1616,225 @@ function WeightStepTracker() {
               ? 'Streckad linje = prognos fram till målet, framräknad ur din egen takt (regression, inte första-mot-sista). Mållinjen sträcker y-axeln; stäng av 🎯 Mål om kurvorna ser platta ut. '
               : 'Mållinjerna är avstängda, så y-axeln spänner bara det som faktiskt hänt. ') +
             'Överst står startvärde → nuvarande. Mät på samma ställe varje söndag. Fett% = midja + hals + längd (halsen bär mest brus).')
+        );
+      })()
+    ); };
+    var MKEYS = [['midja','Midja','#CC6236'],['brost','Bröst','#3F7BBF'],['lar','Lår','#56A56D'],['arm','Arm','#E5A62B'],['vad','Vad','#5A534B'],['hals','Hals','#A8779A']];
+    return h('div', null,
+      // ── Läget just nu ──
+      (function(){
+        var nf = function(v){ return v == null ? '–' : String(v).replace('.', ','); };
+        var o0 = ouraData.length ? ouraData[0] : null;
+        var L = bodyBattery && bodyBattery.lang;
+        var TON = { bra: 'bg-emerald-100 text-emerald-800', dalig: 'bg-orange-100 text-orange-800', varn: 'bg-amber-100 text-amber-800', neutral: 'bg-gray-100 text-gray-600' };
+        var chip = function(txt, ton){ return h('span', { className: 'inline-block text-xs font-medium px-2 py-0.5 rounded-full mt-1 ' + (TON[ton] || TON.neutral) }, txt); };
+        var ruta = function(etikett, varde, enhet, chipEl, key){
+          return h('div', { key: key, className: 'bg-gray-50 rounded-xl p-3' },
+            h('p', { className: 'text-xs text-gray-500' }, etikett),
+            h('p', { className: 'text-xl font-black text-gray-800 leading-tight' }, varde, enhet ? h('span', { className: 'text-xs text-gray-500 ml-1 font-sans' }, enhet) : null),
+            chipEl);
+        };
+        var rutor = [];
+        if (prediction && prediction.gaining) rutor.push(ruta('Vikt, 30 d', '+' + nf(prediction.kgPerWeek), 'kg/v', chip('ökar', 'dalig'), 'v'));
+        else if (prediction) rutor.push(ruta('Vikt, 30 d', '−' + nf(prediction.kgPerWeek), 'kg/v', prediction.kgPerWeek >= 0.1 ? chip('på rätt väg', 'bra') : chip('står still', 'varn'), 'v'));
+        else if (stats) rutor.push(ruta('Vikt', nf(stats.latest.weight), 'kg', chip('för lite data för trend', 'neutral'), 'v'));
+        if (o0 && o0.hrv_avg != null) rutor.push(ruta('HRV i natt', nf(o0.hrv_avg), 'ms',
+          (L && L.hrvPct <= -20) ? chip(L.hrvPct + ' % sedan ' + new Date(L.refDatum).toLocaleDateString('sv-SE', { month: 'long' }), 'dalig') : (L && L.hrvPct >= 10) ? chip('+' + L.hrvPct + ' % långsiktigt', 'bra') : chip('stabil nivå', 'neutral'), 'h'));
+        if (o0 && o0.resting_hr != null) rutor.push(ruta('Vilopuls i natt', nf(o0.resting_hr), '',
+          (L && L.rhrDiff != null && L.rhrDiff >= 5) ? chip('+' + nf(Math.round(L.rhrDiff)) + ' sedan ' + new Date(L.refDatum).toLocaleDateString('sv-SE', { month: 'long' }), 'dalig') : (L && L.rhrDiff != null && L.rhrDiff <= -3) ? chip(nf(Math.round(L.rhrDiff)) + ' långsiktigt', 'bra') : chip('stabil nivå', 'neutral'), 'r'));
+        if (ouraSleepBank) { var tim = Math.round(ouraSleepBank.balance / 60); rutor.push(ruta('Sömn, ' + ouraSleepBank.n + ' nätter', (tim > 0 ? '+' : tim < 0 ? '−' : '') + Math.abs(tim), 'h', tim <= -3 ? chip('sömnskuld', 'varn') : tim >= 2 ? chip('i plus', 'bra') : chip('i balans', 'neutral'), 's')); }
+        var topp = (topSignals && topSignals.length) ? topSignals[0] : null;
+        return h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 p-5' },
+          h('h2', { className: 'font-bold text-gray-800 mb-3' }, '🧭 Läget just nu'),
+          rutor.length ? h('div', { className: 'grid grid-cols-2 md:grid-cols-4 gap-3' }, rutor) : h('p', { className: 'text-sm text-gray-400' }, 'Inte tillräckligt med data än.'),
+          topp ? h('p', { className: 'text-sm text-gray-700 mt-4' },
+            h('span', { className: 'font-bold' }, 'Viktigast idag: '), (topp.action || topp.text || topp.title)) : null,
+          (topSignals && topSignals.length) ? h('button', { onClick: function(){ setVisaSignaler(!visaSignaler); }, className: 'text-xs text-indigo-600 mt-2' },
+            visaSignaler ? 'Dölj signalerna' : ('Visa alla ' + topSignals.length + ' signaler')) : null,
+          visaSignaler ? h('div', { className: 'mt-4' }, signalKort()) : null
+        );
+      })(),
+      // ── Mål ──
+      (function(){
+        var nf = function(v){ return v == null ? '–' : String(Math.round(v * 10) / 10).replace('.', ','); };
+        var datum = function(d){ return d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' }); };
+        var rader = [];
+        if (stats && goalWeight) {
+          var kgKvar = stats.latest.weight - goalWeight;
+          var start = sortedE.length ? sortedE[0].weight : stats.latest.weight;
+          var tot = start - goalWeight, pct = tot > 0 ? Math.max(0, Math.min(1, (start - stats.latest.weight) / tot)) : 1;
+          var hoger = kgKvar <= 0 ? '🎉 i mål' : (prediction && !prediction.gaining && prediction.weeksToGoal != null) ? ('≈ ' + datum(new Date(Date.now() + prediction.weeksToGoal * 7 * 86400000))) : 'trenden står still';
+          rader.push({ namn: 'Vikt', fran: nf(stats.latest.weight), till: nf(goalWeight), enhet: 'kg', pct: pct, hoger: hoger, farg: '#3F7BBF' });
+        }
+        var mal = Analytics.getMattMal ? Analytics.getMattMal(dayLogs, MKEYS, mattMal || Analytics.MATT_MAL || {}) : [];
+        mal.filter(function(g){ return g.mal != null; }).forEach(function(g){
+          var hoger = g.status === 'klar' ? '🎉 i mål' : g.status === 'pa_vag' ? ('≈ ' + datum(g.malDatum)) : g.status === 'bortom' ? 'längre än 6 mån' : g.status === 'felriktning' ? 'fel håll' : 'står stilla';
+          rader.push({ namn: g.name, fran: nf(g.nu), till: nf(g.mal), enhet: 'cm', pct: Math.max(0, Math.min(1, g.pct || 0)), hoger: hoger, farg: g.color });
+        });
+        if (!rader.length) return null;
+        return h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 p-5' },
+          h('h2', { className: 'font-bold text-gray-800 mb-3' }, '🎯 Mål'),
+          h('div', { className: 'space-y-3' }, rader.map(function(r, i){
+            return h('div', { key: i },
+              h('div', { className: 'flex items-baseline justify-between gap-2 text-sm' },
+                h('span', null, h('span', { className: 'font-bold text-gray-800' }, r.namn), h('span', { className: 'text-gray-500' }, ' ' + r.fran + ' → ' + r.till + ' ' + r.enhet)),
+                h('span', { className: 'text-xs font-medium text-gray-600' }, r.hoger)),
+              h('div', { className: 'h-1.5 rounded-full bg-gray-100 overflow-hidden mt-1' },
+                h('div', { className: 'h-full rounded-full', style: { width: (r.pct * 100) + '%', backgroundColor: r.farg } })));
+          })),
+          h('p', { className: 'text-xs text-gray-400 mt-3' }, 'Datumen bygger på din faktiska takt. Målen ändras under Trender → Mått.')
+        );
+      })(),
+      // ── Vad fungerar ──
+      (recovery && recovery.taggar && recovery.taggar.length) ? (function(){
+        var bed = function(t){
+          var e = t.effekt, svag = t.dagar < 14 || e.some(function(x){ return x.svag; });
+          if (svag) return { txt: 'för lite data', ton: 'bg-amber-100 text-amber-800', why: 'Behöver fler dagar både med och utan insatsen för att kunna jämföra.' };
+          var hrv = e.filter(function(x){ return x.key === 'hrv_avg'; })[0], rhr = e.filter(function(x){ return x.key === 'resting_hr'; })[0];
+          var bra = 0, dalig = 0;
+          if (hrv && Math.abs(hrv.diff) >= 1) { if (hrv.battre) bra++; else dalig++; }
+          if (rhr && Math.abs(rhr.diff) >= 1) { if (rhr.battre) bra++; else dalig++; }
+          var detalj = 'Natten efter: HRV ' + (hrv.diff > 0 ? '+' : '') + String(hrv.diff).replace('.', ',') + ' ms, vilopuls ' + (rhr.diff > 0 ? '+' : '') + String(rhr.diff).replace('.', ',') + '.';
+          if (bra && !dalig) return { txt: 'verkar hjälpa', ton: 'bg-emerald-100 text-emerald-800', why: detalj };
+          if (dalig && !bra) return { txt: 'verkar inte hjälpa', ton: 'bg-orange-100 text-orange-800', why: detalj };
+          return { txt: 'ingen tydlig effekt', ton: 'bg-gray-100 text-gray-600', why: detalj };
+        };
+        return h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 p-5' },
+          h('h2', { className: 'font-bold text-gray-800 mb-2' }, '🧪 Vad fungerar'),
+          recovery.taggar.map(function(t, i){
+            var b = bed(t);
+            return h('div', { key: i, className: 'py-2 ' + (i ? 'border-t border-gray-100' : '') },
+              h('div', { className: 'flex items-center justify-between gap-3' },
+                h('span', { className: 'text-sm text-gray-800' }, t.name + ' · ' + t.dagar + ' dagar'),
+                h('span', { className: 'text-xs font-medium px-2 py-0.5 rounded-full ' + b.ton }, b.txt)),
+              h('p', { className: 'text-xs text-gray-500 mt-0.5' }, b.why));
+          }),
+          h('p', { className: 'text-xs text-gray-400 mt-2' }, 'Jämför natten efter en dag med insatsen mot natten efter en dag utan. Detaljer under Fördjupning → Återhämtning i detalj.')
+        );
+      })() : null,
+      // ── Trender: en graf, välj vad den visar ──
+      (function(){
+        var FLIKAR = [['vikt', 'Vikt'], ['hrv', 'HRV'], ['rhr', 'Vilopuls'], ['matt', 'Mått och fett'], ['humor', 'Humör']];
+        var val = FLIKAR.some(function(f){ return f[0] === trendVal; }) ? trendVal : 'vikt';
+        var knappar = h('div', { className: 'flex flex-wrap gap-2 mb-3' }, FLIKAR.map(function(f){
+          var on = f[0] === val;
+          return h('button', { key: f[0], onClick: function(){ setTrendValSparat(f[0]); },
+            className: 'text-xs px-3 py-1.5 rounded-full border ' + (on ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200') }, f[1]);
+        }));
+        var oura7 = function(key){
+          var serie = ouraData.slice(0, 120).reverse().map(function(d){ return { datum: new Date(d.date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' }), t: new Date(d.date).getTime(), v: d[key] }; });
+          serie.forEach(function(pt, ix){ var w = serie.slice(Math.max(0, ix - 6), ix + 1).map(function(x){ return x.v; }).filter(function(v){ return v != null; }); pt.v7 = w.length ? Math.round(w.reduce(function(a, b){ return a + b; }, 0) / w.length * 10) / 10 : null; });
+          return serie;
+        };
+        var innehall = null;
+        if (val === 'vikt') innehall = chartData.length >= 2 ? h(SvgLineChart, { data: chartData, height: 260, lines: [
+            { key: 'vikt', color: '#8DB3DF', width: 1.5, name: 'Vikt (kg)' },
+            { key: 'snitt7', color: '#2F66A6', width: 2.5, name: '7-dagars snitt' },
+            { key: 'målvikt', color: '#3E8B56', width: 1.5, name: 'Målvikt', dashed: true, ref: true } ] }) : h('p', { className: 'text-sm text-gray-400' }, 'För få vägningar för en graf.');
+        else if (val === 'hrv') innehall = ouraData.length >= 14 ? h(SvgLineChart, { data: oura7('hrv_avg'), height: 240, lines: [ { key: 'v', color: '#B8D0EC', width: 1.5, name: 'HRV (ms)' }, { key: 'v7', color: '#2F66A6', width: 2.5, name: '7-dagars snitt' } ] }) : h('p', { className: 'text-sm text-gray-400' }, 'Ingen Oura-data än.');
+        else if (val === 'rhr') innehall = ouraData.length >= 14 ? h(SvgLineChart, { data: oura7('resting_hr'), height: 240, lines: [ { key: 'v', color: '#F3B2A8', width: 1.5, name: 'Vilopuls' }, { key: 'v7', color: '#A93C2F', width: 2.5, name: '7-dagars snitt' } ] }) : h('p', { className: 'text-sm text-gray-400' }, 'Ingen Oura-data än.');
+        else if (val === 'humor') innehall = chartData.some(function(d){ return d.humör; }) ? h(SvgLineChart, { data: chartData, height: 200, lines: [ { key: 'humör', color: '#D0906F', width: 2, name: 'Humör (1–5)' } ] }) : h('p', { className: 'text-sm text-gray-400' }, 'Inget humör loggat än.');
+        return h('div', { className: 'mb-4' },
+          h('div', { className: 'bg-white rounded-2xl shadow-md p-5' + (val === 'matt' ? ' mb-4' : '') },
+            h('h2', { className: 'font-bold text-gray-800 mb-3' }, '📈 Trender'),
+            knappar,
+            val === 'matt' ? h('p', { className: 'text-xs text-gray-500' }, 'Söndagsmåtten, målen och kroppsfett visas nedan.') : innehall),
+          val === 'matt' ? (mattKort() || h('div', { className: 'bg-white rounded-2xl shadow-md p-5 text-sm text-gray-400' }, 'Minst två söndagsmätningar behövs för att visa måtten.')) : null
+        );
+      })(),
+      insGroup('fordjupning', '📚', 'Fördjupning', 'Återhämtning i detalj · veckokortet · dagar som idag · humör och samband · receptet på bästa dagar · experiment · fler grafer', function(){ return h('div', null,
+      insGroup('kropp', '🫀', 'Återhämtning i detalj', 'HRV och vilopuls · effekt per insats · två grafer', function(){ return h('div', null,
+      // ── Återhämtning: HRV & vilopuls mot insatserna ──
+      (function(){
+        if (!recovery) return null;
+        var hrvM = recovery.metrics.filter(function(m){ return m.key === 'hrv_avg'; })[0];
+        var rhrM = recovery.metrics.filter(function(m){ return m.key === 'resting_hr'; })[0];
+        var nf = function(v){ return v == null ? '–' : String(v).replace('.', ','); };
+        var pilTon = function(m){ return m.riktning === 'battre' ? 'text-emerald-600' : m.riktning === 'samre' ? 'text-red-500' : 'text-gray-400'; };
+        var pilTecken = function(m){ return m.riktning === 'platt' ? '→' : (m.trendPerV > 0 ? '▲' : '▼'); };
+        // Två separata grafer: HRV ligger kring 20, vilopulsen kring 60. Samma
+        // y-axel skulle klämma ihop HRV-kurvan till en rak linje.
+        var serie = ouraData.slice(0, 120).reverse().map(function(d){
+          return { datum: new Date(d.date).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}), date: d.date, hrv: d.hrv_avg, rhr: d.resting_hr };
+        });
+        var glid = function(key, ut){
+          serie.forEach(function(pt, ix){
+            var w = serie.slice(Math.max(0, ix-6), ix+1).map(function(x){ return x[key]; }).filter(function(v){ return v != null; });
+            pt[ut] = w.length ? Math.round(w.reduce(function(a,b){ return a+b; },0)/w.length*10)/10 : null;
+          });
+        };
+        glid('hrv', 'hrv7'); glid('rhr', 'rhr7');
+        var markers = recovery.taggar.map(function(t){
+          var mi = serie.findIndex(function(x){ return x.date >= t.start; });
+          return mi >= 0 ? { i: mi, label: t.name.replace(/^\S+\s+/, '') } : null;
+        }).filter(function(x){ return x; });
+
+        var metricRuta = function(m, i){
+          if (!m) return null;
+          return h('div', { key: i, className: 'flex-1 min-w-[9rem]' },
+            h('p', { className: 'text-xs text-gray-400' }, m.name),
+            h('p', { className: 'text-2xl font-black text-gray-800' }, nf(m.nu) + m.unit),
+            h('p', { className: 'text-xs text-gray-400' }, '7d ' + nf(m.snitt7) + ' · 30d ' + nf(m.snitt30)),
+            m.trendPerV != null
+              ? h('p', { className: 'text-xs font-bold ' + pilTon(m) },
+                  pilTecken(m) + ' ' + (m.riktning === 'platt' ? 'ligger stilla' : (nf(Math.abs(m.trendPerV)) + m.unit + '/vecka')) )
+              : h('p', { className: 'text-xs text-gray-300' }, 'för lite data för trend')
+          );
+        };
+
+        var effektRad = function(t, i){
+          var bitar = t.effekt.map(function(e){
+            if (e.svag) return h('span', { key: e.key, className: 'text-xs text-gray-300' }, e.name + ' –');
+            return h('span', { key: e.key, className: 'text-xs font-bold ' + (e.battre ? 'text-emerald-600' : 'text-red-500') },
+              e.name + ' ' + (e.diff > 0 ? '+' : '') + nf(e.diff) + e.unit);
+          });
+          var svag = t.effekt.some(function(e){ return e.svag; }) || t.dagar < 10;
+          return h('div', { key: i, className: 'py-2 border-t border-gray-50' },
+            h('div', { className: 'flex items-baseline justify-between gap-3 flex-wrap' },
+              h('p', { className: 'text-sm text-gray-700' }, t.name),
+              h('div', { className: 'flex items-center gap-3' }, bitar)
+            ),
+            h('p', { className: 'text-xs text-gray-400 mt-0.5' },
+              t.dagar + ' dagar sedan ' + new Date(t.start).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}) +
+              ' · natten efter jämfört med natten efter en dag utan' + (svag ? ' · för tunt underlag för att lita på' : ''))
+          );
+        };
+
+        return h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 overflow-hidden' },
+          h('div', { className: 'flex items-center gap-3 px-6 py-4 border-b border-gray-50' },
+            h('div', { className: 'w-1 h-8 rounded-full bg-violet-500' }),
+            h('div', { className: 'flex-1' },
+              h('h2', { className: 'font-bold text-gray-800' }, '🫀 Återhämtning — HRV & vilopuls'),
+              h('p', { className: 'text-xs text-gray-400' }, recovery.start
+                ? ('Följer dina insatser sedan ' + new Date(recovery.start).toLocaleDateString('sv-SE',{day:'numeric',month:'long'}))
+                : 'Tagga 🚶 Powerwalk, 🪡 Spikmatta eller 💪 100 situps på Lägg till vikt så börjar mätningen')
+            )
+          ),
+          h('div', { className: 'px-6 pt-4 flex flex-wrap gap-6' }, recovery.metrics.map(metricRuta)),
+          (function(){
+            var senaste = ouraData.length ? ouraData[0] : null;
+            if (!senaste) return null;
+            var dlSen = dayLogs[senaste.date] || {};
+            var idag = (Analytics.RECOVERY_TAGS || []).filter(function(t){ return dlSen[t.key]; }).map(function(t){ return t.name; });
+            return h('div', { className: 'px-6 pt-3' },
+              h('p', { className: 'text-xs text-gray-400' }, new Date(senaste.date).toLocaleDateString('sv-SE',{day:'numeric',month:'long'})),
+              h('p', { className: 'text-sm font-bold ' + (idag.length ? 'text-violet-600' : 'text-gray-400') },
+                idag.length ? idag.join(' · ') : 'Ingen insats taggad den dagen')
+            );
+          })(),
+          h('p', { className: 'text-xs font-semibold text-gray-500 px-6 pt-4' }, 'HRV (ms) · 7-dagars snitt'),
+          h('div', { className: 'px-4' },
+            h(SvgLineChart, { data: serie, lines: [{ key:'hrv', name:'HRV', color:'#8DB3DF', width:1.5 }, { key:'hrv7', name:'7-dagars snitt', color:'#2F66A6', width:2.5 }], height: 200, markers: markers })
+          ),
+          h('p', { className: 'text-xs font-semibold text-gray-500 px-6 pt-2' }, 'Vilopuls · 7-dagars snitt'),
+          h('div', { className: 'px-4' },
+            h(SvgLineChart, { data: serie, lines: [{ key:'rhr', name:'Vilopuls', color:'#EA8A7C', width:1.5 }, { key:'rhr7', name:'7-dagars snitt', color:'#A93C2F', width:2.5 }], height: 200, markers: markers })
+          ),
+          recovery.taggar.length ? h('div', { className: 'px-6 pt-3' },
+            h('p', { className: 'text-xs font-semibold text-gray-500 mb-1' }, 'Effekt per insats'),
+            recovery.taggar.map(effektRad)
+          ) : null,
+          h('p', { className: 'text-xs text-gray-400 px-6 py-3' }, 'Oura daterar natten efter morgonen den slutar, så en insats på måndag syns i tisdagens siffra — det är den jämförelsen som görs här. Jämförelsen sker bara inom perioden efter att du började, annars hade halva Wegovy-resan räknats som effekt av spikmattan.')
         );
       })(),
         null
@@ -2198,6 +2328,8 @@ function WeightStepTracker() {
           ]})
         )
       ) : null,
+        null
+      ); }),
         null
       ); }),
       null
