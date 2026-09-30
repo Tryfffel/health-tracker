@@ -16,69 +16,79 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.48.0/dist/tabler-icons.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script>
-  // ── Designtema "Havre, blå ton" ──────────────────────────────────────────
-  // Hela temat ligger HÄR, inte utspritt i koden: Tailwinds färgskalor mappas
-  // om så att alla befintliga klasser (indigo/blå/lila = dämpad blå, grått =
-  // varmt grått, grönt = salvia, rosa = terrakotta) automatiskt får nya toner.
-  // Vill man tillbaka till gamla utseendet räcker det att ta bort detta block
-  // och <style id="tema"> nedan.
-  var BLA = {50:'#EFF6FF',100:'#DBEAFE',200:'#BFDBFE',300:'#93C5FD',400:'#60A5FA',500:'#3B82F6',600:'#2563EB',700:'#1D4ED8',800:'#1E40AF',900:'#1E3A8A'};
+  // ── Designtema "Blårand" (tonen från dif.se) ─────────────────────────────
+  // Hela temat ligger HÄR: Tailwinds färgskalor mappas om så att alla
+  // befintliga klasser får nya toner. Marinblå (#002554) bär sidan, himmelsblå
+  // (#32BAF2) är accenten, rubriker och siffror i kondenserad versal (Anton).
+  var BLA = {50:'#EAF7FE',100:'#D2EFFD',200:'#A6DFFA',300:'#6FCCF6',400:'#32BAF2',500:'#1596D2',600:'#002554',700:'#001C42',800:'#001636',900:'#000F2A'};
   var SALVIA = {50:'#E3F5EC',100:'#C6EBD8',200:'#9ADBBC',300:'#63C596',400:'#34AE77',500:'#22A06B',600:'#178556',700:'#146B47',800:'#115538',900:'#0D432D'};
   var TERRAKOTTA = {50:'#FEF1EE',100:'#FDDCD6',200:'#FBB9AE',300:'#F78F80',400:'#F4715F',500:'#F0625A',600:'#D64A43',700:'#B03A35',800:'#8C2F2B',900:'#6E2522'};
-  var TEGEL = {50:'#FEF2F2',100:'#FEE2E2',200:'#FECACA',300:'#FCA5A5',400:'#F87171',500:'#EF4444',600:'#DC2626',700:'#B91C1C',800:'#991B1B',900:'#7F1D1D'};
-  var OCKRA = {50:'#FFFBEB',100:'#FEF3C7',200:'#FDE68A',300:'#FCD34D',400:'#FBBF24',500:'#F2B33D',600:'#D97706',700:'#B45309',800:'#92400E',900:'#78350F'};
-  var VARMGRA = {50:'#F8FAFC',100:'#F1F5F9',200:'#E4E9F0',300:'#CBD5E1',400:'#98A2B3',500:'#667085',600:'#4B5565',700:'#364152',800:'#1B2230',900:'#111827'};
-  // Tema "Hav": klar blå huvudfärg + en egen färg per mått (sömn lila, HRV turkos,
-  // vilopuls korall, steg/träning grön, bastu orange, kallbad isblå).
+  var TEGEL = {50:'#FEF2F2',100:'#FEE2E2',200:'#FECACA',300:'#FCA5A5',400:'#F87171',500:'#E5352B',600:'#C8231B',700:'#A61C16',800:'#861914',900:'#6E1712'};
+  var OCKRA = {50:'#FFFAE6',100:'#FFF1BF',200:'#FFE380',300:'#FFD84D',400:'#FFCC1A',500:'#F5B800',600:'#D19600',700:'#A87400',800:'#855C00',900:'#6B4A00'};
+  var VARMGRA = {50:'#F4F6FA',100:'#EAEEF4',200:'#D9DFE8',300:'#B9C3D2',400:'#7B8FA8',500:'#5B6E88',600:'#3F5170',700:'#2A3A56',800:'#13233F',900:'#000F2A'};
   var LILA = {50:'#F3F1FD',100:'#E6E1FA',200:'#CFC6F5',300:'#B0A2EC',400:'#8E7BE0',500:'#6D5BD0',600:'#5A48B8',700:'#4A3B96',800:'#3C3079',900:'#302762'};
   var TURKOS = {50:'#E6F7F5',100:'#C4EEE9',200:'#92DFD6',300:'#5BCBBE',400:'#2DB4A5',500:'#0E9F8E',600:'#0B8274',700:'#0A685E',800:'#09534B',900:'#07433D'};
   var APELSIN = {50:'#FFF5EE',100:'#FFE7D6',200:'#FECDAA',300:'#FCAB74',400:'#F98C45',500:'#F2762B',600:'#D95F1A',700:'#B34A15',800:'#8F3C15',900:'#743314'};
   tailwind.config = { theme: { extend: {
-    colors: { blue: BLA, indigo: BLA, violet: LILA, purple: LILA, gray: VARMGRA, slate: VARMGRA,
+    colors: { blue: BLA, indigo: BLA, sky: BLA, violet: LILA, purple: LILA, gray: VARMGRA, slate: VARMGRA,
               emerald: SALVIA, green: SALVIA, lime: SALVIA, teal: TURKOS, cyan: TURKOS,
               pink: TERRAKOTTA, rose: TERRAKOTTA, fuchsia: LILA, orange: APELSIN,
               amber: OCKRA, yellow: OCKRA, red: TEGEL },
-    fontFamily: { sans: ['"DM Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
-    borderRadius: { xl: '1rem', '2xl': '1.25rem' }
+    fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] },
+    borderRadius: { xl: '0.75rem', '2xl': '1rem' }
   } } };
   </script>
   <style id="tema">
-    body { background: #F5F7FA; color: #1B2230; }
-    .from-blue-50.to-indigo-100 { background: #F5F7FA !important; }
+    body { background: #EEF2F7; color: #13233F; -webkit-font-smoothing: antialiased; }
+    .from-blue-50.to-indigo-100 { background: #EEF2F7 !important; }
     .bg-white { background-color: #FFFFFF; }
-    .shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl { box-shadow: 0 0 0 1px #E4E9F0 !important; }
-    .font-black { font-family: 'Fraunces', Georgia, serif; font-weight: 500; letter-spacing: -0.01em; }
-    h1, h2 { letter-spacing: -0.01em; }
-    body { -webkit-font-smoothing: antialiased; }
-    /* Hero-korten: en klar, djupblå färgyta med vit text — sidans färgklick */
-    .bg-gradient-to-br.shadow-xl { background: #1E40AF !important; color: #FFFFFF; box-shadow: none !important; }
-    .bg-gradient-to-br.shadow-xl.from-emerald-500 { background: #0F766E !important; }
-    .bg-gradient-to-br.shadow-xl.from-amber-500 { background: #B45309 !important; }
-    .bg-gradient-to-br.shadow-xl .bg-gradient-to-r { background: #5EEAD4 !important; }
-    .bg-gradient-to-br.shadow-xl [class*="text-emerald-3"], .bg-gradient-to-br.shadow-xl [class*="text-green-3"] { color: #5EEAD4 !important; }
-    .bg-gradient-to-br.shadow-xl [class*="text-red-3"] { color: #FCA5A5 !important; }
+    .shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl { box-shadow: 0 1px 0 #D9DFE8, 0 0 0 1px #E3E8EF !important; }
+    /* Siffror och rubriker: kondenserad versal som på dif.se */
+    .font-black { font-family: 'Anton', 'Arial Narrow', sans-serif; font-weight: 400; letter-spacing: 0.01em; }
+    h1.font-bold, h2.font-bold { font-family: 'Anton', 'Arial Narrow', sans-serif; font-weight: 400; text-transform: uppercase; letter-spacing: 0.03em; color: #002554; }
+    h2.font-bold { font-size: 1.1rem; }
+    /* Toppen: mörk marinblå ram med himmelsblå markering */
+    .tema-topp { background: #000F2A !important; box-shadow: none !important; }
+    .tema-topp h1 { color: #FFFFFF !important; font-size: 1.35rem; }
+    .tema-topp p { color: #7B8FA8; }
+    .tema-topp .border-gray-100 { border-color: rgba(255,255,255,.08); }
+    .tema-topp button.bg-gray-100, .tema-topp button.text-gray-600 { background: rgba(255,255,255,.06); color: #D9DFE8; }
+    .tema-topp button.text-gray-600:hover { background: rgba(255,255,255,.12); }
+    .tema-topp button.bg-indigo-600, .tema-topp button.bg-indigo-50 { background: #32BAF2 !important; color: #000F2A !important; border-color: #32BAF2 !important; }
+    .tema-topp .bg-indigo-50 { background: rgba(50,186,242,.1); }
+    .tema-topp .bg-indigo-50 .text-indigo-700 { color: #FFFFFF; }
+    .tema-topp .bg-indigo-50 .text-indigo-400 { color: #32BAF2; }
+    /* Hero-korten: marinblå yta, himmelsblå accent */
+    .bg-gradient-to-br.shadow-xl { background: #002554 !important; color: #FFFFFF; box-shadow: none !important; }
+    .bg-gradient-to-br.shadow-xl.from-emerald-500 { background: #00384F !important; }
+    .bg-gradient-to-br.shadow-xl.from-amber-500 { background: #6B4A00 !important; }
+    .bg-gradient-to-br.shadow-xl .bg-gradient-to-r { background: #32BAF2 !important; }
+    .bg-gradient-to-br.shadow-xl [class*="text-emerald-3"], .bg-gradient-to-br.shadow-xl [class*="text-green-3"] { color: #6FE3A8 !important; }
+    .bg-gradient-to-br.shadow-xl [class*="text-red-3"] { color: #FF8F8F !important; }
+    .bg-gradient-to-br.shadow-xl [class*="text-blue-1"], .bg-gradient-to-br.shadow-xl [class*="text-indigo-1"], .bg-gradient-to-br.shadow-xl [class*="text-blue-2"], .bg-gradient-to-br.shadow-xl [class*="text-indigo-2"] { color: #A6DFFA !important; }
     /* Varje mått har sin färg — ikonerna tar den, utom på färgade knappar med vit text */
     *:not([class*="text-white"]) > .tema-ikon.ti-moon, *:not([class*="text-white"]) > .tema-ikon.ti-zzz, *:not([class*="text-white"]) > .tema-ikon.ti-bed { color: #6D5BD0; }
     *:not([class*="text-white"]) > .tema-ikon.ti-heart-rate-monitor { color: #0E9F8E; }
-    *:not([class*="text-white"]) > .tema-ikon.ti-heartbeat, *:not([class*="text-white"]) > .tema-ikon.ti-heart, *:not([class*="text-white"]) > .tema-ikon.ti-thermometer { color: #F0625A; }
+    *:not([class*="text-white"]) > .tema-ikon.ti-heartbeat, *:not([class*="text-white"]) > .tema-ikon.ti-heart, *:not([class*="text-white"]) > .tema-ikon.ti-thermometer { color: #E5352B; }
     *:not([class*="text-white"]) > .tema-ikon.ti-shoe, *:not([class*="text-white"]) > .tema-ikon.ti-walk, *:not([class*="text-white"]) > .tema-ikon.ti-run, *:not([class*="text-white"]) > .tema-ikon.ti-barbell { color: #22A06B; }
-    *:not([class*="text-white"]) > .tema-ikon.ti-scale, *:not([class*="text-white"]) > .tema-ikon.ti-target, *:not([class*="text-white"]) > .tema-ikon.ti-trending-down { color: #2563EB; }
+    *:not([class*="text-white"]) > .tema-ikon.ti-scale, *:not([class*="text-white"]) > .tema-ikon.ti-target, *:not([class*="text-white"]) > .tema-ikon.ti-trending-down { color: #1596D2; }
     *:not([class*="text-white"]) > .tema-ikon.ti-flame, *:not([class*="text-white"]) > .tema-ikon.ti-droplet, *:not([class*="text-white"]) > .tema-ikon.ti-bolt { color: #F2762B; }
-    *:not([class*="text-white"]) > .tema-ikon.ti-snowflake { color: #0EA5E9; }
+    *:not([class*="text-white"]) > .tema-ikon.ti-snowflake { color: #32BAF2; }
     *:not([class*="text-white"]) > .tema-ikon.ti-needle, *:not([class*="text-white"]) > .tema-ikon.ti-vaccine { color: #6D5BD0; }
     /* Humörskalan från rött till grönt */
-    .tema-ikon.ti-mood-sad { color: #F0625A; } .tema-ikon.ti-mood-confuzed { color: #F28C4B; } .tema-ikon.ti-mood-empty { color: #E09A12; }
+    .tema-ikon.ti-mood-sad { color: #E5352B; } .tema-ikon.ti-mood-confuzed { color: #F2762B; } .tema-ikon.ti-mood-empty { color: #D19600; }
     .tema-ikon.ti-mood-smile { color: #22A06B; } .tema-ikon.ti-mood-happy { color: #0E9F8E; }
-    /* Knappar: en lugn, platt accent istället för tvåfärgade gradienter */
-    button.bg-gradient-to-r, a.bg-gradient-to-r { background-image: none !important; background-color: #2563EB !important; box-shadow: none !important; }
-    button.bg-gradient-to-r:hover, a.bg-gradient-to-r:hover { background-color: #1D4ED8 !important; }
+    /* Knappar: platt marinblå, som dif.se */
+    button.bg-gradient-to-r, a.bg-gradient-to-r { background-image: none !important; background-color: #002554 !important; box-shadow: none !important; }
+    button.bg-gradient-to-r:hover, a.bg-gradient-to-r:hover { background-color: #001C42 !important; }
+    button.bg-indigo-600, button.bg-blue-600 { letter-spacing: 0.01em; }
     /* Ljusa infoboxar: platta, utan gradient */
     div.bg-gradient-to-r:not(.rounded-full), div.bg-gradient-to-br:not(.shadow-xl) { background-image: none !important; }
-    div.bg-gradient-to-r.from-amber-50 { background-color: #FFFBEB; }
+    div.bg-gradient-to-r.from-amber-50 { background-color: #FFFAE6; }
     div.bg-gradient-to-r.from-green-50 { background-color: #E3F5EC; }
-    div.bg-gradient-to-br.from-violet-50 { background-color: #EFF6FF; }
+    div.bg-gradient-to-br.from-violet-50 { background-color: #EAF7FE; }
     /* Linjeikoner som ersätter emoji */
     .tema-ikon { font-size: 1.05em; vertical-align: -0.12em; margin-right: 0.3em; line-height: 1; }
     .tema-prick { display: inline-block; width: 0.6em; height: 0.6em; border-radius: 99px; vertical-align: 0.05em; margin: 0 0.2em; }
@@ -1163,7 +1173,7 @@ function WeightStepTracker() {
                 return h('button', { key: i, onClick: d.v != null ? function(){ setBbDay(bbDay === d.date ? null : d.date); } : undefined,
                   className: 'flex-1 rounded-t' + (d.v != null ? ' cursor-pointer hover:opacity-100' : '') + (bbDay === d.date ? ' ring-2 ring-indigo-400' : ''),
                   title: d.date + (d.v != null ? ': ' + d.v + '%' : ''),
-                  style: { height: (d.v != null ? Math.max(d.v, 4) : 4) + '%', backgroundColor: d.v != null ? col(d.v) : '#E4E9F0', opacity: (i === bb.days.length-1 || bbDay === d.date) ? 1 : 0.65 } });
+                  style: { height: (d.v != null ? Math.max(d.v, 4) : 4) + '%', backgroundColor: d.v != null ? col(d.v) : '#D9DFE8', opacity: (i === bb.days.length-1 || bbDay === d.date) ? 1 : 0.65 } });
               })
           ),
           h('p', { className: 'text-xs text-gray-400 mt-1' }, '14 dagar · klicka en stapel för att se exakt varifrån poängen kom — öppen formel, ingen magi'),
@@ -1453,7 +1463,7 @@ function WeightStepTracker() {
     var mattKort = function(){ return (
       // ── Mått & kroppsfett över tid ──
       (function(){
-        var mkeys = [['midja','Midja','#F0625A'],['brost','Bröst','#3B82F6'],['lar','Lår','#34AE77'],['arm','Arm','#FBBF24'],['vad','Vad','#4B5565'],['hals','Hals','#B06AB3']];
+        var mkeys = [['midja','Midja','#F0625A'],['brost','Bröst','#1596D2'],['lar','Lår','#34AE77'],['arm','Arm','#FBBF24'],['vad','Vad','#3F5170'],['hals','Hals','#B06AB3']];
         var mdates = Object.keys(dayLogs).filter(function(k){ return mkeys.some(function(m){ return dayLogs[k][m[0]] != null; }); }).sort();
         if (mdates.length < 2) return null;
         // Absoluta cm på samma axel gör små förändringar osynliga (bröst ~102 vs
@@ -1529,7 +1539,7 @@ function WeightStepTracker() {
                 return h('button', { key: i, title: dold ? 'Visa ' + x.name : 'Dölj ' + x.name,
                   onClick: function(){ var o = Object.assign({}, mattDold); if (o[x.key]) delete o[x.key]; else o[x.key] = true; setMattDoldSparat(o); },
                   className: 'flex items-baseline gap-1.5 px-2.5 py-1 rounded-lg border transition-colors ' + (dold ? 'border-gray-100 bg-gray-50 opacity-50' : 'border-gray-200 bg-white') },
-                  h('span', { className: 'w-2.5 h-2.5 rounded-full inline-block', style: { backgroundColor: dold ? '#CBD5E1' : x.color } }),
+                  h('span', { className: 'w-2.5 h-2.5 rounded-full inline-block', style: { backgroundColor: dold ? '#B9C3D2' : x.color } }),
                   h('span', { className: 'text-xs ' + (dold ? 'text-gray-400' : 'text-gray-600') }, x.name),
                   (x.start != null && x.start !== x.v) ? h('span', { className: 'text-xs ' + (dold ? 'text-gray-300' : 'text-gray-400') }, x.start + ' →') : null,
                   h('span', { className: 'text-sm font-black ' + (dold ? 'text-gray-400' : 'text-gray-800') }, x.v + ' cm'),
@@ -1629,7 +1639,7 @@ function WeightStepTracker() {
         );
       })()
     ); };
-    var MKEYS = [['midja','Midja','#F0625A'],['brost','Bröst','#3B82F6'],['lar','Lår','#34AE77'],['arm','Arm','#FBBF24'],['vad','Vad','#4B5565'],['hals','Hals','#B06AB3']];
+    var MKEYS = [['midja','Midja','#F0625A'],['brost','Bröst','#1596D2'],['lar','Lår','#34AE77'],['arm','Arm','#FBBF24'],['vad','Vad','#3F5170'],['hals','Hals','#B06AB3']];
     return h('div', null,
       // ── Läget just nu ──
       (function(){
@@ -1674,7 +1684,7 @@ function WeightStepTracker() {
           var start = sortedE.length ? sortedE[0].weight : stats.latest.weight;
           var tot = start - goalWeight, pct = tot > 0 ? Math.max(0, Math.min(1, (start - stats.latest.weight) / tot)) : 1;
           var hoger = kgKvar <= 0 ? '🎉 i mål' : (prediction && !prediction.gaining && prediction.weeksToGoal != null) ? ('≈ ' + datum(new Date(Date.now() + prediction.weeksToGoal * 7 * 86400000))) : 'trenden står still';
-          rader.push({ namn: 'Vikt', fran: nf(stats.latest.weight), till: nf(goalWeight), enhet: 'kg', pct: pct, hoger: hoger, farg: '#3B82F6' });
+          rader.push({ namn: 'Vikt', fran: nf(stats.latest.weight), till: nf(goalWeight), enhet: 'kg', pct: pct, hoger: hoger, farg: '#1596D2' });
         }
         var mal = Analytics.getMattMal ? Analytics.getMattMal(dayLogs, MKEYS, mattMal || Analytics.MATT_MAL || {}) : [];
         mal.filter(function(g){ return g.mal != null; }).forEach(function(g){
@@ -1738,10 +1748,10 @@ function WeightStepTracker() {
         };
         var innehall = null;
         if (val === 'vikt') innehall = chartData.length >= 2 ? h(SvgLineChart, { data: chartData, height: 260, lines: [
-            { key: 'vikt', color: '#93C5FD', width: 1.5, name: 'Vikt (kg)' },
-            { key: 'snitt7', color: '#2563EB', width: 2.5, name: '7-dagars snitt' },
+            { key: 'vikt', color: '#6FCCF6', width: 1.5, name: 'Vikt (kg)' },
+            { key: 'snitt7', color: '#002554', width: 2.5, name: '7-dagars snitt' },
             { key: 'målvikt', color: '#22A06B', width: 1.5, name: 'Målvikt', dashed: true, ref: true } ] }) : h('p', { className: 'text-sm text-gray-400' }, 'För få vägningar för en graf.');
-        else if (val === 'hrv') innehall = ouraData.length >= 14 ? h(SvgLineChart, { data: oura7('hrv_avg'), height: 240, lines: [ { key: 'v', color: '#BFDBFE', width: 1.5, name: 'HRV (ms)' }, { key: 'v7', color: '#2563EB', width: 2.5, name: '7-dagars snitt' } ] }) : h('p', { className: 'text-sm text-gray-400' }, 'Ingen Oura-data än.');
+        else if (val === 'hrv') innehall = ouraData.length >= 14 ? h(SvgLineChart, { data: oura7('hrv_avg'), height: 240, lines: [ { key: 'v', color: '#A6DFFA', width: 1.5, name: 'HRV (ms)' }, { key: 'v7', color: '#002554', width: 2.5, name: '7-dagars snitt' } ] }) : h('p', { className: 'text-sm text-gray-400' }, 'Ingen Oura-data än.');
         else if (val === 'rhr') innehall = ouraData.length >= 14 ? h(SvgLineChart, { data: oura7('resting_hr'), height: 240, lines: [ { key: 'v', color: '#FECACA', width: 1.5, name: 'Vilopuls' }, { key: 'v7', color: '#DC2626', width: 2.5, name: '7-dagars snitt' } ] }) : h('p', { className: 'text-sm text-gray-400' }, 'Ingen Oura-data än.');
         else if (val === 'humor') innehall = chartData.some(function(d){ return d.humör; }) ? h(SvgLineChart, { data: chartData, height: 200, lines: [ { key: 'humör', color: '#D0906F', width: 2, name: 'Humör (1–5)' } ] }) : h('p', { className: 'text-sm text-gray-400' }, 'Inget humör loggat än.');
         return h('div', { className: 'mb-4' },
@@ -1834,7 +1844,7 @@ function WeightStepTracker() {
           })(),
           h('p', { className: 'text-xs font-semibold text-gray-500 px-6 pt-4' }, 'HRV (ms) · 7-dagars snitt'),
           h('div', { className: 'px-4' },
-            h(SvgLineChart, { data: serie, lines: [{ key:'hrv', name:'HRV', color:'#93C5FD', width:1.5 }, { key:'hrv7', name:'7-dagars snitt', color:'#2563EB', width:2.5 }], height: 200, markers: markers })
+            h(SvgLineChart, { data: serie, lines: [{ key:'hrv', name:'HRV', color:'#6FCCF6', width:1.5 }, { key:'hrv7', name:'7-dagars snitt', color:'#002554', width:2.5 }], height: 200, markers: markers })
           ),
           h('p', { className: 'text-xs font-semibold text-gray-500 px-6 pt-2' }, 'Vilopuls · 7-dagars snitt'),
           h('div', { className: 'px-4' },
@@ -2302,8 +2312,8 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: chartData, height: 280, lines: [
-            { key: 'vikt',    color: '#93C5FD', width: 1.5, name: 'Vikt (kg)' },
-            { key: 'snitt7',  color: '#2563EB', width: 2.5, name: '7-dagars snitt' },
+            { key: 'vikt',    color: '#6FCCF6', width: 1.5, name: 'Vikt (kg)' },
+            { key: 'snitt7',  color: '#002554', width: 2.5, name: '7-dagars snitt' },
             { key: 'målvikt', color: '#22A06B', width: 1.5, name: 'Målvikt', dashed: true, ref: true }
           ]})
         )
@@ -2422,7 +2432,7 @@ function WeightStepTracker() {
       weekChartData.push({ datum: new Date(wMonday).toLocaleDateString('sv-SE',{day:'numeric',month:'short'}), pass: wCount });
     }
     // ── Träningsanalys ──
-    var TYPE_COLORS=['#3B82F6','#22A06B','#FBBF24','#F0625A','#60A5FA','#F4715F','#63C596','#F2B33D','#D64A43','#2563EB','#34AE77','#B06AB3'];
+    var TYPE_COLORS=['#1596D2','#22A06B','#FBBF24','#F0625A','#32BAF2','#F4715F','#63C596','#F2B33D','#D64A43','#002554','#34AE77','#B06AB3'];
     var byType={}; workouts.forEach(function(w){ byType[w.type]=(byType[w.type]||0)+w.duration; });
     var typeSegs = Object.keys(byType).map(function(k){ return {label:k, value:byType[k]}; }).sort(function(a,b){return b.value-a.value;}).map(function(seg,i){ seg.color=TYPE_COLORS[i%TYPE_COLORS.length]; return seg; });
     var typeTotal = typeSegs.reduce(function(s,x){return s+x.value;},0);
@@ -2439,7 +2449,7 @@ function WeightStepTracker() {
     var thCorr=null; if(trainHrvPts.length>=3){ var n=trainHrvPts.length,sx=0,sy=0,sxy=0,sxx=0,syy=0; trainHrvPts.forEach(function(p){sx+=p.x;sy+=p.y;sxy+=p.x*p.y;sxx+=p.x*p.x;syy+=p.y*p.y;}); var den=Math.sqrt((n*sxx-sx*sx)*(n*syy-sy*sy)); thCorr=den?(n*sxy-sx*sy)/den:null; }
     // heatmap (17 veckor)
     var hmWeeks=[]; for(var hw=-16; hw<=0; hw++){ var hM=new Date(todayD); hM.setDate(todayD.getDate()-(dow===0?6:dow-1)+hw*7); var col=[]; for(var hd=0; hd<7; hd++){ var cD=new Date(hM); cD.setDate(hM.getDate()+hd); var cs=cD.getFullYear()+'-'+String(cD.getMonth()+1).padStart(2,'0')+'-'+String(cD.getDate()).padStart(2,'0'); col.push({date:cs, min:(minByDate[cs]||0), future: cD>todayD}); } hmWeeks.push(col); }
-    var hmColor=function(m){ return m===0?'#F1F5F9':m<=20?'#C6EBD8':m<=45?'#34AE77':m<=80?'#22A06B':'#146B47'; };
+    var hmColor=function(m){ return m===0?'#EAEEF4':m<=20?'#C6EBD8':m<=45?'#34AE77':m<=80?'#22A06B':'#146B47'; };
     var trGrupp = function(id, emoji, title, sub, content) {
       var open = !!insOpen[id];
       return h('div', { className: 'mb-4' },
@@ -2539,7 +2549,7 @@ function WeightStepTracker() {
         ),
         weekChartData.some(function(d){return d.pass>0;}) ? h('div', { className:'mt-5 pt-5 border-t' },
           h('p', { className:'text-xs text-gray-400 mb-2' }, 'Pass per vecka (senaste 8 veckorna)'),
-          h(SvgBarChart, { data: weekChartData, dataKey: 'pass', color: '#3B82F6', height: 100 })
+          h(SvgBarChart, { data: weekChartData, dataKey: 'pass', color: '#1596D2', height: 100 })
         ) : null
       ),
       // ── WORKOUT HISTORY ─────────────────────────────────────────────────────
@@ -2615,7 +2625,7 @@ function WeightStepTracker() {
         h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
           h('h2', { className:'text-lg font-bold text-gray-800 mb-1' }, '📊 Veckovolym'),
           h('p', { className:'text-xs text-gray-400 mb-4' }, 'Träningsminuter per vecka · senaste 16 veckorna'),
-          h(SvgBarChart, { data: volData, dataKey:'min', color:'#3B82F6', height: 180 })
+          h(SvgBarChart, { data: volData, dataKey:'min', color:'#1596D2', height: 180 })
         ),
         // Intensitetsfördelning
         h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
@@ -2633,7 +2643,7 @@ function WeightStepTracker() {
         trainHrvPts.length>=3 ? h('div', { className: 'bg-white rounded-xl p-6 shadow-md mb-6' },
           h('h2', { className:'text-lg font-bold text-gray-800 mb-1' }, '🔗 Träning vs återhämtning'),
           h('p', { className:'text-xs text-gray-400 mb-3' }, 'Träningsminuter en dag vs HRV nästa morgon' + (thCorr!=null ? ' · samband ' + (thCorr>0?'+':'') + thCorr.toFixed(2) : '')),
-          h(SvgScatter, { points: trainHrvPts, xName:'Träningsminuter', yName:'HRV nästa dag (ms)', color:'#3B82F6', height: 230 }),
+          h(SvgScatter, { points: trainHrvPts, xName:'Träningsminuter', yName:'HRV nästa dag (ms)', color:'#1596D2', height: 230 }),
           thCorr!=null && thCorr < -0.3 ? h('p', { className:'text-xs text-amber-600 mt-2' }, 'Hård träning verkar sänka nästa dags HRV — se till att varva med återhämtning.') : null
         ) : null,
         // Heatmap
@@ -2740,7 +2750,7 @@ function WeightStepTracker() {
                     onClick: cell.v != null ? function(){ setSelectedDay(cell.ds); } : undefined,
                     title: cell.ds + (cell.v != null ? ': ' + cell.v : ''),
                     className: 'w-3 h-3 rounded-sm' + (cell.v != null ? ' cursor-pointer hover:ring-2 hover:ring-emerald-400' : ''),
-                    style: { backgroundColor: cell.future ? 'transparent' : (cell.v != null ? colorOf(cell.v) : '#F1F5F9') }
+                    style: { backgroundColor: cell.future ? 'transparent' : (cell.v != null ? colorOf(cell.v) : '#EAEEF4') }
                   });
                 })
               );
@@ -3052,8 +3062,8 @@ function WeightStepTracker() {
             ruta('Dagsform', nf(ouraLatest.dagsform_score), '', ouraLatest.dagsform_score >= 70 ? 'bra' : ouraLatest.dagsform_score >= 60 ? 'ok' : 'lågt', 'd')
           ),
           h('div', { className: 'flex h-2 rounded-full overflow-hidden mt-4' },
-            h('div', { style: { width: deepPct + '%', backgroundColor: '#5EEAD4' } }),
-            h('div', { style: { width: remPct + '%', backgroundColor: '#93C5FD' } }),
+            h('div', { style: { width: deepPct + '%', backgroundColor: '#32BAF2' } }),
+            h('div', { style: { width: remPct + '%', backgroundColor: '#6FCCF6' } }),
             h('div', { style: { width: lightPct + '%', backgroundColor: 'rgba(255,255,255,0.3)' } })
           ),
           h('p', { className: 'text-xs text-purple-200 mt-1' }, 'Djup ' + deepPct + ' % · REM ' + remPct + ' % · lätt och vaken ' + lightPct + ' %'),
@@ -3092,7 +3102,7 @@ function WeightStepTracker() {
           h('p', { className: 'text-xs text-gray-500' }, 'Sömn, HRV, vilopuls, temperatur och SpO2 inom dina vanliga nivåer'))),
       // ── Trender ──
       (function(){
-        var M = [['somn', 'Sömn', 'sleep_score', '#2563EB', ''], ['hrv', 'HRV', 'hrv_avg', '#2563EB', ' ms'], ['rhr', 'Vilopuls', 'resting_hr', '#DC2626', ''], ['steg', 'Steg', 'steps', '#178556', ''], ['stress', 'Stress', 'stress_high_min', '#D64A43', ' min'], ['temp', 'Temperatur', 'temp_dev', '#D97706', '°']];
+        var M = [['somn', 'Sömn', 'sleep_score', '#002554', ''], ['hrv', 'HRV', 'hrv_avg', '#002554', ' ms'], ['rhr', 'Vilopuls', 'resting_hr', '#DC2626', ''], ['steg', 'Steg', 'steps', '#178556', ''], ['stress', 'Stress', 'stress_high_min', '#D64A43', ' min'], ['temp', 'Temperatur', 'temp_dev', '#D97706', '°']];
         var val = M.filter(function(m){ return m[0] === ouraTrend; })[0] || M[0];
         var serie = ouraData.slice(0, ouraRange).reverse().map(function(d){ return { datum: new Date(d.date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' }), t: new Date(d.date).getTime(), v: d[val[2]] }; });
         serie.forEach(function(pt, ix){ var w = serie.slice(Math.max(0, ix - 6), ix + 1).map(function(x){ return x.v; }).filter(function(v){ return v != null; }); pt.v7 = w.length ? Math.round(w.reduce(function(a, b){ return a + b; }, 0) / w.length * 10) / 10 : null; });
@@ -3101,7 +3111,7 @@ function WeightStepTracker() {
           h('h2', { className: 'font-bold text-gray-800 mb-3' }, '📈 Trender'),
           h('div', { className: 'flex flex-wrap gap-2 mb-3' }, M.map(function(m){ return knapp(m[0] === val[0], m[1], function(){ setOuraTrendSparat(m[0]); }, m[0]); })),
           serie.filter(function(x){ return x.v != null; }).length >= 2
-            ? h(SvgLineChart, { data: serie, height: 230, lines: [ { key: 'v', color: '#CBD5E1', width: 1.5, name: val[1] }, { key: 'v7', color: val[3], width: 2.5, name: '7-dagars snitt' } ] })
+            ? h(SvgLineChart, { data: serie, height: 230, lines: [ { key: 'v', color: '#B9C3D2', width: 1.5, name: val[1] }, { key: 'v7', color: val[3], width: 2.5, name: '7-dagars snitt' } ] })
             : h('p', { className: 'text-sm text-gray-400' }, 'Ingen data för ' + val[1].toLowerCase() + ' i perioden.'),
           h('div', { className: 'flex gap-2 mt-3' }, [30, 90, 180].map(function(r){ return knapp(ouraRange === r, r + ' d', function(){ setOuraRange(r); }, 'r' + r); }))
         );
@@ -3326,7 +3336,7 @@ function WeightStepTracker() {
         h('div', { className: 'p-5' },
           (function(){
             var parts = [
-              ['Stillasittande', activityBalance.sed, '#CBD5E1'],
+              ['Stillasittande', activityBalance.sed, '#B9C3D2'],
               ['Låg aktivitet', activityBalance.lo, '#9ADBBC'],
               ['Medel', activityBalance.me, '#34AE77'],
               ['Hög', activityBalance.hi, '#178556']
@@ -3392,7 +3402,7 @@ function WeightStepTracker() {
                     var a = Math.abs(c.r);
                     var bg = c.r > 0 ? 'rgba(99,102,241,' + Math.min(0.85, a).toFixed(2) + ')' : 'rgba(244,63,94,' + Math.min(0.85, a).toFixed(2) + ')';
                     return h('td', { key: ci, className: 'text-center px-1 py-1' },
-                      h('div', { className: 'rounded-lg py-2 text-xs font-bold', style: { backgroundColor: bg, color: a > 0.35 ? 'white' : '#1B2230' }, title: 'n=' + c.n },
+                      h('div', { className: 'rounded-lg py-2 text-xs font-bold', style: { backgroundColor: bg, color: a > 0.35 ? 'white' : '#13233F' }, title: 'n=' + c.n },
                         (c.r > 0 ? '+' : '') + c.r.toFixed(2))
                     );
                   })
@@ -3433,7 +3443,7 @@ function WeightStepTracker() {
               ),
               topCorr ? h('div', null,
                 h('p', { className:'text-xs font-semibold text-gray-500 mb-1 px-2' }, 'Starkast: ' + topCorr.name + ' vs viktförändring (kg) nästa dag'),
-                h(SvgScatter, { points: scatterPoints, xName: topCorr.name, yName: 'Viktändring (kg)', color: '#3B82F6', height: 240 })
+                h(SvgScatter, { points: scatterPoints, xName: topCorr.name, yName: 'Viktändring (kg)', color: '#1596D2', height: 240 })
               ) : null,
               (corr[0] && corr[0].n < 14) ? h('p', { className:'text-xs text-amber-600 mt-2 px-2' }, '⚠ Få datapunkter ännu — tolka försiktigt.') : null,
               h('p', { className:'text-xs text-gray-400 mt-2 px-2' }, 'Samband = inte nödvändigtvis orsak. Värden nära 0 betyder inget tydligt mönster.')
@@ -3471,9 +3481,9 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: overlayData, height: 240, lines: [
-            hasWeightOverlay ? { key:'nvikt', color:'#2563EB', width:2.5, name:'Vikt' } : null,
+            hasWeightOverlay ? { key:'nvikt', color:'#002554', width:2.5, name:'Vikt' } : null,
             { key:'nhrv', color:'#F4715F', width:1.5, name:'HRV' },
-            { key:'nsomn', color:'#2563EB', width:1.5, name:'Sömn' },
+            { key:'nsomn', color:'#002554', width:1.5, name:'Sömn' },
             { key:'nsteg', color:'#FBBF24', width:1.5, name:'Steg' }
           ].filter(function(x){return x;}) })
         )
@@ -3494,7 +3504,7 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: chartData, height: 220, lines: [
-            { key: 'sömn', color: '#2563EB', width: 2, name: 'Sömnpoäng' },
+            { key: 'sömn', color: '#002554', width: 2, name: 'Sömnpoäng' },
             { key: 'readiness', color: '#22A06B', width: 2, name: 'Dagsform' }
           ]})
         )
@@ -3537,7 +3547,7 @@ function WeightStepTracker() {
           )
         ),
         h('div', { className: 'px-4 py-4' },
-          h(SvgBarChart, { data: chartData, dataKey: 'sömntimmar', color: '#3B82F6', height: 180 })
+          h(SvgBarChart, { data: chartData, dataKey: 'sömntimmar', color: '#1596D2', height: 180 })
         )
       ),
       // ── Sömnstadier över tid ──
@@ -3551,8 +3561,8 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: chartData, height: 200, lines: [
-            { key:'djup', color:'#2563EB', width:2, name:'Djupsömn (min)' },
-            { key:'rem', color:'#60A5FA', width:2, name:'REM (min)' }
+            { key:'djup', color:'#002554', width:2, name:'Djupsömn (min)' },
+            { key:'rem', color:'#32BAF2', width:2, name:'REM (min)' }
           ]})
         )
       ),
@@ -3595,7 +3605,7 @@ function WeightStepTracker() {
         ),
         h('div', { className: 'px-4 py-4' },
           h(SvgLineChart, { data: chartData, height: 180, lines: [
-            { key: 'effektivitet', color: '#3B82F6', width: 2, name: 'Effektivitet (%)' }
+            { key: 'effektivitet', color: '#1596D2', width: 2, name: 'Effektivitet (%)' }
           ]})
         )
       ),
@@ -3611,11 +3621,11 @@ function WeightStepTracker() {
         h('div', { className: 'px-4 py-2' },
           h('p', { className: 'text-xs text-gray-400 px-2 pt-2' }, 'Syresättning SpO2 (%)'),
           h(SvgLineChart, { data: chartData, height: 150, lines: [
-            { key: 'spo2', color: '#60A5FA', width: 2, name: 'SpO2 (%)' }
+            { key: 'spo2', color: '#32BAF2', width: 2, name: 'SpO2 (%)' }
           ]}),
           h('p', { className: 'text-xs text-gray-400 px-2 pt-3' }, 'Andningsfrekvens (andetag/min)'),
           h(SvgLineChart, { data: chartData, height: 150, lines: [
-            { key: 'andning', color: '#60A5FA', width: 2, name: 'Andning' }
+            { key: 'andning', color: '#32BAF2', width: 2, name: 'Andning' }
           ]})
         )
       ),
@@ -3895,8 +3905,8 @@ function WeightStepTracker() {
           h('p', { className: 'text-base text-gray-800 font-medium' }, rubrik),
           under ? h('p', { className: 'text-xs text-gray-500 mt-0.5' }, under) : null,
           (dr && dr.chart) ? h('div', { className: 'mt-3' }, h(SvgLineChart, { data: dr.chart, height: 200, lines: [
-            { key: 'vikt', color: '#3B82F6', width: 2.5, name: 'Vikt (kg)' },
-            { key: 'prognos', color: '#60A5FA', width: 2, name: 'Prognos', dashed: true },
+            { key: 'vikt', color: '#1596D2', width: 2.5, name: 'Vikt (kg)' },
+            { key: 'prognos', color: '#32BAF2', width: 2, name: 'Prognos', dashed: true },
             { key: 'mål', color: '#22A06B', width: 1.5, name: 'Målvikt', dashed: true, ref: true } ] })) : null
         );
       })(),
@@ -4044,7 +4054,7 @@ function WeightStepTracker() {
             h('p', { className: 'text-xs font-semibold text-gray-500 mb-1' }, 'Din väg till målet (streckad linje = prognos)'),
             h(SvgLineChart, { data: doseResponse.chart, height: 230, lines: [
               { key: 'vikt', color: '#F0625A', width: 2.5, name: 'Vikt (kg)' },
-              { key: 'prognos', color: '#60A5FA', width: 2, name: 'Prognos', dashed: true },
+              { key: 'prognos', color: '#32BAF2', width: 2, name: 'Prognos', dashed: true },
               { key: 'mål', color: '#22A06B', width: 1.5, name: 'Målvikt', dashed: true, ref: true }
             ]})
           ) : null,
@@ -4482,7 +4492,7 @@ function WeightStepTracker() {
     h(Toast, { toast: toast, onClose: function(){ setToast(null); } }),
     renderBackupModal(),
     renderDayModal(),
-    h('div', { className: 'md:hidden bg-white shadow-sm px-4 pt-4 pb-2' },
+    h('div', { className: 'tema-topp md:hidden bg-white shadow-sm px-4 pt-4 pb-2' },
       h('h1', { className: 'text-xl font-bold text-gray-800 mb-2' }, 'Hälsodagbok'),
       h('div', { className: 'flex gap-2 overflow-x-auto pb-2' },
         allNav.map(function(n) {
@@ -4493,7 +4503,7 @@ function WeightStepTracker() {
       )
     ),
     h('div', { className: 'flex' },
-      h('aside', { className: 'hidden md:flex flex-col fixed left-0 top-0 h-full w-56 bg-white shadow-xl z-10 overflow-y-auto' },
+      h('aside', { className: 'tema-topp hidden md:flex flex-col fixed left-0 top-0 h-full w-56 bg-white shadow-xl z-10 overflow-y-auto' },
         h('div', { className: 'p-5' },
           h('div', { className: 'mb-5 pb-4 border-b border-gray-100' },
             h('div', { className: 'flex items-center gap-2 mb-2' },
