@@ -92,6 +92,11 @@
     div.bg-gradient-to-br.from-violet-50 { background-color: #EAF7FE; }
     /* Linjeikoner som ersätter emoji */
     .tema-ikon { font-size: 1.05em; vertical-align: -0.12em; margin-right: 0.3em; line-height: 1; }
+    /* Färgade lodräta streck framför rubriker: bort, rubriken räcker */
+    .w-1.h-8.rounded-full { display: none; }
+    /* Fäll ut/ihop: tydlig pil i en rund knapp */
+    .tema-fall { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 99px; background: #EAF7FE; color: #002554; font-size: 16px; transition: transform .2s; }
+    .tema-fall-oppen { transform: rotate(180deg); }
     .tema-prick { display: inline-block; width: 0.6em; height: 0.6em; border-radius: 99px; vertical-align: 0.05em; margin: 0 0.2em; }
   </style>
   <script src="charts.js"></script>
@@ -1019,11 +1024,11 @@ function WeightStepTracker() {
     }, props.label);
   };
   if (loading) {
-    return h('div', { className: 'min-h-screen bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center' },
+    return h('div', { className: 'min-h-screen flex items-center justify-center', style: { backgroundColor: '#000F2A' } },
       h('div', { className: 'text-center' },
         h('div', { style: { fontSize:'64px', animation:'pulse 1.2s ease-in-out infinite' } }, '🏥'),
-        h('p', { className: 'text-white text-xl font-bold mt-4 mb-1' }, 'Hälsodagbok'),
-        h('p', { className: 'text-blue-100 text-sm' }, 'Laddar din data…'),
+        h('p', { className: 'text-white text-2xl font-black uppercase tracking-wide mt-4 mb-1' }, 'Hälsodagbok'),
+        h('p', { className: 'text-sm', style: { color: '#32BAF2' } }, 'Laddar din data…'),
         h('style', null, '@keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.15)} }')
       )
     );
@@ -1142,9 +1147,9 @@ function WeightStepTracker() {
       var bb = bodyBattery;
       var hasBb = bb && bb.today != null;
       if (!hasBb && !dagensForm) return null;
-      var col = function(v){ return v >= 70 ? '#22A06B' : v >= 45 ? '#FBBF24' : '#EF4444'; };
-      var frame = dagensForm ? (dagensForm.level === 'green' ? 'bg-emerald-50 border-emerald-200' : dagensForm.level === 'yellow' ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200') : 'bg-white border-gray-100';
-      return h('div', { className: 'rounded-2xl shadow-md mb-4 p-5 border-2 ' + frame },
+      var col = function(v){ return v >= 70 ? '#22A06B' : v >= 45 ? '#F5B800' : '#E5352B'; };
+      var ramF = dagensForm ? (dagensForm.level === 'green' ? '#22A06B' : dagensForm.level === 'yellow' ? '#F5B800' : '#E5352B') : '#D9DFE8';
+      return h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 p-5 border-t-4', style: { borderTopColor: ramF } },
         h('div', { className: 'flex items-center gap-5 flex-wrap' },
           hasBb ? h('div', { className: 'text-center' },
             h('p', { className: 'text-xs text-gray-400 mb-0.5' }, '🔋 Kroppsbatteriet'),
@@ -1161,9 +1166,9 @@ function WeightStepTracker() {
              ['HRV', dagensForm.hrv, dagensForm.hrvB != null && dagensForm.hrv != null ? (dagensForm.hrv >= dagensForm.hrvB ? '▲' : '▼') : ''],
              ['Vilopuls', dagensForm.rhr, dagensForm.rhrB != null && dagensForm.rhr != null ? (dagensForm.rhr <= dagensForm.rhrB ? '▼' : '▲') : '']
             ].filter(function(s){ return s[1] != null; }).map(function(s, i) {
-              return h('div', { key: i, className: 'bg-white/70 rounded-xl px-3 py-2 text-center min-w-[64px]' },
+              return h('div', { key: i, className: 'bg-gray-50 rounded-xl px-3 py-2 text-center min-w-[64px]' },
                 h('p', { className: 'text-xs text-gray-400' }, s[0]),
-                h('p', { className: 'text-lg font-black text-gray-800' }, s[1] + (s[2] ? ' ' + s[2] : ''))
+                h('p', { className: 'text-xl font-black text-gray-800' }, s[1] + (s[2] ? ' ' + s[2] : ''))
               );
             })
           ) : null
@@ -1174,7 +1179,7 @@ function WeightStepTracker() {
                 return h('button', { key: i, onClick: d.v != null ? function(){ setBbDay(bbDay === d.date ? null : d.date); } : undefined,
                   className: 'flex-1 rounded-t' + (d.v != null ? ' cursor-pointer hover:opacity-100' : '') + (bbDay === d.date ? ' ring-2 ring-indigo-400' : ''),
                   title: d.date + (d.v != null ? ': ' + d.v + '%' : ''),
-                  style: { height: (d.v != null ? Math.max(d.v, 4) : 4) + '%', backgroundColor: d.v != null ? col(d.v) : '#D9DFE8', opacity: (i === bb.days.length-1 || bbDay === d.date) ? 1 : 0.65 } });
+                  style: { height: (d.v != null ? Math.max(d.v, 4) : 4) + '%', backgroundColor: d.v != null ? col(d.v) : '#D9DFE8', opacity: (i === bb.days.length-1 || bbDay === d.date) ? 1 : 0.45 } });
               })
           ),
           h('p', { className: 'text-xs text-gray-400 mt-1' }, '14 dagar · klicka en stapel för att se exakt varifrån poängen kom — öppen formel, ingen magi'),
@@ -1413,7 +1418,7 @@ function WeightStepTracker() {
             h('h2', { className: 'font-bold text-gray-800' }, emoji + ' ' + title),
             h('p', { className: 'text-xs text-gray-400' }, sub)
           ),
-          h('span', { className: 'text-indigo-500 text-xl font-black ml-3' }, open ? '\u2212' : '+')
+          h('i', { className: 'ti ti-chevron-down tema-fall ml-3' + (open ? ' tema-fall-oppen' : '') })
         ),
         open ? h('div', { className: 'mt-4' }, content()) : null
       );
@@ -2457,7 +2462,7 @@ function WeightStepTracker() {
         h('button', { onClick: function(){ var o = Object.assign({}, insOpen); o[id] = !open; setInsOpenSparat(o); },
           className: 'w-full flex items-center justify-between bg-white rounded-2xl shadow-md px-6 py-4 text-left hover:bg-indigo-50 transition-colors' },
           h('div', null, h('h2', { className: 'font-bold text-gray-800' }, emoji + ' ' + title), h('p', { className: 'text-xs text-gray-400' }, sub)),
-          h('span', { className: 'text-indigo-500 text-xl font-black ml-3' }, open ? '\u2212' : '+')),
+          h('i', { className: 'ti ti-chevron-down tema-fall ml-3' + (open ? ' tema-fall-oppen' : '') })),
         open ? h('div', { className: 'mt-4' }, content()) : null);
     };
     return h('div', null,
@@ -2469,7 +2474,7 @@ function WeightStepTracker() {
             h('p', { className: 'text-6xl font-black leading-none' }, weekWorkouts.length),
             h('p', { className: 'text-blue-100 text-sm mt-1' }, 'träningspass' + (weekMinutes>0 ? ' · ' + weekMinutes + ' min' : ''))
           ),
-          h('div', { className: 'text-5xl' }, weekWorkouts.length===0 ? '😴' : weekWorkouts.length>=3 ? '🔥' : '💪')
+          h('div', { className: 'text-4xl', style: { color: '#32BAF2' } }, weekWorkouts.length===0 ? '😴' : weekWorkouts.length>=3 ? '🔥' : '💪')
         ),
         h('p', { className: 'text-blue-100 text-sm mb-4' }, motivationMsg),
         h('div', { className: 'flex gap-2' },
@@ -2479,8 +2484,7 @@ function WeightStepTracker() {
             var had = workouts.some(function(w){ return w.date===dayStr; });
             var isToday = dayStr===todayStr2;
             return h('div', { key:i, className:'flex-1 flex flex-col items-center gap-1' },
-              h('div', { className:'w-full py-2 rounded-lg text-center text-xs font-bold ' + (had ? 'bg-white text-blue-600' : isToday ? 'border-2 border-white text-white' : 'bg-blue-400/40 text-blue-200') }, had ? '✓' : DAY_NAMES[i]),
-              h('p', { className:'text-blue-200 text-xs' }, DAY_NAMES[i])
+              h('div', { className:'w-full py-2 rounded-lg text-center text-xs font-bold ' + (had ? 'text-white' : isToday ? 'border-2 text-white' : ''), style: had ? { backgroundColor: '#32BAF2', color: '#000F2A' } : isToday ? { borderColor: '#32BAF2' } : { backgroundColor: 'rgba(255,255,255,0.07)', color: '#7B8FA8' } }, had ? '✓' : DAY_NAMES[i])
             );
           })
         )
@@ -2562,7 +2566,7 @@ function WeightStepTracker() {
         h('div', { className:'space-y-3 max-h-96 overflow-y-auto' },
           ...workouts.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).slice(0,25).map(function(w) {
             var intensity = w.intensity||3;
-            var bgColors = ['','bg-gray-50','bg-blue-50','bg-blue-50','bg-orange-50','bg-red-50'];
+            var bgColors = ['','bg-gray-50','bg-gray-50','bg-gray-50','bg-gray-50','bg-gray-50'];
             var intensityEmojis = ['','😴','🚶','⚡','💪','🔥'];
             return h('div', { key:w.id, className:'flex items-center justify-between p-4 '+(bgColors[intensity]||'bg-gray-50')+' rounded-xl' },
               h('div', { className:'flex items-center gap-3' },
@@ -2580,8 +2584,8 @@ function WeightStepTracker() {
                   h('p', { className:'font-bold text-gray-800' }, w.duration+' min'),
                   h('p', { className:'text-xs text-blue-400 font-medium' }, '🔥 '+getCalories(w.type,w.duration,currentWeight)+' kcal')
                 ),
-                h('button', { onClick:function(){editWorkout(w);}, className:'text-gray-200 hover:text-indigo-400 text-lg transition-colors mr-2', title:'Redigera minuter' }, '✎'),
-                h('button', { onClick:function(){deleteWorkout(w.id);}, className:'text-gray-200 hover:text-red-400 text-lg transition-colors' }, '✕')
+                h('button', { onClick:function(){editWorkout(w);}, className:'text-gray-400 hover:text-indigo-600 text-lg transition-colors mr-2', title:'Redigera minuter' }, '✎'),
+                h('button', { onClick:function(){deleteWorkout(w.id);}, className:'text-gray-400 hover:text-red-500 text-lg transition-colors' }, '✕')
               )
             );
           })
@@ -2800,7 +2804,7 @@ function WeightStepTracker() {
             ),
             h('div', { className: 'flex items-center gap-3' },
               m.rader.length > 1 ? h('span', { className: 'text-xs font-bold px-2 py-0.5 rounded-full ' + (dM <= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600') }, (dM > 0 ? '+' : '−') + nfh(Math.abs(dM)) + ' kg') : null,
-              h('span', { className: 'text-indigo-500 text-lg font-black w-4 text-center' }, open ? '−' : '+')
+              h('i', { className: 'ti ti-chevron-down tema-fall' + (open ? ' tema-fall-oppen' : '') })
             )
           ),
           open ? h('div', { className: 'overflow-x-auto' },
@@ -3022,7 +3026,7 @@ function WeightStepTracker() {
             h('h2', { className: 'font-bold text-gray-800' }, emoji + ' ' + title),
             h('p', { className: 'text-xs text-gray-400' }, sub)
           ),
-          h('span', { className: 'text-indigo-500 text-xl font-black ml-3' }, open ? '−' : '+')
+          h('i', { className: 'ti ti-chevron-down tema-fall ml-3' + (open ? ' tema-fall-oppen' : '') })
         ),
         open ? h('div', { className: 'mt-4' }, content) : null
       );
@@ -3805,7 +3809,7 @@ function WeightStepTracker() {
             h('h2', { className: 'font-bold text-gray-800' }, emoji + ' ' + title),
             h('p', { className: 'text-xs text-gray-400' }, sub)
           ),
-          h('span', { className: 'text-indigo-500 text-xl font-black ml-3' }, open ? '−' : '+')
+          h('i', { className: 'ti ti-chevron-down tema-fall ml-3' + (open ? ' tema-fall-oppen' : '') })
         ),
         open ? h('div', { className: 'mt-4' }, content()) : null
       );
@@ -3816,7 +3820,7 @@ function WeightStepTracker() {
       h('div', { className: 'bg-gradient-to-br from-pink-500 via-purple-500 to-indigo-600 rounded-2xl shadow-xl mb-4 p-6 text-white' },
         h('div', { className: 'flex items-start justify-between gap-4' },
           h('div', null,
-            h('p', { className: 'text-pink-200 text-xs font-semibold uppercase tracking-widest mb-1' }, '💉 Wegovy · vecka ' + weeksOn),
+            h('p', { className: 'text-pink-200 text-xs font-semibold uppercase tracking-widest mb-1' }, '💉 Wegovy' + (wegovyProtocol && wegovyProtocol.start_date && weeksOn > 0 && weeksOn < 520 ? ' · vecka ' + weeksOn : '')),
             h('p', { className: 'text-3xl font-black' }, nfv(aktuellDos, 2) + ' mg'),
             h('p', { className: 'text-pink-200 text-sm mt-1' }, 'Nästa dos ' + new Date(nextTue).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'short' }) + ' · ' + (daysToNext === 0 ? 'idag' : 'om ' + daysToNext + (daysToNext === 1 ? ' dag' : ' dagar')))
           ),
@@ -3934,7 +3938,7 @@ function WeightStepTracker() {
                 return h('button', { key:w, onClick: function(){
                   var stepW = wegovyProtocol.weeks_per_step || 4;
                   saveProtocol(Object.assign({},wegovyProtocol,{first_step_weeks:w,titration_plan:buildTitrationPlan(w, stepW)}));
-                }, className: 'px-4 py-2 rounded-lg text-sm border-2 font-medium '+(firstW===w?'bg-purple-600 text-white border-purple-600':'border-gray-200 text-gray-600') }, w+'v');
+                }, className: 'px-4 py-2 rounded-lg text-sm border-2 font-medium '+(firstW===w?'bg-indigo-600 text-white border-indigo-600':'border-gray-200 text-gray-600') }, w+'v');
               })
             )
           ),
@@ -3945,7 +3949,7 @@ function WeightStepTracker() {
                 return h('button', { key:w, onClick: function(){
                   var firstW = wegovyProtocol.first_step_weeks || 6;
                   saveProtocol(Object.assign({},wegovyProtocol,{weeks_per_step:w,titration_plan:buildTitrationPlan(firstW, w)}));
-                }, className: 'px-4 py-2 rounded-lg text-sm border-2 font-medium '+((wegovyProtocol.weeks_per_step||4)===w?'bg-purple-600 text-white border-purple-600':'border-gray-200 text-gray-600') }, w+'v');
+                }, className: 'px-4 py-2 rounded-lg text-sm border-2 font-medium '+((wegovyProtocol.weeks_per_step||4)===w?'bg-indigo-600 text-white border-indigo-600':'border-gray-200 text-gray-600') }, w+'v');
               })
             )
           ),
@@ -3954,7 +3958,7 @@ function WeightStepTracker() {
             h('div', { className: 'flex gap-2' },
               [1.0, 1.7, 2.4].map(function(v) {
                 return h('button', { key: v, onClick: function(){ saveProtocol(Object.assign({}, wegovyProtocol, { max_dose: v })); },
-                  className: 'px-4 py-2 rounded-lg text-sm border-2 font-medium ' + (MAXDOS === v ? 'bg-purple-600 text-white border-purple-600' : 'border-gray-200 text-gray-600') }, String(v).replace('.', ',') + ' mg');
+                  className: 'px-4 py-2 rounded-lg text-sm border-2 font-medium ' + (MAXDOS === v ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-200 text-gray-600') }, String(v).replace('.', ',') + ' mg');
               })
             )
           ),
@@ -3965,10 +3969,10 @@ function WeightStepTracker() {
             plan.map(function(step, i) {
               var isCurrent = i === stepIdx;
               var isPast = i < stepIdx;
-              return h('div', { key:i, className: 'flex-shrink-0 rounded-xl px-4 py-3 text-center border-2 min-w-[90px] '+(isCurrent?'bg-purple-600 border-purple-600 text-white':isPast?'bg-gray-50 border-gray-200 text-gray-400':'bg-white border-gray-200 text-gray-600') },
+              return h('div', { key:i, className: 'flex-shrink-0 rounded-xl px-4 py-3 text-center border-2 min-w-[90px] '+(isCurrent?'bg-indigo-600 border-indigo-600 text-white':isPast?'bg-gray-50 border-gray-200 text-gray-400':'bg-white border-gray-200 text-gray-600') },
                 h('p', { className: 'text-lg font-black' }, String(step.dose).replace('.', ',')+' mg'),
-                h('p', { className: 'text-xs mt-0.5 '+(isCurrent?'text-purple-200':'') }, 'v'+step.weeks),
-                isCurrent ? h('p', { className: 'text-xs text-purple-200 mt-1' }, '← Nu') : null
+                h('p', { className: 'text-xs mt-0.5 '+(isCurrent?'text-indigo-200':'') }, 'v'+step.weeks),
+                isCurrent ? h('p', { className: 'text-xs mt-1', style: { color: '#32BAF2' } }, '← Nu') : null
               );
             })
           )
@@ -4270,7 +4274,7 @@ function WeightStepTracker() {
         h('div', { className: 'flex items-start justify-between' },
           h('div', null,
             h('p', { className: 'text-teal-100 text-xs font-semibold uppercase tracking-widest mb-1' }, '🩺 Provsvar & hälsokontroller'),
-            h('p', { className: 'text-3xl font-black' }, sorted.length ? sorted.length + (sorted.length === 1 ? ' kontroll' : ' kontroller') : 'Inga kontroller ännu'),
+            h('p', { className: 'text-3xl font-black uppercase tracking-wide' }, sorted.length ? sorted.length + (sorted.length === 1 ? ' kontroll' : ' kontroller') : 'Inga kontroller ännu'),
             h('p', { className: 'text-teal-100 text-sm mt-1' }, sorted.length ? 'Senaste: ' + sorted[0].date + ' (' + sorted[0].source + ')' : 'Lägg in värdena från din Neko Health-undersökning')
           ),
           h('button', { onClick: function(){ setCheckupForm({ date: todayStr() }); setShowCheckupForm(true); }, className: 'bg-white/20 hover:bg-white/30 text-white font-bold px-4 py-2 rounded-xl text-sm' }, '+ Ny kontroll')
@@ -4470,18 +4474,18 @@ function WeightStepTracker() {
     ),
     h('div', { className: 'space-y-6' },
       h('div', { className: 'flex gap-3 flex-wrap' },
-        h('button', { onClick:exportData, className:'bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-medium' }, 'Ladda ner backup'),
-        h('label', { className:'bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium cursor-pointer' },
-          'Aterställ från fil',
+        h('button', { onClick:exportData, className:'bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium' }, 'Ladda ner backup'),
+        h('label', { className:'px-5 py-2 rounded-lg text-sm font-medium border-2 border-indigo-600 text-indigo-600 bg-white hover:bg-indigo-50 cursor-pointer' },
+          'Återställ från fil',
           h('input', { type:'file', accept:'.json', onChange:importFromFile, className:'hidden' })
         ),
-        h('button', { onClick:exportEncrypted, className:'bg-purple-600 text-white px-5 py-2 rounded-lg text-sm font-medium' }, '🔐 Krypterad backup'),
-        h('label', { className:'bg-purple-500 text-white px-5 py-2 rounded-lg text-sm font-medium cursor-pointer' },
+        h('button', { onClick:exportEncrypted, className:'px-5 py-2 rounded-lg text-sm font-medium border-2 border-indigo-600 text-indigo-600 bg-white hover:bg-indigo-50' }, '🔐 Krypterad backup'),
+        h('label', { className:'px-5 py-2 rounded-lg text-sm font-medium border-2 border-indigo-600 text-indigo-600 bg-white hover:bg-indigo-50 cursor-pointer' },
           '🔓 Återställ krypterad',
           h('input', { type:'file', accept:'.enc,.json', onChange:importEncrypted, className:'hidden' })
         ),
-        h('button', { onClick:function(){ cloudSync(true); }, className:'bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium' }, '🔄 Synka nu (dubbelriktat)'),
-        h('button', { onClick:restoreFromCloud, className:'bg-emerald-700 text-white px-5 py-2 rounded-lg text-sm font-medium' }, '⬇️ Hämta & slå ihop från molnet')
+        h('button', { onClick:function(){ cloudSync(true); }, className:'px-5 py-2 rounded-lg text-sm font-medium border-2 border-indigo-600 text-indigo-600 bg-white hover:bg-indigo-50' }, '🔄 Synka nu (dubbelriktat)'),
+        h('button', { onClick:restoreFromCloud, className:'px-5 py-2 rounded-lg text-sm font-medium border-2 border-indigo-600 text-indigo-600 bg-white hover:bg-indigo-50' }, '⬇️ Hämta & slå ihop från molnet')
       ),
       lastCloudBackup ? h('p', { className: 'text-xs text-gray-400' }, 'Senaste molnbackup: ' + new Date(lastCloudBackup).toLocaleString('sv-SE') + ' · uppdateras automatiskt varje vecka') : h('p', { className: 'text-xs text-gray-400' }, 'Molnbackup kräver GitHub-token + lösenord under Inställningar. Filen krypteras innan den lämnar telefonen.'),
       h('div', { className: 'border-t pt-5' },
