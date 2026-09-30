@@ -49,6 +49,7 @@
     .font-black { font-family: 'Anton', 'Arial Narrow', sans-serif; font-weight: 400; letter-spacing: 0.01em; }
     h1.font-bold, h2.font-bold { font-family: 'Anton', 'Arial Narrow', sans-serif; font-weight: 400; text-transform: uppercase; letter-spacing: 0.03em; color: #002554; }
     h2.font-bold { font-size: 1.1rem; }
+    h2.font-black, h3.font-black { text-transform: uppercase; letter-spacing: 0.02em; }
     /* Toppen: mörk marinblå ram med himmelsblå markering */
     .tema-topp { background: #000F2A !important; box-shadow: none !important; }
     .tema-topp h1 { color: #FFFFFF !important; font-size: 1.35rem; }
@@ -3039,12 +3040,12 @@ function WeightStepTracker() {
         var dom = somnTxt + (hrvTxt ? ', ' + hrvTxt : '') + ((L && L.varning) ? ' (men långsiktigt lågt)' : '');
         var pil = function(v, b, hogtBra){ if (v == null || b == null) return ''; var d = v - b; if (Math.abs(d) < b * 0.03) return '→ som vanligt'; return (d > 0 ? '▲' : '▼') + ' mot 30 d: ' + nf(b, 1); };
         var ruta = function(etikett, varde, enhet, under, key){
-          return h('div', { key: key, className: 'bg-white rounded-xl p-3' },
-            h('p', { className: 'text-xs text-gray-500' }, etikett),
-            h('p', { className: 'text-2xl font-black text-gray-800 leading-tight' }, varde, enhet ? h('span', { className: 'text-xs text-gray-500 ml-1 font-sans' }, enhet) : null),
-            h('p', { className: 'text-xs text-gray-500' }, under));
+          return h('div', { key: key, className: 'rounded-xl p-3 border border-white/10', style: { backgroundColor: 'rgba(255,255,255,0.07)' } },
+            h('p', { className: 'text-[11px] font-semibold uppercase tracking-widest', style: { color: '#7FB6E0' } }, etikett),
+            h('p', { className: 'text-4xl font-black text-white leading-none mt-1.5' }, varde, enhet ? h('span', { className: 'text-sm ml-1 font-sans font-medium', style: { color: '#A6DFFA' } }, enhet) : null),
+            h('p', { className: 'text-xs mt-1.5', style: { color: '#B9C3D2' } }, under));
         };
-        var chip = function(txt, key){ return txt ? h('span', { key: key, className: 'text-xs px-2.5 py-1 rounded-full bg-white text-gray-600' }, txt) : null; };
+        var chip = function(txt, key){ return txt ? h('span', { key: key, className: 'text-xs px-2.5 py-1 rounded-full border border-white/15', style: { color: '#D9DFE8', backgroundColor: 'rgba(255,255,255,0.05)' } }, txt) : null; };
         var lightPct = Math.max(0, 100 - deepPct - remPct);
         var igarO = ouraData.length > 1 ? ouraData[1] : null;
         return h('div', { className: 'bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700 rounded-2xl shadow-xl mb-4 p-5 text-white' },
@@ -3061,12 +3062,15 @@ function WeightStepTracker() {
             ruta('Vilopuls', nf(ouraLatest.resting_hr), '', pil(ouraLatest.resting_hr, rB), 'r'),
             ruta('Dagsform', nf(ouraLatest.dagsform_score), '', ouraLatest.dagsform_score >= 70 ? 'bra' : ouraLatest.dagsform_score >= 60 ? 'ok' : 'lågt', 'd')
           ),
-          h('div', { className: 'flex h-2 rounded-full overflow-hidden mt-4' },
+          h('div', { className: 'flex h-2.5 rounded-full overflow-hidden mt-5 gap-0.5' },
             h('div', { style: { width: deepPct + '%', backgroundColor: '#32BAF2' } }),
-            h('div', { style: { width: remPct + '%', backgroundColor: '#6FCCF6' } }),
-            h('div', { style: { width: lightPct + '%', backgroundColor: 'rgba(255,255,255,0.3)' } })
+            h('div', { style: { width: remPct + '%', backgroundColor: '#B0A2EC' } }),
+            h('div', { style: { width: lightPct + '%', backgroundColor: 'rgba(255,255,255,0.18)' } })
           ),
-          h('p', { className: 'text-xs text-purple-200 mt-1' }, 'Djup ' + deepPct + ' % · REM ' + remPct + ' % · lätt och vaken ' + lightPct + ' %'),
+          h('div', { className: 'flex flex-wrap gap-x-4 gap-y-1 text-xs mt-2', style: { color: '#B9C3D2' } },
+            h('span', null, h('span', { className: 'tema-prick', style: { backgroundColor: '#32BAF2' } }), 'Djup ' + deepPct + ' %'),
+            h('span', null, h('span', { className: 'tema-prick', style: { backgroundColor: '#B0A2EC' } }), 'REM ' + remPct + ' %'),
+            h('span', null, h('span', { className: 'tema-prick', style: { backgroundColor: 'rgba(255,255,255,0.35)' } }), 'Lätt och vaken ' + lightPct + ' %')),
           h('div', { className: 'flex flex-wrap gap-2 mt-3' },
             // Aktivitet för dagens datum är bara påbörjad på morgonen — gårdagen är den hela dagen.
             chip(igarO && igarO.steps != null ? 'Steg igår ' + igarO.steps.toLocaleString('sv-SE') : null, 'st'),
@@ -3081,13 +3085,13 @@ function WeightStepTracker() {
         );
       })(),
       // ── Veckocoach ──
-      coach ? h('div', { className: 'rounded-2xl shadow-xl mb-4 p-6 text-white bg-gradient-to-br ' + (coach.tone==='good'?'from-emerald-500 to-teal-600':coach.tone==='tough'?'from-amber-500 to-orange-600':'from-indigo-500 to-blue-600') },
-        h('p', { className:'text-white/80 text-xs font-semibold uppercase tracking-widest mb-1' }, '🧠 Veckocoach'),
-        h('h2', { className:'text-2xl font-black mb-2' }, coach.headline),
-        h('p', { className:'text-sm text-white/90 leading-relaxed mb-3' }, coach.paragraph),
-        h('div', { className:'bg-white/15 rounded-xl p-3 space-y-1.5' },
-          h('p', { className:'text-xs font-semibold text-white/80 uppercase tracking-wide mb-1' }, 'Fokus framåt'),
-          coach.tips.map(function(t,i){ return h('div', { key:i, className:'flex items-start gap-2 text-sm' }, h('span',null,'→'), h('span',null,t)); })
+      coach ? h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 p-5 border-l-4', style: { borderLeftColor: coach.tone==='good' ? '#22A06B' : coach.tone==='tough' ? '#F5B800' : '#32BAF2' } },
+        h('p', { className:'text-xs font-semibold uppercase tracking-widest mb-1', style: { color: '#1596D2' } }, '🧠 Veckocoach'),
+        h('h2', { className:'text-2xl font-black mb-2 text-blue-600 uppercase tracking-wide' }, coach.headline),
+        h('p', { className:'text-sm text-gray-600 leading-relaxed mb-3' }, coach.paragraph),
+        h('div', { className:'bg-blue-50 rounded-xl p-3 space-y-1.5' },
+          h('p', { className:'text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1' }, 'Fokus framåt'),
+          coach.tips.map(function(t,i){ return h('div', { key:i, className:'flex items-start gap-2 text-sm text-gray-800' }, h('span',{ style: { color: '#1596D2' } },'→'), h('span',null,t)); })
         )
       ) : null,
       // ── Hälsoflaggor, kort ──
