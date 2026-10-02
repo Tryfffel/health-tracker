@@ -53,6 +53,20 @@
     .font-black { font-weight: 600; letter-spacing: -0.02em; }
     .shadow-xl h2, .shadow-xl h3 { color: inherit; }
     h2.font-black.text-xl, h2.font-black.text-lg, h2.font-black.text-base { font-size: 1.9rem; }
+    /* Serifen överallt där något är en rubrik eller ett värde — inte bara de stora */
+    .font-black, td.font-bold, p.font-bold.text-gray-800, span.font-bold.text-gray-800, span.text-sm.font-bold, span.text-sm.font-semibold.text-gray-700,
+    p.font-semibold.text-gray-700, p.text-sm.font-semibold.text-gray-600, .shadow-xl p.text-base.font-bold, svg text[font-weight="900"] {
+      font-family: 'Instrument Serif', Georgia, serif !important; font-weight: 400 !important; letter-spacing: -0.015em;
+    }
+    .font-black.text-xs { font-size: 0.95rem; } .font-black.text-sm { font-size: 1.1rem; }
+    .font-black.text-base, .font-black:not([class*="text-xs"]):not([class*="text-sm"]):not([class*="text-lg"]):not([class*="text-xl"]):not([class*="text-2xl"]):not([class*="text-3xl"]):not([class*="text-4xl"]):not([class*="text-5xl"]):not([class*="text-6xl"]) { font-size: 1.35rem; line-height: 1.15; }
+    .font-black.text-lg { font-size: 1.6rem; line-height: 1.1; } .font-black.text-xl { font-size: 1.85rem; line-height: 1.05; }
+    td.font-bold { font-size: 1.15em; }
+    p.font-bold.text-gray-800, span.font-bold.text-gray-800 { font-size: 1.2em; }
+    span.text-sm.font-bold, span.text-sm.font-semibold.text-gray-700 { font-size: 1.2rem; }
+    p.font-semibold.text-gray-700, p.text-sm.font-semibold.text-gray-600 { font-size: 1.2rem; line-height: 1.25; color: #2F2C28; }
+    .shadow-xl p.text-base.font-bold { font-size: 1.6rem; line-height: 1.15; }
+    svg text[font-weight="900"] { font-size: 26px; }
     button.border-2.rounded-xl { border-radius: 9999px; }
     .font-black.text-2xl, .font-black.text-3xl, .font-black.text-4xl, .font-black.text-5xl, .font-black.text-6xl, h2.font-black { font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; letter-spacing: -0.03em; line-height: 1; }
     .font-black.text-2xl { font-size: 2rem; } .font-black.text-3xl { font-size: 2.5rem; } .font-black.text-4xl { font-size: 3.25rem; }
