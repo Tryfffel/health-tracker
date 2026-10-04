@@ -4581,7 +4581,23 @@ function WeightStepTracker() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(h(WeightStepTracker, null));
+// Felskydd: kraschar något visas felet på sidan istället för en tom vit skärm.
+// Datan rörs inte — den ligger kvar i webbläsaren.
+class Felskydd extends React.Component {
+  constructor(p) { super(p); this.state = { fel: null }; }
+  static getDerivedStateFromError(fel) { return { fel: fel }; }
+  componentDidCatch(fel, info) { try { console.error(fel, info && info.componentStack); } catch (e) {} }
+  render() {
+    if (!this.state.fel) return this.props.children;
+    var f = this.state.fel;
+    return _ce('div', { style: { padding: '24px', fontFamily: 'system-ui, sans-serif', maxWidth: '640px', margin: '40px auto', background: '#fff', borderRadius: '16px', boxShadow: '0 0 0 1px #ECE4D8' } },
+      _ce('h2', { style: { fontSize: '20px', marginBottom: '8px' } }, 'Något gick fel när sidan ritades'),
+      _ce('p', { style: { fontSize: '14px', color: '#69655E', marginBottom: '12px' } }, 'Din data är orörd. Ta en skärmdump av texten nedan och skicka den.'),
+      _ce('pre', { style: { fontSize: '12px', whiteSpace: 'pre-wrap', background: '#F4EEE5', padding: '12px', borderRadius: '8px' } }, String(f && (f.stack || f.message) || f).slice(0, 1500)),
+      _ce('button', { onClick: function(){ location.reload(); }, style: { marginTop: '12px', padding: '8px 16px', borderRadius: '999px', background: '#2A72DE', color: '#fff', border: 0 } }, 'Ladda om'));
+  }
+}
+ReactDOM.createRoot(document.getElementById('root')).render(_ce(Felskydd, null, h(WeightStepTracker, null)));
 
 </script>
   <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){var hadController=!!navigator.serviceWorker.controller;navigator.serviceWorker.register('sw.js').then(function(reg){reg.update();setInterval(function(){reg.update();},30*60*1000);}).catch(function(){});var reloaded=false;navigator.serviceWorker.addEventListener('controllerchange',function(){if(reloaded||!hadController)return;reloaded=true;location.reload();});});}</script>
