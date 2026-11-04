@@ -1282,7 +1282,7 @@
   A.RECOVERY_TAGS = [
     { key: 'powerwalk', name: '🚶 Powerwalk' },
     { key: 'spikmatta', name: '🪡 Spikmatta' },
-    { key: 'situps', name: '💪 100 situps' }
+    { key: 'yoga', name: '🧘 Yoga' }
   ];
   A.getRecovery = function(ouraData, dayLogs, trendDagar) {
     if (!ouraData || ouraData.length < 14) return null;

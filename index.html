@@ -98,6 +98,7 @@
     *:not([class*="text-white"]) > .tema-ikon.ti-shoe, *:not([class*="text-white"]) > .tema-ikon.ti-walk, *:not([class*="text-white"]) > .tema-ikon.ti-run, *:not([class*="text-white"]) > .tema-ikon.ti-barbell { color: #3E8A5E; }
     *:not([class*="text-white"]) > .tema-ikon.ti-scale, *:not([class*="text-white"]) > .tema-ikon.ti-target, *:not([class*="text-white"]) > .tema-ikon.ti-trending-down { color: #2A72DE; }
     *:not([class*="text-white"]) > .tema-ikon.ti-flame, *:not([class*="text-white"]) > .tema-ikon.ti-droplet, *:not([class*="text-white"]) > .tema-ikon.ti-bolt { color: #D06F2E; }
+    *:not([class*="text-white"]) > .tema-ikon.ti-yoga { color: #35798A; }
     *:not([class*="text-white"]) > .tema-ikon.ti-snowflake { color: #5A93E6; }
     *:not([class*="text-white"]) > .tema-ikon.ti-needle, *:not([class*="text-white"]) > .tema-ikon.ti-vaccine { color: #7464BC; }
     /* Humörskalan från rött till grönt */
@@ -1098,12 +1099,11 @@ function WeightStepTracker() {
           ),
           h('div', null,
             h('p', { className: 'text-xs text-gray-400 mb-1' }, 'Övrigt'),
-            h('div', { className: 'flex gap-1.5' },
+            h('div', { className: 'flex flex-wrap gap-1.5' },
               chip(!!dl.sjuk, '🤒 Sjuk', function(){ setDayTag(tds, 'sjuk', dl.sjuk ? null : true); }, 'bg-rose-500 text-white'),
               chip(!!dl.bastu, '🧖 Bastu', function(){ setDayTag(tds, 'bastu', dl.bastu ? null : true); }, 'bg-orange-500 text-white'),
-              chip(!!dl.kallbad, '🧊 Kallbad', function(){ setDayTag(tds, 'kallbad', dl.kallbad ? null : true); }, 'bg-sky-500 text-white'),
               chip(!!dl.spikmatta, '🪡 Spikmatta', function(){ setDayTag(tds, 'spikmatta', dl.spikmatta ? null : true); }, 'bg-violet-500 text-white'),
-              chip(!!dl.situps, '💪 100 situps', function(){ setDayTag(tds, 'situps', dl.situps ? null : true); }, 'bg-teal-500 text-white'),
+              chip(!!dl.yoga, '🧘 Yoga', function(){ setDayTag(tds, 'yoga', dl.yoga ? null : true); }, 'bg-teal-500 text-white'),
               chip(!!dl.powerwalk, '🚶 Powerwalk', function(){ setDayTag(tds, 'powerwalk', dl.powerwalk ? null : true); }, 'bg-lime-600 text-white')
             )
           )
@@ -1856,7 +1856,7 @@ function WeightStepTracker() {
               h('h2', { className: 'font-bold text-gray-800' }, '🫀 Återhämtning — HRV & vilopuls'),
               h('p', { className: 'text-xs text-gray-400' }, recovery.start
                 ? ('Följer dina insatser sedan ' + new Date(recovery.start).toLocaleDateString('sv-SE',{day:'numeric',month:'long'}))
-                : 'Tagga 🚶 Powerwalk, 🪡 Spikmatta eller 💪 100 situps på Lägg till vikt så börjar mätningen')
+                : 'Tagga 🚶 Powerwalk, 🪡 Spikmatta eller 🧘 Yoga på Lägg till vikt så börjar mätningen')
             )
           ),
           h('div', { className: 'px-6 pt-4 flex flex-wrap gap-6' }, recovery.metrics.map(metricRuta)),
@@ -4465,6 +4465,7 @@ function WeightStepTracker() {
             dl.kallbad ? Row('Kallbad', '✓') : null,
             dl.spikmatta ? Row('Spikmatta', '🪡 ✓') : null,
             dl.powerwalk ? Row('Powerwalk', '🚶 ✓') : null,
+            dl.yoga ? Row('Yoga', '🧘 ✓') : null,
             (dl.midja && dl.hals) ? Row('Midja / hals', dl.midja + ' / ' + dl.hals + ' cm (fett ~' + bodyFatPct(dl.midja, dl.hals, height) + '%)') : null
           ];
         })()),
