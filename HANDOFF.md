@@ -75,6 +75,7 @@ Smart yogaplan (Move With Nicole) som anpassar sig efter gympassen. Ersätter de
 - **Rotation (2026-11-14):** varje roll växlar pass mellan jämna och udda ISO-veckor (`R(jämn, udda)` i `Yoga.plan`). Nya pass från kanalgenomgången: Feel Good Yoga, Yoga Full Body Stretch, Hips-flow, Yoga Stretch Flexibility, Strong Yoga, Daily Yoga Stretch.
 - **Tombstones:** `deletedIds` (`deleted-ids`) fylls av `deleteWorkout`. `mergeBackup` tar union av dem och filtrerar bort raderade pass, så molnsynken inte väcker liv i dem. gymPlan mergas per datum, nyast `u` vinner.
 - **Import:** Yoga-vyn har "Importera historik från yogaveckan.vercel.app" som läser den sidans säkerhetskopia (array eller `{log, gym}`).
+- **Cache:** yoga.js laddas som `yoga.js?v=ÅÅÅÅMMDDnn` i index.html. Höj versionen vid varje ändring av yoga.js, annars kan Safari hålla kvar den gamla filen.
 - SW-cache bumpad till `halsa-v8` och `yoga.js` tillagd i ASSETS.
 
 ## Deploy — lärdomar (viktigt)
