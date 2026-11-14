@@ -125,6 +125,7 @@
   </style>
   <script src="charts.js"></script>
   <script src="analytics.js"></script>
+  <script src="yoga.js"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -226,6 +227,11 @@ function WeightStepTracker() {
   const [experiments, setExperiments] = useState([]);
   const [expForm, setExpForm] = useState({ date: '', label: '' });
   const [dayLogs, setDayLogs] = useState({});
+  // Yoga: planerade gympass (per datum, t:null = borttaget) och raderade pass-id:n
+  // så att molnsynken inte väcker liv i borttagna pass.
+  const [gymPlan, setGymPlanState] = useState({});
+  const setGymPlan = function(obj) { setGymPlanState(obj); window.storage.set('gym-plan', JSON.stringify(obj)); };
+  const [deletedIds, setDeletedIds] = useState([]);
   const saveDayLogs = function(obj) {
     setDayLogs(obj);
     window.storage.set('day-logs', JSON.stringify(obj));
@@ -566,6 +572,8 @@ function WeightStepTracker() {
         window.storage.get('experiments'),
         window.storage.get('checkups'),
         window.storage.get('day-logs'),
+        window.storage.get('gym-plan'),
+        window.storage.get('deleted-ids'),
       ]);
       if (results[0] && results[0].value) setEntries(JSON.parse(results[0].value));
       if (results[1] && results[1].value) setWorkouts(JSON.parse(results[1].value));
@@ -579,6 +587,8 @@ function WeightStepTracker() {
       if (results[9] && results[9].value) setExperiments(JSON.parse(results[9].value));
       if (results[10] && results[10].value) setCheckups(JSON.parse(results[10].value));
       if (results[11] && results[11].value) setDayLogs(JSON.parse(results[11].value));
+      if (results[12] && results[12].value) setGymPlanState(JSON.parse(results[12].value));
+      if (results[13] && results[13].value) setDeletedIds(JSON.parse(results[13].value));
     } catch (err) {
       console.log('Ingen sparad data', err);
     } finally {
@@ -639,7 +649,39 @@ function WeightStepTracker() {
     showToast('💪 Träningspass sparat!');
   };
   const deleteEntry   = function(id) { setEntries(function(prev) { return prev.filter(function(e) { return e.id !== id; }); }); };
-  const deleteWorkout = function(id) { setWorkouts(function(prev) { return prev.filter(function(w) { return w.id !== id; }); }); };
+  const deleteWorkout = function(id) {
+    setWorkouts(function(prev) { return prev.filter(function(w) { return w.id !== id; }); });
+    setDeletedIds(function(prev) { var k = String(id); if (prev.indexOf(k) >= 0) return prev; var n = prev.concat(k); window.storage.set('deleted-ids', JSON.stringify(n)); return n; });
+  };
+  // ── Yoga ─────────────────────────────────────────────────────────────────
+  const sortByDate = function(a, b) { return new Date(a.date) - new Date(b.date); };
+  const yogaToggle = function(d, vid) {
+    var ex = workouts.filter(function(w){ return w.date === d && w.yoga === vid; });
+    if (ex.length) { ex.forEach(function(w){ deleteWorkout(w.id); }); showToast('Avbockat'); return; }
+    var w = Yoga.makeYoga(d, vid);
+    setWorkouts(function(prev){ return prev.concat(w).sort(sortByDate); });
+    showToast('🧘 Loggat: ' + w.comment + ', ' + w.duration + ' min');
+  };
+  const yogaToggleGym = function(d, t) {
+    var ex = workouts.filter(function(w){ return w.date === d && w.type === 'Styrketräning'; });
+    if (ex.length) {
+      var mine = ex.filter(function(w){ return w.gymPlan; });
+      if (!mine.length) { showToast('Gympasset är loggat under Träning. Ta bort det där om det blev fel.', 'error'); return; }
+      mine.forEach(function(w){ deleteWorkout(w.id); }); showToast('Gympass avbockat'); return;
+    }
+    var w = { id: Date.now(), date: d, type: 'Styrketräning', duration: 60, intensity: 4, comment: 'Gym: ' + (Yoga.GYM[t] || 'Helkropp'), gymPlan: true };
+    setWorkouts(function(prev){ return prev.concat(w).sort(sortByDate); });
+    showToast('🏋 Gympass loggat, 60 min. Ändra längden under Träning.');
+  };
+  const yogaImport = function(r) {
+    var gymAdd = r.gymDone.filter(function(d){ return !workouts.some(function(w){ return w.date === d && w.type === 'Styrketräning'; }); })
+      .map(function(d, i){ return { id: Date.now() + 5000 + i, date: d, type: 'Styrketräning', duration: 60, intensity: 4, comment: 'Gym: ' + (Yoga.GYM[r.gym[d] && r.gym[d].t] || 'Helkropp'), gymPlan: true }; });
+    if (r.workouts.length || gymAdd.length) setWorkouts(function(prev){ return prev.concat(r.workouts, gymAdd).sort(sortByDate); });
+    var gp = Object.assign({}, gymPlan); Object.keys(r.gym).forEach(function(k){ if (!gp[k] || !gp[k].t) gp[k] = r.gym[k]; });
+    setGymPlan(gp);
+    showToast('🧘 ' + r.workouts.length + ' yogapass och ' + gymAdd.length + ' gympass inlästa');
+  };
+  const yogaProps = { workouts: workouts, gymPlan: gymPlan, setGymPlan: setGymPlan, onToggle: yogaToggle, onToggleGym: yogaToggleGym, onDelete: deleteWorkout, onImport: yogaImport, toast: showToast };
   const editWorkout = function(w) {
     var nd = window.prompt('Minuter:', w.duration);
     if (nd === null) return;
@@ -674,7 +716,7 @@ function WeightStepTracker() {
     showToast('💾 Backup nedladdad!');
   };
   const buildBackupObj = function() {
-    return { entries: entries, workouts: workouts, goalWeight: goalWeight, height: height, yearlyGoal: yearlyGoal, targetRate: targetRate, wegovyDoses: wegovyDoses, wegovyProtocol: wegovyProtocol, experiments: experiments, checkups: checkups, dayLogs: dayLogs, updatedAt: localStorage.getItem('data-updated-at') || new Date().toISOString(), exportDate: new Date().toISOString() };
+    return { entries: entries, workouts: workouts, goalWeight: goalWeight, height: height, yearlyGoal: yearlyGoal, targetRate: targetRate, wegovyDoses: wegovyDoses, wegovyProtocol: wegovyProtocol, experiments: experiments, checkups: checkups, dayLogs: dayLogs, gymPlan: gymPlan, deletedIds: deletedIds, updatedAt: localStorage.getItem('data-updated-at') || new Date().toISOString(), exportDate: new Date().toISOString() };
   };
   const exportEncrypted = async function() {
     var p = appSettings.backupPassword || window.prompt('Lösenord för krypteringen:');
@@ -740,6 +782,8 @@ function WeightStepTracker() {
     if (d.experiments) { setExperiments(d.experiments); window.storage.set('experiments', JSON.stringify(d.experiments)); }
     if (d.checkups) { setCheckups(d.checkups); window.storage.set('checkups', JSON.stringify(d.checkups)); }
     if (d.dayLogs) { setDayLogs(d.dayLogs); window.storage.set('day-logs', JSON.stringify(d.dayLogs)); }
+    if (d.gymPlan) { setGymPlan(d.gymPlan); }
+    if (d.deletedIds) { setDeletedIds(d.deletedIds); window.storage.set('deleted-ids', JSON.stringify(d.deletedIds)); }
   };
   const fetchCloudBackup = async function(token) {
     var url = 'https://api.github.com/repos/Tryfffel/health-tracker/contents/backup.enc';
@@ -804,7 +848,7 @@ function WeightStepTracker() {
     if (!appSettings.ghToken || !appSettings.backupPassword) return;
     var id = setTimeout(function(){ cloudSync(false); }, 45000);
     return function(){ clearTimeout(id); };
-  }, [entries, workouts, dayLogs, wegovyDoses, experiments, checkups, goalWeight, height, yearlyGoal, targetRate]);
+  }, [entries, workouts, dayLogs, wegovyDoses, experiments, checkups, goalWeight, height, yearlyGoal, targetRate, gymPlan, deletedIds]);
 
   // Skriver, läser tillbaka OCH avkrypterar — annars vet man inte om synken
   // faktiskt fungerar, bara att ett anrop inte kraschade.
@@ -1286,6 +1330,7 @@ function WeightStepTracker() {
         h('button', { onClick: function(){ setView('workouts'); }, className: 'bg-white border-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50 font-bold py-3.5 rounded-xl shadow-md' }, '💪 Logga pass')
       )
       ),
+      window.Yoga ? h(window.Yoga.Today, { workouts: workouts, gymPlan: gymPlan, onToggle: yogaToggle, onOpen: function(){ setView('yoga'); } }) : null,
       batteryCard,
       // ── HERO CARD ──────────────────────────────────────────────────────────────
       h('div', { className: 'bg-gradient-to-br from-indigo-600 via-blue-600 to-blue-700 rounded-2xl shadow-xl mb-5 overflow-hidden' },
@@ -4485,6 +4530,7 @@ function WeightStepTracker() {
     { id:'insights', label:'💡 Insikter', group:'h' },
     { id:'add', label:'➕ Lägg till vikt', group:'h' },
     { id:'workouts', label:'💪 Träning', group:'h' },
+    { id:'yoga', label:'🧘 Yoga', group:'h' },
     { id:'history', label:'📋 Historik', group:'h' },
     { id:'oura', label:'💍 Oura', group:'h' },
     { id:'wegovy', label:'📉 Viktminskning', group:'h' },
@@ -4575,7 +4621,8 @@ function WeightStepTracker() {
           view === 'settings' ? renderSettings()  : null,
           view === 'oura'     ? renderOura()      : null,
           view === 'wegovy'   ? renderWegovy()    : null,
-          view === 'checkups' ? renderCheckups()  : null
+          view === 'checkups' ? renderCheckups()  : null,
+          view === 'yoga'     ? (window.Yoga ? h(window.Yoga.View, yogaProps) : null) : null
         )
       )
     )

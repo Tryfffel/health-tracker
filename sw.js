@@ -1,6 +1,6 @@
-const CACHE = 'halsa-v7';
+const CACHE = 'halsa-v8';
 const ASSETS = [
-  './', './index.html', './charts.js', './analytics.js', './manifest.json', './icon-192.png', './icon-512.png',
+  './', './index.html', './charts.js', './analytics.js', './yoga.js', './manifest.json', './icon-192.png', './icon-512.png',
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
   'https://cdn.tailwindcss.com'

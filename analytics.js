@@ -1647,6 +1647,23 @@
       dayLogs:   mergeDayLogs(local.dayLogs, remote.dayLogs)
     };
 
+    // Raderade pass (tombstones): union. Ett pass som raderats på någon enhet
+    // ska inte väckas till liv av den andra enhetens kopia.
+    var dead = {};
+    (Array.isArray(local.deletedIds) ? local.deletedIds : []).concat(Array.isArray(remote.deletedIds) ? remote.deletedIds : [])
+      .forEach(function(k){ dead[String(k)] = 1; });
+    merged.deletedIds = Object.keys(dead);
+    merged.workouts = merged.workouts.filter(function(w){ return !(w && w.id != null && dead[String(w.id)]); });
+
+    // Gymplan (yoga): per datum, den senast ändrade vinner (u = tidsstämpel).
+    var gp = {}, lg = local.gymPlan || {}, rg = remote.gymPlan || {};
+    Object.keys(lg).forEach(function(d){ gp[d] = lg[d]; });
+    Object.keys(rg).forEach(function(d){
+      if (!gp[d]) { gp[d] = rg[d]; stats.added++; return; }
+      if ((rg[d] && rg[d].u || 0) > (gp[d] && gp[d].u || 0)) { gp[d] = rg[d]; stats.updated++; }
+    });
+    merged.gymPlan = gp;
+
     // Skalärer: ta från nyaste sidan, men aldrig skriv över ett värde med tomt
     ['goalWeight','height','yearlyGoal','targetRate','wegovyProtocol'].forEach(function(k){
       var lv = local[k], rv = remote[k];
@@ -1660,10 +1677,12 @@
     var changedVs = function(orig, key) {
       var o = orig[key];
       if (key === 'dayLogs') return JSON.stringify(o || {}) !== JSON.stringify(merged.dayLogs);
+      if (key === 'gymPlan') return JSON.stringify(o || {}) !== JSON.stringify(merged.gymPlan);
+      if (key === 'deletedIds') return JSON.stringify((Array.isArray(o) ? o : []).map(String).sort()) !== JSON.stringify(merged.deletedIds.slice().sort());
       if (Array.isArray(merged[key])) return JSON.stringify(Array.isArray(o) ? o : []) !== JSON.stringify(merged[key]);
       return JSON.stringify(o) !== JSON.stringify(merged[key]);
     };
-    var keys = ['entries','workouts','wegovyDoses','experiments','checkups','dayLogs','goalWeight','height','yearlyGoal','targetRate','wegovyProtocol'];
+    var keys = ['entries','workouts','wegovyDoses','experiments','checkups','dayLogs','goalWeight','height','yearlyGoal','targetRate','wegovyProtocol','gymPlan','deletedIds'];
     var localChanged = keys.some(function(k){ return changedVs(local, k); });
     var remoteChanged = keys.some(function(k){ return changedVs(remote, k); });
 
