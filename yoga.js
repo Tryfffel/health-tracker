@@ -31,7 +31,14 @@
     '0fPk-UzQWOs':{n:'Energising Vinyasa',m:35,c:'helg'},
     'B1U-Z1b-EOg':{n:'Dancer Inspired Flow',m:30,c:'helg'},
     'PZB7EkWkj_M':{n:'Full Body Vinyasa',m:45,c:'helg'},
-    '7SU59GxGqbo':{n:'Full Body, Intermediate',m:40,c:'helg'}
+    '7SU59GxGqbo':{n:'Full Body, Intermediate',m:40,c:'helg'},
+    // Tillagda 2026-11-14 efter genomgång av kanalen
+    'poZBpvLTHNw':{n:'Feel Good Yoga',m:20,c:'morgon'},
+    'TDo4HU60IXY':{n:'Yoga Full Body Stretch',m:20,c:'stretch'},
+    'HIuJA4xS4WM':{n:'Yoga Pilates Flow, Hips',m:30,c:'stretch'},
+    'baqAriam3l8':{n:'Yoga Stretch, Flexibility',m:30,c:'stretch'},
+    'EpRxH1v-nqc':{n:'Strong Yoga',m:20,c:'styrka'},
+    'YKtDkKUHtPU':{n:'Daily Yoga Stretch',m:20,c:'kvall'}
   };
   var INTENSITY = { morgon:2, stretch:1, kvall:1, styrka:4, helg:3 };
   var CATS = [
@@ -42,11 +49,13 @@
     { k:'kvall', l:'Kväll', cls:'bg-teal-500' }
   ];
   var LIB = [
-    ['Morgon, vardag',['dqIZnyUtKXI','5TzqqPJFHeQ','Vr3h5X9kmUo','8URMcK7_PjY','UxU8OCsNbYY']],
-    ['Stretch och återhämtning',['HvluUhDizIY','98rmMgBwJXE','RvCntPg7oPE','2eC7TlC2NLs','8cltCOUpYTQ']],
-    ['Styrka, 1 till 2 gånger i veckan',['e8TuZbVK3h8','iYS1P-ZjNsA']],
-    ['Helg',['0fPk-UzQWOs','B1U-Z1b-EOg']],
-    ['Från december',['PZB7EkWkj_M','7SU59GxGqbo']]
+    ['Morgon',['dqIZnyUtKXI','poZBpvLTHNw','5TzqqPJFHeQ','2eC7TlC2NLs']],
+    ['Efter gym och stretch',['HvluUhDizIY','TDo4HU60IXY','98rmMgBwJXE','HIuJA4xS4WM','RvCntPg7oPE','baqAriam3l8']],
+    ['Yogastyrka',['e8TuZbVK3h8','EpRxH1v-nqc','iYS1P-ZjNsA']],
+    ['Helg',['0fPk-UzQWOs']],
+    ['Kväll',['8cltCOUpYTQ','YKtDkKUHtPU']],
+    ['Korta, för gymdagar och stressiga morgnar',['Vr3h5X9kmUo','8URMcK7_PjY','UxU8OCsNbYY']],
+    ['Senare',['PZB7EkWkj_M','7SU59GxGqbo','B1U-Z1b-EOg']]
   ];
   var GYM = { ben:'Ben', over:'Överkropp', hel:'Helkropp' };
   var GYM_ORDER = [null,'ben','over','hel'];
@@ -105,19 +114,24 @@
     var key = ymd(d), dow = (d.getDay()+6)%7;
     var g = gt(key), prev = gt(ymd(addDays(d,-1)));
     var strength = weekStrength(monday(d), gOn)[dow];
-    var big = function(){ return isoWeek(d) % 2 === 0 ? '0fPk-UzQWOs' : 'B1U-Z1b-EOg'; };
+    // Rotation: varannan vecka byts passet i varje roll, så det inte blir samma video hela tiden.
+    var odd = isoWeek(d) % 2 === 1;
+    var R = function(even, oddId){ return odd ? oddId : even; };
+    var STD = R('dqIZnyUtKXI','poZBpvLTHNw');
+    if (strength === 'e8TuZbVK3h8') strength = R('e8TuZbVK3h8','EpRxH1v-nqc');
+    var big = R('0fPk-UzQWOs','5TzqqPJFHeQ');
     var morning, lunch = null;
     if (g) morning = { id:'Vr3h5X9kmUo', why:'Lätt morgon, gym i dag' };
-    else if (prev) morning = dow >= 5 ? { id:'RvCntPg7oPE', why:'Rörlighet dagen efter gym' }
+    else if (prev) morning = dow >= 5 ? { id:R('RvCntPg7oPE','HIuJA4xS4WM'), why:'Rörlighet dagen efter gym' }
       : prev === 'over' ? { id:'98rmMgBwJXE', why:'Snällt för axeln efter överkroppspass' }
-      : { id:'HvluUhDizIY', why:'Återhämtning dagen efter gym' };
-    else if (strength) { morning = { id: dow === 4 ? 'HvluUhDizIY' : 'Vr3h5X9kmUo', why:'Lätt morgon, styrka på lunchen' }; lunch = { id:strength, why:'Ingen gym nära, kroppen är utvilad' }; }
-    else if (dow === 3) morning = { id:'5TzqqPJFHeQ', why:'Längre allround' };
-    else if (dow === 5) morning = { id:big(), why:'Veckans stora pass' };
-    else if (dow === 6 && gOn(ymd(addDays(d,-2)))) morning = { id:big(), why:'Veckans stora pass, flyttat från lördag' };
-    else if (dow === 6) morning = { id:'RvCntPg7oPE', why:'Lugn rörlighet' };
-    else morning = { id:'dqIZnyUtKXI', why:'Standardpasset' };
-    if (!g && gOn(ymd(addDays(d,1))) && !lunch && dow < 5 && morning.id === 'dqIZnyUtKXI') morning.why = 'Standardpasset, gym i morgon';
+      : { id:R('HvluUhDizIY','TDo4HU60IXY'), why:'Återhämtning dagen efter gym' };
+    else if (strength) { morning = { id: dow === 4 ? R('HvluUhDizIY','TDo4HU60IXY') : 'Vr3h5X9kmUo', why:'Lätt morgon, styrka på lunchen' }; lunch = { id:strength, why:'Ingen gym nära, kroppen är utvilad' }; }
+    else if (dow === 3) morning = { id:R('5TzqqPJFHeQ','2eC7TlC2NLs'), why:'Längre allround' };
+    else if (dow === 5) morning = { id:big, why:'Veckans stora pass' };
+    else if (dow === 6 && gOn(ymd(addDays(d,-2)))) morning = { id:big, why:'Veckans stora pass, flyttat från lördag' };
+    else if (dow === 6) morning = { id:R('baqAriam3l8','RvCntPg7oPE'), why:'Lugn rörlighet' };
+    else morning = { id:STD, why:'Standardpasset' };
+    if (!g && gOn(ymd(addDays(d,1))) && !lunch && dow < 5 && morning.id === STD) morning.why = 'Standardpasset, gym i morgon';
     return { key:key, dow:dow, gym:g, morning:morning, lunch:lunch };
   };
 
@@ -331,7 +345,7 @@
           [['Gymdag','15 min lätt morgonflöde. Ingen yogastyrka samma dag.'],
            ['Dagen efter gym','20 min Stretch Routine. Efter överkropp Everyday Yoga, som är snällare mot axeln. På helgen 30 min Flexibility.'],
            ['Yogastyrka på lunchen','Högst två pass i veckan, bara måndag, onsdag eller fredag (tisdag och torsdag är kontorsdagar) och aldrig dagen före, samma dag eller dagen efter gym. Pilates först, Power sedan.'],
-           ['Övriga dagar','25 min Morning Flow, 30 min allround på torsdag, veckans stora pass på lördag (söndag om du gymmar fredag) och lugn rörlighet på söndag.']
+           ['Övriga dagar','Morgonflöde, 30 min allround på torsdag, veckans stora pass på lördag (söndag om du gymmar fredag) och lugn rörlighet på söndag. Passen i varje roll byts varannan vecka.']
           ].map(function(r){ return h('div', { key:r[0], className: card + ' p-4' }, h('p', { className:'font-semibold text-gray-800 mb-1' }, r[0]), h('p', { className:'text-sm text-gray-500' }, r[1])); }))),
 
       // bibliotek
