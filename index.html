@@ -669,13 +669,13 @@ function WeightStepTracker() {
       if (!mine.length) { showToast('Gympasset är loggat under Träning. Ta bort det där om det blev fel.', 'error'); return; }
       mine.forEach(function(w){ deleteWorkout(w.id); }); showToast('Gympass avbockat'); return;
     }
-    var w = { id: Date.now(), date: d, type: 'Styrketräning', duration: 60, intensity: 4, comment: 'Gym: ' + (Yoga.GYM[t] || 'Helkropp'), gymPlan: true };
+    var w = { id: Date.now(), date: d, type: 'Styrketräning', duration: 30, intensity: 4, comment: 'Gym: ' + (Yoga.GYM[t] || 'Helkropp'), gymPlan: true };
     setWorkouts(function(prev){ return prev.concat(w).sort(sortByDate); });
-    showToast('🏋 Gympass loggat, 60 min. Ändra längden under Träning.');
+    showToast('🏋 Gympass loggat, 30 min. Ändra längden under Träning.');
   };
   const yogaImport = function(r) {
     var gymAdd = r.gymDone.filter(function(d){ return !workouts.some(function(w){ return w.date === d && w.type === 'Styrketräning'; }); })
-      .map(function(d, i){ return { id: Date.now() + 5000 + i, date: d, type: 'Styrketräning', duration: 60, intensity: 4, comment: 'Gym: ' + (Yoga.GYM[r.gym[d] && r.gym[d].t] || 'Helkropp'), gymPlan: true }; });
+      .map(function(d, i){ return { id: Date.now() + 5000 + i, date: d, type: 'Styrketräning', duration: 30, intensity: 4, comment: 'Gym: ' + (Yoga.GYM[r.gym[d] && r.gym[d].t] || 'Helkropp'), gymPlan: true }; });
     if (r.workouts.length || gymAdd.length) setWorkouts(function(prev){ return prev.concat(r.workouts, gymAdd).sort(sortByDate); });
     var gp = Object.assign({}, gymPlan); Object.keys(r.gym).forEach(function(k){ if (!gp[k] || !gp[k].t) gp[k] = r.gym[k]; });
     setGymPlan(gp);
