@@ -138,6 +138,11 @@
     else if (dow === 3) morning = { id:R('5TzqqPJFHeQ','2eC7TlC2NLs'), why:'Längre allround' };
     else if (dow === 5) morning = { id:big, why:'Veckans stora pass' };
     else if (dow === 6 && gOn(ymd(addDays(d,-2)))) morning = { id:big, why:'Veckans stora pass, flyttat från lördag' };
+    else if (dow === 6 && (function(){
+      // Körde du något annat än lördagens stora pass flyttas det till söndag.
+      var satKey = ymd(addDays(d,-1)), sp = plan(addDays(d,-1), gymPlan, workouts);
+      return sp.morning.id === big && !has(workouts, satKey, big) && yogaOf(workouts).some(function(w){ return w.date === satKey; });
+    })()) morning = { id:big, why:'Lördagens stora pass, flyttat till i dag' };
     else if (dow === 6) morning = { id:R('baqAriam3l8','RvCntPg7oPE'), why:'Lugn rörlighet' };
     else morning = { id:STD, why:'Standardpasset' };
     if (!g && gOn(ymd(addDays(d,1))) && !lunch && dow < 5 && morning.id === STD) morning.why = 'Standardpasset, gym i morgon';
