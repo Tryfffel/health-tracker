@@ -149,6 +149,19 @@
     return { key:key, dow:dow, gym:g, morning:morning, lunch:lunch };
   };
 
+  // Visning: har du kört ett annat pass än planerat (i dag eller tidigare) visas
+  // det du faktiskt körde i stället för planens morgonpass.
+  var asDone = function(p, workouts){
+    var today = ymd(todayD());
+    if (p.key > today) return p;
+    var ws = workouts || [];
+    var hasIt = function(id){ return ws.some(function(w){ return w.date === p.key && w.yoga === id; }); };
+    if (hasIt(p.morning.id)) return p;
+    var other = ws.filter(function(w){ return w.date === p.key && w.yoga && P[w.yoga] && !(p.lunch && w.yoga === p.lunch.id); });
+    if (!other.length) return p;
+    return Object.assign({}, p, { morning: { id: other[0].yoga, why: 'Kört i stället för ' + P[p.morning.id].n } });
+  };
+
   // ── loggning ──
   var yogaOf = function(workouts){ return (workouts || []).filter(function(w){ return w && w.yoga && P[w.yoga]; }); };
   var has = function(workouts, d, id){ return (workouts || []).some(function(w){ return w.date === d && w.yoga === id; }); };
@@ -185,7 +198,7 @@
   // ── Kortet på Idag ──
   function Today(props){
     var wk = props.workouts || [], t = todayD(), k = ymd(t);
-    var p = plan(t, props.gymPlan, wk);
+    var p = asDone(plan(t, props.gymPlan, wk), wk);
     var row = function(lbl, it, warm){
       return h('div', { className:'flex items-center justify-between gap-3 flex-wrap py-2' },
         h('div', { className:'min-w-0' },
@@ -241,7 +254,7 @@
     // kalender
     var mon = addDays(mon0, offset*7);
     var calDays = [0,1,2,3,4,5,6].map(function(i){
-      var d = addDays(mon,i), p = plan(d, gp, wk), k = p.key, future = k > today;
+      var d = addDays(mon,i), p = asDone(plan(d, gp, wk), wk), k = p.key, future = k > today;
       var tick = function(it, lunch){
         var on = has(wk,k,it.id);
         return h('div', { key: it.id + (lunch?'l':'m'), className:'flex items-start gap-3' },
@@ -279,7 +292,7 @@
           h('p', { className:'text-sm text-gray-500' }, it.why)),
         h('div', { className:'flex gap-2' }, btnPlay(Y(it.id), warm), btnDone(has(wk,today,it.id), function(){ props.onToggle(today, it.id); })));
     };
-    var pt = plan(t, gp, wk);
+    var pt = asDone(plan(t, gp, wk), wk);
 
     return h('div', { className:'max-w-3xl space-y-6' },
       h('div', null,
