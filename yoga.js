@@ -55,9 +55,17 @@
     ['Helg',['0fPk-UzQWOs']],
     ['Kväll',['8cltCOUpYTQ','YKtDkKUHtPU']],
     ['Korta, för gymdagar och stressiga morgnar',['Vr3h5X9kmUo','8URMcK7_PjY','UxU8OCsNbYY']],
-    ['Senare',['PZB7EkWkj_M','7SU59GxGqbo','B1U-Z1b-EOg']]
+    ['Senare, från yogavecka 12 (vecka 4 2027)',['PZB7EkWkj_M','7SU59GxGqbo','B1U-Z1b-EOg']]
   ];
   var GYM = { ben:'Ben', over:'Överkropp', hel:'Helkropp' };
+  // Startade med yoga vecka 45 2026 (måndag 2/11).
+  var YOGA_START = '2026-11-02';
+  var MILESTONES = [
+    [4, 'Vecka 4: rörligheten i höfter och bröstrygg ska märkas tydligt, och HRV bör börja röra sig uppåt i Oura.'],
+    [8, 'Vecka 8: bålen och hållningen är märkbart bättre, och sömnen bör vara stabilare.'],
+    [12, 'Vecka 12: rörligheten är strukturell, inte bara uppvärmd. Dags att prova de längre passen under Senare.'],
+    [26, 'Halvår: vanan sitter. Jämför HRV och vilopuls mot oktober 2026.']
+  ];
   var GYM_ORDER = [null,'ben','over','hel'];
   var DN = ['Måndag','Tisdag','Onsdag','Torsdag','Fredag','Lördag','Söndag'];
 
@@ -271,6 +279,13 @@
     return h('div', { className:'max-w-3xl space-y-6' },
       h('div', null,
         h('h2', { className:'text-2xl font-bold text-gray-800' }, '🧘 Yoga'),
+        (function(){
+          var wkNo = Math.floor((monday(t) - parse(YOGA_START)) / (7*864e5)) + 1;
+          if (wkNo < 1) return null;
+          var next = MILESTONES.find(function(m){ return m[0] >= wkNo; });
+          return h('p', { className:'text-sm font-semibold text-indigo-700 mt-1' }, 'Yogavecka ' + wkNo + ' · startade vecka 45',
+            next ? h('span', { className:'block font-normal text-gray-500' }, next[1]) : null);
+        })(),
         h('p', { className:'text-sm text-gray-500 mt-1' }, 'Lägg in gympassen i kalendern så planeras yogan om runt dem. Avbockade pass sparas som träningspass och syns i Träning och statistiken.')),
 
       // i dag
