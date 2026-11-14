@@ -55,7 +55,7 @@
     ['Helg',['0fPk-UzQWOs']],
     ['Kväll',['8cltCOUpYTQ','YKtDkKUHtPU']],
     ['Korta, för gymdagar och stressiga morgnar',['Vr3h5X9kmUo','8URMcK7_PjY','UxU8OCsNbYY']],
-    ['Senare, från yogavecka 12 (vecka 4 2027)',['PZB7EkWkj_M','7SU59GxGqbo','B1U-Z1b-EOg']]
+    ['Senare, från yogavecka 12 (vecka 3 2027)',['PZB7EkWkj_M','7SU59GxGqbo','B1U-Z1b-EOg']]
   ];
   var GYM = { ben:'Ben', over:'Överkropp', hel:'Helkropp' };
   // Startade med yoga vecka 45 2026 (måndag 2/11).
