@@ -1,35 +1,34 @@
-const CACHE = 'halsa-v8';
-const ASSETS = [
-  './', './index.html', './charts.js', './analytics.js', './yoga.js', './manifest.json', './icon-192.png', './icon-512.png',
-  'https://unpkg.com/react@18/umd/react.production.min.js',
-  'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
-  'https://cdn.tailwindcss.com'
-];
-self.addEventListener('install', function(e){
-  e.waitUntil(caches.open(CACHE).then(function(c){ return c.addAll(ASSETS).catch(function(){}); }).then(function(){ return self.skipWaiting(); }));
-});
+// Service worker för Hälsodagbok.
+// Egna filer (index.html, *.js, oura-data.json): ALLTID nätverket först, utan HTTP-cache.
+// Cachen används bara som reserv när nätet saknas. CDN-filer (React, Tailwind): cache först.
+//
+// Viktigt (2026-11-14): hämta med URL-strängen, inte med request-objektet. Safari kastar fel
+// på fetch(navigeringsrequest, {cache:...}), och då föll den gamla versionen tillbaka på en
+// gammal cachad index.html för alltid. Bumpa CACHE vid varje ändring här.
+const CACHE = 'halsa-v9';
+self.addEventListener('install', function(e){ self.skipWaiting(); });
 self.addEventListener('activate', function(e){
-  e.waitUntil(caches.keys().then(function(ks){ return Promise.all(ks.filter(function(k){return k!==CACHE;}).map(function(k){return caches.delete(k);})); }).then(function(){ return self.clients.claim(); }));
+  e.waitUntil(caches.keys()
+    .then(function(ks){ return Promise.all(ks.filter(function(k){ return k !== CACHE; }).map(function(k){ return caches.delete(k); })); })
+    .then(function(){ return self.clients.claim(); }));
 });
 self.addEventListener('fetch', function(e){
   var req = e.request;
   if (req.method !== 'GET') return;
   var url = new URL(req.url);
-  if (url.pathname.indexOf('oura-data.json') !== -1) {
-    e.respondWith(fetch(req).then(function(r){ var cp=r.clone(); caches.open(CACHE).then(function(c){c.put(req,cp);}); return r; }).catch(function(){ return caches.match(req); }));
+  if (url.origin === location.origin) {
+    var nav = req.mode === 'navigate';
+    var key = nav ? new URL('./index.html', self.registration.scope).href : url.href;
+    e.respondWith(
+      fetch(url.href, { cache: 'no-store', credentials: 'same-origin' }).then(function(r){
+        if (r && r.ok) { var cp = r.clone(); caches.open(CACHE).then(function(c){ c.put(key, cp); }); }
+        return r;
+      }).catch(function(){ return caches.match(key, { ignoreSearch: true }); })
+    );
     return;
   }
-  // Lokala JS-filer (charts.js, analytics.js): network-first så nya versioner alltid når klienten
-  if (url.origin === location.origin && url.pathname.slice(-3) === '.js') {
-    e.respondWith(fetch(req, { cache: 'no-cache' }).then(function(r){ if (r && r.ok) { var cp = r.clone(); caches.open(CACHE).then(function(c){ c.put(req, cp); }); } return r; }).catch(function(){ return caches.match(req); }));
-    return;
-  }
-  if (req.mode === 'navigate') {
-    // no-cache krävs: utan det går fetch via webbläsarens HTTP-cache och
-    // GitHub Pages max-age gör att en gammal index.html serveras i upp till
-    // 10 min — då hjälper inte "network-first", och användaren måste ladda om hårt.
-    e.respondWith(fetch(req, { cache: 'no-cache' }).catch(function(){ return caches.match('./index.html'); }));
-    return;
-  }
-  e.respondWith(caches.match(req).then(function(c){ return c || fetch(req).then(function(r){ if(r && r.ok && url.origin===location.origin){ var cp=r.clone(); caches.open(CACHE).then(function(ca){ca.put(req,cp);}); } return r; }); }));
+  // CDN: cache först (versionerade filer)
+  e.respondWith(caches.match(req).then(function(c){
+    return c || fetch(req).then(function(r){ if (r && (r.ok || r.type === 'opaque')) { var cp = r.clone(); caches.open(CACHE).then(function(ca){ ca.put(req, cp); }); } return r; });
+  }));
 });

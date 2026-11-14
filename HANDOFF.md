@@ -82,6 +82,10 @@ Smart yogaplan (Move With Nicole) som anpassar sig efter gympassen. Ersätter de
 
 Stressavdraget i `getBodyBattery` räknas nu mot 30-dagarssnittet: `-(stress_igår − snitt) × 0,08`, begränsat till −8…+15 poäng. Förut absoluta minuter (0,1/min, max 20), vilket gav ~−11 en vanlig dag (snittet ~110 min) och höll normaldagar runt 50 trots dagsform 80+. Faller tillbaka på gamla formeln om baslinje saknas. analytics.js laddas med `?v=` i index.html, höj den vid ändring.
 
+## Service worker omskriven (2026-11-14, `halsa-v9`)
+
+Safari fastnade på gammal index.html: gamla SW:n gjorde `fetch(req, {cache:'no-cache'})` på navigeringsrequesten, vilket Safari kastar på, och catch-grenen serverade cachad index.html för alltid. Nu hämtas egna filer med URL-strängen och `cache:'no-store'`, cachen används bara offline. Registreringen har `updateViaCache:'none'`. Nödutgång: `?reset=1` avregistrerar SW och tömmer cacheminnen (localStorage orörd). `window.APP_VERSION` visas bredvid datumet i sidomenyn, uppdatera den vid deploy så det går att se vilken version en enhet kör.
+
 ## Deploy — lärdomar (viktigt)
 
 - **`file_upload`-verktyget fungerar inte** i Cowork-sessioner: klienten konverterar sökvägarna innan de når värden.

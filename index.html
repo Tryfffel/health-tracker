@@ -123,6 +123,7 @@
     .tema-fall-oppen { transform: rotate(180deg); }
     .tema-prick { display: inline-block; width: 0.6em; height: 0.6em; border-radius: 99px; vertical-align: 0.05em; margin: 0 0.2em; }
   </style>
+  <script>window.APP_VERSION = "v14/11 kl 09";</script>
   <script src="charts.js"></script>
   <script src="analytics.js?v=2026111402"></script>
   <script src="yoga.js?v=2026111406"></script>
@@ -4588,7 +4589,7 @@ function WeightStepTracker() {
               h('div', { className: 'text-2xl' }, '🏥'),
               h('div', null,
                 h('h1', { className: 'text-base font-bold text-gray-800 leading-tight' }, 'Hälsodagbok'),
-                h('p', { className: 'text-xs text-gray-400' }, new Date().toLocaleDateString('sv-SE',{day:'numeric',month:'long'}))
+                h('p', { className: 'text-xs text-gray-400' }, new Date().toLocaleDateString('sv-SE',{day:'numeric',month:'long'}) + ' · ' + (window.APP_VERSION || ''))
               )
             ),
             stats ? h('div', { className: 'bg-indigo-50 rounded-xl px-3 py-2 mt-2' },
@@ -4648,6 +4649,7 @@ class Felskydd extends React.Component {
 ReactDOM.createRoot(document.getElementById('root')).render(_ce(Felskydd, null, h(WeightStepTracker, null)));
 
 </script>
-  <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){var hadController=!!navigator.serviceWorker.controller;navigator.serviceWorker.register('sw.js').then(function(reg){reg.update();setInterval(function(){reg.update();},30*60*1000);}).catch(function(){});var reloaded=false;navigator.serviceWorker.addEventListener('controllerchange',function(){if(reloaded||!hadController)return;reloaded=true;location.reload();});});}</script>
+  <script>if(/[?&]reset=1/.test(location.search)&&'serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister();}));}).then(function(){return window.caches?caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k);}));}):null;}).then(function(){location.replace(location.pathname);});}</script>
+  <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){var hadController=!!navigator.serviceWorker.controller;navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(function(reg){reg.update();setInterval(function(){reg.update();},30*60*1000);}).catch(function(){});var reloaded=false;navigator.serviceWorker.addEventListener('controllerchange',function(){if(reloaded||!hadController)return;reloaded=true;location.reload();});});}</script>
 </body>
 </html>
