@@ -612,7 +612,9 @@
     // Baslinjen = de 30 nätterna FÖRE den senaste (dagen själv ska inte jämföras med sig själv).
     var base = function(key){ var v = ouraData.slice(1,31).map(function(d){ return d[key]; }).filter(function(x){ return x != null; }); return v.length ? v.reduce(function(a,b){ return a+b; },0)/v.length : null; };
     var hrvB = base('hrv_avg'), rhrB = base('resting_hr'), stressB = base('stress_high_min');
-    var trainByDate = {}; workouts.forEach(function(w){ trainByDate[w.date] = (trainByDate[w.date]||0) + w.duration; });
+    // Träningsbelastning = minuter × intensitet/3 (intensitet 1–5, saknas = 3). Lugn yoga
+    // (intensitet 1–2) ska inte dra ner morgondagens batteri som ett gympass.
+    var trainByDate = {}; workouts.forEach(function(w){ var it = w.intensity ? Math.max(1, Math.min(5, w.intensity)) : 3; trainByDate[w.date] = (trainByDate[w.date]||0) + (w.duration||0) * it / 3; });
     // Tidslogik: Oura daterar natten efter morgonen den slutar, men stress och
     // träning gäller dagtid. Morgonens batteri för dag d påverkas alltså av
     // GÅRDAGENS stress, träning och alkohol, inte av dag d:s som inte har hänt
