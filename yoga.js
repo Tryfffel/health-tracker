@@ -121,7 +121,8 @@
     if (strength === 'e8TuZbVK3h8') strength = R('e8TuZbVK3h8','EpRxH1v-nqc');
     var big = R('0fPk-UzQWOs','5TzqqPJFHeQ');
     var morning, lunch = null;
-    if (g) morning = { id:'Vr3h5X9kmUo', why:'Lätt morgon, gym i dag' };
+    // Gymdag: vanligt morgonflöde (20 till 25 min rörlighet tröttar inte ut inför gymmet).
+    if (g) morning = { id:STD, why:'Rörlighet inför gymmet' };
     else if (prev) morning = dow >= 5 ? { id:R('RvCntPg7oPE','HIuJA4xS4WM'), why:'Rörlighet dagen efter gym' }
       : prev === 'over' ? { id:'98rmMgBwJXE', why:'Snällt för axeln efter överkroppspass' }
       : { id:R('HvluUhDizIY','TDo4HU60IXY'), why:'Återhämtning dagen efter gym' };
@@ -342,7 +343,7 @@
       h('div', null,
         h('h3', { className:'text-lg font-bold text-gray-800 mb-3' }, 'Så anpassar sig planen'),
         h('div', { className:'grid sm:grid-cols-2 gap-3' },
-          [['Gymdag','15 min lätt morgonflöde. Ingen yogastyrka samma dag.'],
+          [['Gymdag','Vanligt morgonflöde, 20 till 25 min rörlighet som förbereder kroppen. Ingen yogastyrka samma dag.'],
            ['Dagen efter gym','20 min Stretch Routine. Efter överkropp Everyday Yoga, som är snällare mot axeln. På helgen 30 min Flexibility.'],
            ['Yogastyrka på lunchen','Högst två pass i veckan, bara måndag, onsdag eller fredag (tisdag och torsdag är kontorsdagar) och aldrig dagen före, samma dag eller dagen efter gym. Pilates först, Power sedan.'],
            ['Övriga dagar','Morgonflöde, 30 min allround på torsdag, veckans stora pass på lördag (söndag om du gymmar fredag) och lugn rörlighet på söndag. Passen i varje roll byts varannan vecka.']
