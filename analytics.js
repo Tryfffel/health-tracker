@@ -611,7 +611,7 @@
     if (ouraData.length < 10) return null;
     // Baslinjen = de 30 nätterna FÖRE den senaste (dagen själv ska inte jämföras med sig själv).
     var base = function(key){ var v = ouraData.slice(1,31).map(function(d){ return d[key]; }).filter(function(x){ return x != null; }); return v.length ? v.reduce(function(a,b){ return a+b; },0)/v.length : null; };
-    var hrvB = base('hrv_avg'), rhrB = base('resting_hr');
+    var hrvB = base('hrv_avg'), rhrB = base('resting_hr'), stressB = base('stress_high_min');
     var trainByDate = {}; workouts.forEach(function(w){ trainByDate[w.date] = (trainByDate[w.date]||0) + w.duration; });
     // Tidslogik: Oura daterar natten efter morgonen den slutar, men stress och
     // träning gäller dagtid. Morgonens batteri för dag d påverkas alltså av
@@ -630,7 +630,13 @@
       if (d.hrv_avg != null && hrvB) { var pH = clamp((d.hrv_avg - hrvB)/hrvB*60, -15, 15); v += pH; parts.push({ n: '💗 HRV', v: pH, max: 15 }); }
       if (d.resting_hr != null && rhrB) { var pR = -clamp((d.resting_hr - rhrB)*2, -10, 10); v += pR; parts.push({ n: '❤️ Vilopuls', v: pR, max: 10 }); }
       var ig = igar(d.date);
-      if (stressByDate[ig] != null) { var pSt = -clamp(stressByDate[ig]*0.1, 0, 20); v += pSt; parts.push({ n: '🔥 Stress igår', v: pSt, max: 20 }); }
+      // Stress jämförs mot ditt eget 30-dagarssnitt, precis som HRV och vilopuls.
+      // Förut drogs absoluta minuter av (0,1/min, max 20), vilket gav ~−11 en helt
+      // normal dag eftersom Oura räknar mycket som hög stress när HRV ligger lågt.
+      if (stressByDate[ig] != null) {
+        var pSt = stressB != null ? -clamp((stressByDate[ig] - stressB)*0.08, -8, 15) : -clamp(stressByDate[ig]*0.1, 0, 20);
+        v += pSt; parts.push({ n: '🔥 Stress igår', v: pSt, max: 15 });
+      }
       var pT = -clamp((trainByDate[ig]||0)*0.08, 0, 10); v += pT; parts.push({ n: '💪 Träning igår', v: pT, max: 10 });
       var dl = dayLogs[d.date], dlIg = dayLogs[ig];
       var pA = (dlIg && dlIg.alkohol) ? -clamp(dlIg.alkohol*5, 0, 20) : 0; v += pA; parts.push({ n: '🍷 Alkohol igår', v: pA, max: 20 });
