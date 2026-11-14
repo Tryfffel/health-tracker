@@ -62,14 +62,27 @@
   var isoWeek = function(dt){ var d=new Date(Date.UTC(dt.getFullYear(),dt.getMonth(),dt.getDate())); var n=d.getUTCDay()||7; d.setUTCDate(d.getUTCDate()+4-n); var y=new Date(Date.UTC(d.getUTCFullYear(),0,1)); return Math.ceil(((d-y)/864e5+1)/7); };
   var todayD = function(){ return addDays(new Date(),0); };
 
-  // ── gym: plan + loggad styrketräning ──
-  var gymType = function(d, gymPlan, workouts){
+  // ── gym: återkommande schema + plan + loggad styrketräning ──
+  // Standard: måndag och fredag, plus onsdag udda veckor (47, 49, ...), från 16/11 2026.
+  // En post i gymPlan för datumet (även t:null = inget gym) går före standarden.
+  var GYM_FROM = '2026-11-16';
+  var GYM_SKIP = { '2026-11-18': 1 }; // undantag: inget onsdagsgym denna dag
+  var defaultGym = function(d){
+    if (d < GYM_FROM || GYM_SKIP[d]) return null;
+    var dt = parse(d), dow = (dt.getDay()+6)%7;
+    if (dow === 0 || dow === 4) return 'hel';
+    if (dow === 2 && isoWeek(dt) % 2 === 1) return 'hel';
+    return null;
+  };
+  var plannedGym = function(d, gymPlan){
     var g = gymPlan && gymPlan[d];
-    if (g && g.t && GYM[g.t]) return g.t;
-    if (g && g.t === null) {
-      // borttaget i planen, men ett loggat pass räknas ändå
-      return (workouts || []).some(function(w){ return w.date === d && w.type === 'Styrketräning'; }) ? 'hel' : null;
-    }
+    if (g && 't' in g) return g.t && GYM[g.t] ? g.t : null;
+    return defaultGym(d);
+  };
+  var gymType = function(d, gymPlan, workouts){
+    var t = plannedGym(d, gymPlan);
+    if (t) return t;
+    // ingen planerad gymdag, men ett loggat styrkepass räknas ändå
     return (workouts || []).some(function(w){ return w.date === d && w.type === 'Styrketräning'; }) ? 'hel' : null;
   };
   var gymDone = function(d, workouts){ return (workouts || []).some(function(w){ return w.date === d && w.type === 'Styrketräning'; }); };
@@ -173,7 +186,7 @@
     var _i = useState(''), imp = _i[0], setImp = _i[1];
 
     var cycleGym = function(k){
-      var cur = gp[k] && GYM[gp[k].t] ? gp[k].t : null;
+      var cur = plannedGym(k, gp);
       var nxt = GYM_ORDER[(GYM_ORDER.indexOf(cur)+1) % GYM_ORDER.length];
       var next = Object.assign({}, gp); next[k] = { t:nxt, u:Date.now() };
       props.setGymPlan(next);
@@ -276,7 +289,7 @@
             offset !== 0 ? h('button', { type:'button', onClick:function(){ setOffset(0); }, className:'text-xs text-indigo-600 font-semibold mt-0.5' }, 'Till denna vecka') : null),
           h('button', { type:'button', onClick:function(){ setOffset(offset+1); }, 'aria-label':'Nästa vecka', className:'px-4 py-1.5 rounded-full bg-white shadow-md font-bold' }, '›')),
         h('ul', { className:'flex flex-col gap-2' }, calDays),
-        h('p', { className:'text-xs text-gray-500 mt-2' }, 'Tryck + Gym för att planera ett pass, igen för att byta typ (ben, överkropp, helkropp) och en fjärde gång för att ta bort det. Loggar du styrketräning under Träning räknas den också som gym.')),
+        h('p', { className:'text-xs text-gray-500 mt-2' }, 'Gym ligger inlagt måndag och fredag, plus onsdag varannan vecka. Tryck på gymknappen för att byta typ (ben, överkropp, helkropp) eller ta bort det en enskild dag, och + Gym för att lägga till. Loggar du styrketräning under Träning räknas den också som gym.')),
 
       // statistik
       h('div', null,
