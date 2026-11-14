@@ -123,7 +123,7 @@
     .tema-fall-oppen { transform: rotate(180deg); }
     .tema-prick { display: inline-block; width: 0.6em; height: 0.6em; border-radius: 99px; vertical-align: 0.05em; margin: 0 0.2em; }
   </style>
-  <script>window.APP_VERSION = "v14/11 kl 09";</script>
+  <script>window.APP_VERSION = "v14/11 kl 09:15";</script>
   <script src="charts.js"></script>
   <script src="analytics.js?v=2026111402"></script>
   <script src="yoga.js?v=2026111406"></script>
@@ -228,6 +228,7 @@ function WeightStepTracker() {
   const [experiments, setExperiments] = useState([]);
   const [expForm, setExpForm] = useState({ date: '', label: '' });
   const [dayLogs, setDayLogs] = useState({});
+  const [tagDate, setTagDate] = useState(todayStr());
   // Yoga: planerade gympass (per datum, t:null = borttaget) och raderade pass-id:n
   // så att molnsynken inte väcker liv i borttagna pass.
   const [gymPlan, setGymPlanState] = useState({});
@@ -1105,8 +1106,11 @@ function WeightStepTracker() {
   // ─── View rendering helpers ─────────────────────────────────────────────────
   function renderTagCard() {
     return (function(){
-      var tds = todayStr();
-      var todayDate = new Date();
+      // Taggarna gäller valt datum (standard i dag) så att man kan efterregistrera,
+      // t.ex. alkohol från en tidigare kväll.
+      var tds = tagDate || todayStr();
+      var isToday = tds === todayStr();
+      var todayDate = new Date(tds + 'T12:00:00');
       var dl = dayLogs[tds] || {};
       var chip = function(active, label, onClick, cls) {
         return h('button', { key: label, onClick: onClick,
@@ -1122,8 +1126,10 @@ function WeightStepTracker() {
       })();
       return h('div', { className: 'bg-white rounded-2xl shadow-md mb-4 p-5' },
         h('div', { className: 'flex items-center justify-between mb-3' },
-          h('h2', { className: 'font-bold text-gray-800' }, '🏷️ Dagens taggar'),
-          h('p', { className: 'text-xs text-gray-400' }, 'Två sekunder — flödar in i alla analyser')
+          h('h2', { className: 'font-bold text-gray-800' }, isToday ? '🏷️ Dagens taggar' : '🏷️ Taggar ' + todayDate.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })),
+          h('div', { className: 'flex items-center gap-2' },
+            !isToday ? h('button', { onClick: function(){ setTagDate(todayStr()); }, className: 'text-xs font-bold px-2 py-1 rounded-lg border border-indigo-200 text-indigo-700 bg-white' }, 'I dag') : null,
+            h('input', { type: 'date', value: tds, max: todayStr(), onChange: function(e){ setTagDate(e.target.value || todayStr()); }, 'aria-label': 'Datum för taggarna', className: 'px-2 py-1 border rounded-lg text-sm outline-none' }))
         ),
         h('div', { className: 'flex flex-wrap items-center gap-x-5 gap-y-3' },
           h('div', null,
