@@ -76,10 +76,11 @@
 
   // ── planering ──
   var weekStrength = function(mon, gOn){
-    var free = [0,1,2,3,4].filter(function(i){ var d = addDays(mon,i); return !gOn(ymd(d)) && !gOn(ymd(addDays(d,-1))) && !gOn(ymd(addDays(d,1))); });
+    // Tisdag och torsdag är kontorsdagar: ingen yoga på lunchen.
+    var free = [0,2,4].filter(function(i){ var d = addDays(mon,i); return !gOn(ymd(d)) && !gOn(ymd(addDays(d,-1))) && !gOn(ymd(addDays(d,1))); });
     var out = {};
     if (!free.length) return out;
-    var first = [1,0,2,3,4].find(function(i){ return free.indexOf(i) >= 0; });
+    var first = [0,2,4].find(function(i){ return free.indexOf(i) >= 0; });
     out[first] = 'e8TuZbVK3h8';
     var rest = free.filter(function(i){ return Math.abs(i-first) >= 2; }).sort(function(a,b){ return Math.abs(b-first)-Math.abs(a-first) || b-a; });
     if (rest.length) out[rest[0]] = 'iYS1P-ZjNsA';
@@ -316,7 +317,7 @@
         h('div', { className:'grid sm:grid-cols-2 gap-3' },
           [['Gymdag','15 min lätt morgonflöde. Ingen yogastyrka samma dag.'],
            ['Dagen efter gym','20 min Stretch Routine. Efter överkropp Everyday Yoga, som är snällare mot axeln. På helgen 30 min Flexibility.'],
-           ['Yogastyrka på lunchen','Högst två pass i veckan, bara vardagar utan gym dagen före, samma dag eller dagen efter. Pilates först, Power sedan, minst en dag emellan.'],
+           ['Yogastyrka på lunchen','Högst två pass i veckan, bara måndag, onsdag eller fredag (tisdag och torsdag är kontorsdagar) och aldrig dagen före, samma dag eller dagen efter gym. Pilates först, Power sedan.'],
            ['Övriga dagar','25 min Morning Flow, 30 min allround på torsdag, veckans stora pass på lördag (söndag om du gymmar fredag) och lugn rörlighet på söndag.']
           ].map(function(r){ return h('div', { key:r[0], className: card + ' p-4' }, h('p', { className:'font-semibold text-gray-800 mb-1' }, r[0]), h('p', { className:'text-sm text-gray-500' }, r[1])); }))),
 

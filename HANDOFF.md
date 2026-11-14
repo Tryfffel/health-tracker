@@ -70,7 +70,7 @@ Smart yogaplan (Move With Nicole) som anpassar sig efter gympassen. Ersätter de
 
 - **Fil:** `yoga.js` (laddas efter analytics.js), exponerar `window.Yoga = { View, Today, plan, ... }`. Vyn `yoga` i menyn och kortet "Dagens yoga" på Idag.
 - **Data:** yogapass sparas som vanliga `workouts` med `type:'Yoga'` och `yoga:<videoId>`, så de räknas i Träning, veckostatistik, årsmål och kroppsbatteri. Gym räknas som gjort om det finns ett `Styrketräning`-pass samma dag; avbockning i yogakalendern skapar ett sådant med `gymPlan:true` (30 min). Planerade gympass i `gymPlan` (`gym-plan` i storage): `{datum: {t:'ben'|'over'|'hel'|null, u:ms}}`, `t:null` = borttaget.
-- **Planeringsregler** (`Yoga.plan`): gymdag → 15 min lätt; dagen efter → Stretch Routine (Everyday efter överkropp, Flexibility på helg); yogastyrka på lunchen max 2/vecka på vardagar utan gym dagen före/samma/efter; lördagens stora pass flyttas till söndag om fredag är gymdag.
+- **Planeringsregler** (`Yoga.plan`): gymdag → 15 min lätt; dagen efter → Stretch Routine (Everyday efter överkropp, Flexibility på helg); yogastyrka på lunchen max 2/vecka, bara mån/ons/fre (tis och tor är kontorsdagar) och utan gym dagen före/samma/efter; lördagens stora pass flyttas till söndag om fredag är gymdag.
 - **Tombstones:** `deletedIds` (`deleted-ids`) fylls av `deleteWorkout`. `mergeBackup` tar union av dem och filtrerar bort raderade pass, så molnsynken inte väcker liv i dem. gymPlan mergas per datum, nyast `u` vinner.
 - **Import:** Yoga-vyn har "Importera historik från yogaveckan.vercel.app" som läser den sidans säkerhetskopia (array eller `{log, gym}`).
 - SW-cache bumpad till `halsa-v8` och `yoga.js` tillagd i ASSETS.
