@@ -2984,7 +2984,7 @@ function WeightStepTracker() {
                 h('input', { type:'password', value:appSettings.backupPassword || '', onChange:function(e){setAppSettings(Object.assign({},appSettings,{backupPassword:e.target.value}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1' }),
                 h('p', { className: 'text-xs text-gray-400 mt-1' }, 'Datan AES-krypteras på telefonen innan uppladdning — repot ser bara oläsbar text.'),
                 h('div', { className: 'flex flex-wrap gap-2 mt-2' },
-                  h('a', { href: 'https://github.com/settings/personal-access-tokens/new?name=H%C3%A4lsodagbok+synk&description=Krypterad+synk+f%C3%B6r+health-tracker&target_name=Tryfffel&expires_in=366&contents=write&actions=write', target: '_blank', rel: 'noopener',
+                  h('a', { href: 'https://github.com/settings/personal-access-tokens/new?name=H%C3%A4lsodagbok+synk&description=Krypterad+synk+f%C3%B6r+health-tracker&target_name=Tryfffel&expires_in=365&contents=write&actions=write', target: '_blank', rel: 'noopener',
                     className: 'px-3 py-2 rounded-lg text-xs font-bold bg-gray-900 text-white' }, '1. Skapa token på GitHub ↗'),
                   h('button', { type: 'button', onClick: function(){
                       var abc = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', a = new Uint32Array(20), pw = '';
