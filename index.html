@@ -123,10 +123,10 @@
     .tema-fall-oppen { transform: rotate(180deg); }
     .tema-prick { display: inline-block; width: 0.6em; height: 0.6em; border-radius: 99px; vertical-align: 0.05em; margin: 0 0.2em; }
   </style>
-  <script>window.APP_VERSION = "v15/11 kl 07:30";</script>
+  <script>window.APP_VERSION = "v15/11 kl 08:30";</script>
   <script src="charts.js"></script>
-  <script src="analytics.js?v=2026111402"></script>
-  <script src="yoga.js?v=2026111407"></script>
+  <script src="analytics.js?v=2026111403"></script>
+  <script src="yoga.js?v=2026111408"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -223,6 +223,7 @@ function WeightStepTracker() {
   const [toast, setToast]           = useState(null);
   const [loading, setLoading]       = useState(true);
   const [lastBackup, setLastBackup] = useState(null);
+  const [showPw, setShowPw] = useState(false);
   const [appSettings, setAppSettings] = useState({ injectionDay: 2, stepGoal: 8000, stepTarget: 12000, sleepNeed: 450, latitude: 59.3, ghToken: '', backupPassword: '' });
   const [lastCloudBackup, setLastCloudBackup] = useState(null);
   const [experiments, setExperiments] = useState([]);
@@ -683,7 +684,7 @@ function WeightStepTracker() {
     setGymPlan(gp);
     showToast('🧘 ' + r.workouts.length + ' yogapass och ' + gymAdd.length + ' gympass inlästa');
   };
-  const yogaProps = { workouts: workouts, gymPlan: gymPlan, setGymPlan: setGymPlan, onToggle: yogaToggle, onToggleGym: yogaToggleGym, onDelete: deleteWorkout, onImport: yogaImport, toast: showToast };
+  const yogaProps = { ouraData: ouraData, workouts: workouts, gymPlan: gymPlan, setGymPlan: setGymPlan, onToggle: yogaToggle, onToggleGym: yogaToggleGym, onDelete: deleteWorkout, onImport: yogaImport, toast: showToast };
   const editWorkout = function(w) {
     var nd = window.prompt('Minuter:', w.duration);
     if (nd === null) return;
@@ -2981,7 +2982,20 @@ function WeightStepTracker() {
                 h('input', { type:'password', value:appSettings.ghToken || '', placeholder:'github_pat_…', onChange:function(e){setAppSettings(Object.assign({},appSettings,{ghToken:e.target.value}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1 mb-2' }),
                 h('label', { className: 'text-xs text-gray-500' }, 'Krypteringslösenord (glöm inte detta — utan det kan backupen aldrig läsas)'),
                 h('input', { type:'password', value:appSettings.backupPassword || '', onChange:function(e){setAppSettings(Object.assign({},appSettings,{backupPassword:e.target.value}));}, className:'w-full px-4 py-3 border rounded-lg outline-none mt-1' }),
-                h('p', { className: 'text-xs text-gray-400 mt-1' }, 'Datan AES-krypteras på telefonen innan uppladdning — repot ser bara oläsbar text. Skapa token på github.com → Settings → Developer settings → Fine-grained tokens.'),
+                h('p', { className: 'text-xs text-gray-400 mt-1' }, 'Datan AES-krypteras på telefonen innan uppladdning — repot ser bara oläsbar text.'),
+                h('div', { className: 'flex flex-wrap gap-2 mt-2' },
+                  h('a', { href: 'https://github.com/settings/personal-access-tokens/new?name=H%C3%A4lsodagbok+synk&description=Krypterad+synk+f%C3%B6r+health-tracker&target_name=Tryfffel&expires_in=366&contents=write&actions=write', target: '_blank', rel: 'noopener',
+                    className: 'px-3 py-2 rounded-lg text-xs font-bold bg-gray-900 text-white' }, '1. Skapa token på GitHub ↗'),
+                  h('button', { type: 'button', onClick: function(){
+                      var abc = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', a = new Uint32Array(20), pw = '';
+                      crypto.getRandomValues(a); for (var i = 0; i < a.length; i++) { pw += abc[a[i] % abc.length]; if (i % 5 === 4 && i < 19) pw += '-'; }
+                      setAppSettings(Object.assign({}, appSettings, { backupPassword: pw }));
+                      setShowPw(true);
+                      try { navigator.clipboard.writeText(pw); showToast('Lösenord skapat och kopierat. Spara det i din lösenordshanterare nu.'); } catch(e) { showToast('Lösenord skapat. Spara det i din lösenordshanterare nu.'); }
+                    }, className: 'px-3 py-2 rounded-lg text-xs font-bold border border-gray-300 bg-white text-gray-700' }, '2. Skapa lösenord åt mig')
+                ),
+                h('p', { className: 'text-xs text-gray-500 mt-1' }, 'GitHub-sidan är förifylld (namn, ett år, Contents och Actions: write). Det enda du väljer själv är Repository access → Only select repositories → health-tracker. Tryck Generate token och klistra in den ovan.'),
+                showPw && appSettings.backupPassword ? h('p', { className: 'text-xs mt-1 font-mono bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-900 select-all' }, appSettings.backupPassword) : null,
                 (function(){
                   var harToken = !!appSettings.ghToken, harPw = !!appSettings.backupPassword;
                   var steg = function(klar, txt, i){

@@ -641,7 +641,16 @@
       }
       var pT = -clamp((trainByDate[ig]||0)*0.08, 0, 10); v += pT; parts.push({ n: '💪 Träning igår', v: pT, max: 10 });
       var dl = dayLogs[d.date], dlIg = dayLogs[ig];
-      var pA = (dlIg && dlIg.alkohol) ? -clamp(dlIg.alkohol*5, 0, 20) : 0; v += pA; parts.push({ n: '🍷 Alkohol igår', v: pA, max: 20 });
+      // Alkohol: 5 p/enhet (max 20). Blev natten ändå bra (sömn ≥ 75 och HRV på minst
+      // 95 % av baslinjen) syns ingen påverkan i mätningen, så då högst −5. Annars
+      // dubbelräknas det som sömn och HRV redan fångat.
+      var pA = 0;
+      if (dlIg && dlIg.alkohol) {
+        pA = -clamp(dlIg.alkohol*5, 0, 20);
+        var braNatt = d.sleep_score >= 75 && d.hrv_avg != null && hrvB && d.hrv_avg >= hrvB*0.95;
+        if (braNatt) pA = Math.max(pA, -5);
+      }
+      v += pA; parts.push({ n: '🍷 Alkohol igår', v: pA, max: 20 });
       if (dl && dl.sjuk) { v -= 15; parts.push({ n: '🤒 Sjuk', v: -15, max: 15 }); }
       return { date: d.date, v: Math.round(clamp(v, 0, 100)), parts: parts };
     }).reverse();

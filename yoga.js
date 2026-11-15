@@ -189,6 +189,25 @@
     return { workouts:add, gym:gym, gymDone:gymDoneDates };
   };
 
+  // ── Effekt: Oura före och efter start, och nätter efter yogadag mot utan ──
+  var METRICS = [
+    { k:'hrv_avg', l:'HRV', u:' ms', up:true, d:1 },
+    { k:'resting_hr', l:'Vilopuls', u:' bpm', up:false, d:1 },
+    { k:'sleep_score', l:'Sömnpoäng', u:'', up:true, d:0 },
+    { k:'stress_high_min', l:'Hög stress', u:' min', up:false, d:0 }
+  ];
+  var effect = function(oura, workouts){
+    var o = (oura || []).filter(function(x){ return x && x.date; });
+    var start = YOGA_START, before0 = ymd(addDays(parse(start), -28));
+    var yDays = {}; yogaOf(workouts).forEach(function(w){ yDays[w.date] = 1; });
+    var avg = function(rows, k){ var v = rows.map(function(r){ return r[k]; }).filter(function(x){ return x != null && !isNaN(x); }); return v.length ? { m: v.reduce(function(a,b){ return a+b; },0)/v.length, n: v.length } : null; };
+    var pre = o.filter(function(r){ return r.date >= before0 && r.date < start; });
+    var post = o.filter(function(r){ return r.date >= start; });
+    var after = post.filter(function(r){ return yDays[ymd(addDays(parse(r.date), -1))]; });
+    var without = post.filter(function(r){ return !yDays[ymd(addDays(parse(r.date), -1))]; });
+    return { pre:pre, post:post, after:after, without:without, row: function(set, k){ return avg(set, k); } };
+  };
+
   // ── små UI-bitar ──
   var card = 'bg-white rounded-xl shadow-md';
   var btnPlay = function(href, warm){ return h('a', { href:href, target:'_blank', rel:'noopener', className:'inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold text-white whitespace-nowrap ' + (warm ? 'bg-orange-500 hover:bg-orange-600' : 'bg-indigo-600 hover:bg-indigo-700') }, '▶ Starta'); };
@@ -338,6 +357,38 @@
           h('button', { type:'button', onClick:function(){ setOffset(offset+1); }, 'aria-label':'Nästa vecka', className:'px-4 py-1.5 rounded-full bg-white shadow-md font-bold' }, '›')),
         h('ul', { className:'flex flex-col gap-2' }, calDays),
         h('p', { className:'text-xs text-gray-500 mt-2' }, 'Gym ligger inlagt måndag och fredag, plus onsdag varannan vecka. Tryck på gymknappen för att byta typ (ben, överkropp, helkropp) eller ta bort det en enskild dag, och + Gym för att lägga till. Loggar du styrketräning under Träning räknas den också som gym.')),
+
+      // effekt
+      (function(){
+        var e = effect(props.ouraData, wk);
+        if (!e.post.length || !e.pre.length) return null;
+        var fmtV = function(x, m){ return x ? x.m.toFixed(m.d).replace('.', ',') + m.u : '–'; };
+        var diff = function(a, b, m){
+          if (!a || !b) return h('span', { className:'text-gray-400' }, '–');
+          var dv = b.m - a.m, good = m.up ? dv > 0 : dv < 0, small = Math.abs(dv) < (m.k === 'stress_high_min' ? 10 : m.k === 'sleep_score' ? 1 : 0.5);
+          return h('span', { className:'font-semibold ' + (small ? 'text-gray-500' : good ? 'text-emerald-600' : 'text-red-600') }, (dv > 0 ? '+' : '') + dv.toFixed(m.d).replace('.', ',') + m.u);
+        };
+        var table = function(lA, setA, lB, setB){
+          return h('div', { className:'overflow-x-auto' }, h('table', { className:'w-full text-sm' },
+            h('thead', null, h('tr', { className:'text-xs text-gray-400 text-left' },
+              h('th', { className:'font-semibold py-1' }, ''), h('th', { className:'font-semibold py-1' }, lA + ' (' + setA.length + ')'), h('th', { className:'font-semibold py-1' }, lB + ' (' + setB.length + ')'), h('th', { className:'font-semibold py-1' }, 'Skillnad'))),
+            h('tbody', null, METRICS.map(function(m){
+              var a = e.row(setA, m.k), b = e.row(setB, m.k);
+              return h('tr', { key:m.k, className:'border-t border-gray-100' },
+                h('td', { className:'py-1.5 text-gray-700' }, m.l), h('td', { className:'py-1.5 text-gray-600' }, fmtV(a, m)), h('td', { className:'py-1.5 text-gray-800 font-medium' }, fmtV(b, m)), h('td', { className:'py-1.5' }, diff(a, b, m)));
+            }))));
+        };
+        var enough = e.without.length >= 5 && e.after.length >= 5;
+        return h('div', { className: card + ' p-4' },
+          h('h3', { className:'text-lg font-bold text-gray-800' }, 'Vad yogan gör för dig'),
+          h('p', { className:'text-xs text-gray-500 mb-3' }, 'Oura-värden. Siffran inom parentes är antal nätter.'),
+          h('p', { className:'text-xs font-bold uppercase tracking-wider text-gray-400 mb-1' }, 'Fyra veckor före start mot sedan start'),
+          table('Före', e.pre, 'Sedan v45', e.post),
+          h('p', { className:'text-xs font-bold uppercase tracking-wider text-gray-400 mt-4 mb-1' }, 'Natten efter en yogadag mot natten efter en dag utan'),
+          enough ? table('Utan yoga', e.without, 'Med yoga', e.after)
+            : h('p', { className:'text-sm text-gray-500' }, 'Behöver minst fem nätter i varje grupp. Nu: ' + e.after.length + ' efter yogadagar, ' + e.without.length + ' utan. Kör du yoga nästan varje dag tar den här jämförelsen tid, och jämförelsen ovan säger mer.'),
+          h('p', { className:'text-xs text-gray-400 mt-3' }, e.post.length < 21 ? 'Under tre veckor data sedan start, så siffrorna rör sig mycket. Titta på riktningen när det gått en månad. ' : '', 'Wegovy, säsong, sjukdom och jobbstress påverkar också, så det här visar samband, inte bevis.'));
+      })(),
 
       // statistik
       h('div', null,

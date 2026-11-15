@@ -86,6 +86,12 @@ Stressavdraget i `getBodyBattery` räknas nu mot 30-dagarssnittet: `-(stress_ig�
 
 Safari fastnade på gammal index.html: gamla SW:n gjorde `fetch(req, {cache:'no-cache'})` på navigeringsrequesten, vilket Safari kastar på, och catch-grenen serverade cachad index.html för alltid. Nu hämtas egna filer med URL-strängen och `cache:'no-store'`, cachen används bara offline. Registreringen har `updateViaCache:'none'`. Nödutgång: `?reset=1` avregistrerar SW och tömmer cacheminnen (localStorage orörd). `window.APP_VERSION` visas bredvid datumet i sidomenyn, uppdatera den vid deploy så det går att se vilken version en enhet kör.
 
+## 2026-11-15: synkuppsättning, yogaeffekt, alkoholregel
+
+- **Synk:** knapp som öppnar GitHubs sida för fine-grained token förifylld via URL-parametrar (namn, Tryfffel, 366 dagar, contents+actions write). Repovalet går inte att förifylla. Knappen "Skapa lösenord åt mig" genererar ett lösenord med crypto.getRandomValues, visar det och kopierar det.
+- **Yogaeffekt** (`effect` i yoga.js): Oura 28 nätter före YOGA_START mot sedan start, och natten efter yogadag mot utan (kräver ≥5 i varje grupp). Yoga-vyn får `ouraData` via yogaProps.
+- **Alkohol i batteriet:** 5 p/enhet max 20, men högst −5 om natten ändå var bra (sömn ≥ 75 och HRV ≥ 95 % av baslinjen).
+
 ## Deploy — lärdomar (viktigt)
 
 - **`file_upload`-verktyget fungerar inte** i Cowork-sessioner: klienten konverterar sökvägarna innan de når värden.
