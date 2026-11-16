@@ -519,9 +519,13 @@
           return h('div', { key:g[0] },
             h('p', { className:'text-sm font-semibold text-gray-700 mb-1' }, g[0]),
             h('ul', { className:'divide-y divide-gray-100' }, g[1].map(function(id){
-              return h('li', { key:id, className:'flex justify-between gap-3 py-1.5 text-sm' },
-                h('a', { href:Y(id), target:'_blank', rel:'noopener', className:'text-gray-800 hover:underline' }, MED[id].n),
-                h('span', { className:'text-gray-400 whitespace-nowrap' }, MED[id].m + ' min'));
+              var on = props.dayLogs && props.dayLogs[today] && props.dayLogs[today].med === id;
+              return h('li', { key:id, className:'flex items-center justify-between gap-3 py-1.5 text-sm' },
+                h('a', { href:Y(id), target:'_blank', rel:'noopener', className:'text-gray-800 hover:underline min-w-0' }, MED[id].n),
+                h('span', { className:'flex items-center gap-2' },
+                  h('span', { className:'text-gray-400 whitespace-nowrap' }, MED[id].m + ' min'),
+                  h('button', { type:'button', onClick:function(){ props.onToggleMed(today, id); }, 'aria-pressed':on,
+                    className:'px-2.5 py-1 rounded-full text-xs font-bold border whitespace-nowrap ' + (on ? 'bg-teal-50 border-teal-500 text-teal-700' : 'border-gray-200 text-gray-600 hover:border-teal-400') }, on ? '✓ Körd i dag' : 'Körde i dag')));
             })));
         }))),
 
