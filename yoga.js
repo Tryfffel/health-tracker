@@ -208,6 +208,51 @@
     return { pre:pre, post:post, after:after, without:without, row: function(set, k){ return avg(set, k); } };
   };
 
+  // ── Meditation efter yogan (10–15 min) ──
+  // Loggas i dayLogs[datum].med = videoId, så den följer med i synken utan ny lagring.
+  var MED = {
+    'u1JIIF6o0RM':{n:'Tony Robbins Priming, guidad',m:14,c:'priming'},
+    'fDXiYiSrG7M':{n:'Tony Robbins 10-Minute Priming',m:11,c:'priming'},
+    '_v2HX0ezk60':{n:'Elevate Your Morning (Sarah Wes)',m:10,c:'priming'},
+    'qQ4vD5FdOKM':{n:'Morning Meditation, Most Incredible Day',m:11,c:'priming'},
+    '-9KLB2HI9BI':{n:'Positivity, Gratitude & Joy',m:11,c:'tacksamhet'},
+    'ASO6Kd4u-Sc':{n:'21 Affirmations for Gratitude (Sarah Wes)',m:11,c:'tacksamhet'},
+    'YRRjaa-Yji0':{n:'Reset Your Mind (Sarah Wes)',m:10,c:'lugn'},
+    'FGO8IWiusJo':{n:'Guided Morning Meditation (Boho Beautiful)',m:11,c:'lugn'},
+    'Gb9YxCC5WBw':{n:'10 Minute Morning Breathwork',m:12,c:'andning'},
+    'KHIbgSN2qAU':{n:'NSDR, djupvila (Huberman)',m:11,c:'vila'}
+  };
+  var MED_LIB = [
+    ['Priming och visualisering',['u1JIIF6o0RM','fDXiYiSrG7M','_v2HX0ezk60','qQ4vD5FdOKM']],
+    ['Tacksamhet',['-9KLB2HI9BI','ASO6Kd4u-Sc']],
+    ['Lugn',['YRRjaa-Yji0','FGO8IWiusJo']],
+    ['Andning och vila',['Gb9YxCC5WBw','KHIbgSN2qAU']]
+  ];
+  var MED_WEEK = [
+    ['u1JIIF6o0RM','Priming inför veckan'],
+    ['YRRjaa-Yji0','Lugn dagen efter gym'],
+    ['_v2HX0ezk60','Visualisera dagen'],
+    ['Gb9YxCC5WBw','Andning för energi'],
+    ['fDXiYiSrG7M','Priming inför helgen'],
+    ['qQ4vD5FdOKM','Starta helgen bra'],
+    ['-9KLB2HI9BI','Tacksamhet']
+  ];
+  var medPlan = function(d, oura, dayLogs){
+    var key = ymd(d), dow = (d.getDay()+6)%7, done = dayLogs && dayLogs[key] && dayLogs[key].med;
+    var w = MED_WEEK[dow], plan = { key:key, id:w[0], why:w[1] };
+    // Hög stress i går (minst 40 % över 30-dagarssnittet): djupvila i stället.
+    var o = (oura || []), y = ymd(addDays(d,-1));
+    var yRow = o.find(function(r){ return r && r.date === y; });
+    if (yRow && yRow.stress_high_min != null) {
+      var prev = o.filter(function(r){ return r && r.date < y && r.stress_high_min != null; }).sort(function(a,b){ return b.date.localeCompare(a.date); }).slice(0,30);
+      var base = prev.length >= 7 ? prev.reduce(function(a,r){ return a + r.stress_high_min; },0)/prev.length : null;
+      if (base && yRow.stress_high_min > base*1.4) plan = { key:key, id:'KHIbgSN2qAU', why:'Hög stress i går (' + yRow.stress_high_min + ' min mot snitt ' + Math.round(base) + '), djupvila i dag' };
+    }
+    if (done && MED[done] && done !== plan.id) plan = { key:key, id:done, why:'Körde i stället för ' + MED[plan.id].n };
+    plan.done = !!(done && MED[done]);
+    return plan;
+  };
+
   // ── små UI-bitar ──
   var card = 'bg-white rounded-xl shadow-md';
   var btnPlay = function(href, warm){ return h('a', { href:href, target:'_blank', rel:'noopener', className:'inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold text-white whitespace-nowrap ' + (warm ? 'bg-orange-500 hover:bg-orange-600' : 'bg-indigo-600 hover:bg-indigo-700') }, '▶ Starta'); };
@@ -232,6 +277,12 @@
         h('button', { type:'button', onClick:props.onOpen, className:'text-xs font-bold px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-700 bg-white' }, 'Kalender →')),
       h('div', { className:'divide-y divide-gray-100' },
         row('Morgon', p.morning, false),
+        (function(){ var mp = medPlan(t, props.ouraData, props.dayLogs); return h('div', { className:'flex items-center justify-between gap-3 flex-wrap py-2' },
+          h('div', { className:'min-w-0' },
+            h('p', { className:'text-xs font-bold uppercase tracking-wider text-teal-600' }, 'Meditation efter yogan'),
+            h('p', { className:'font-semibold text-gray-800' }, MED[mp.id].m + ' min ' + MED[mp.id].n),
+            h('p', { className:'text-xs text-gray-500' }, mp.why)),
+          h('div', { className:'flex gap-2' }, h('a', { href:Y(mp.id), target:'_blank', rel:'noopener', className:'inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold text-white whitespace-nowrap bg-teal-600 hover:bg-teal-700' }, '▶ Starta'), btnDone(mp.done, function(){ props.onToggleMed(k, mp.id); }))); })(),
         p.lunch ? row('Lunch', p.lunch, true) : null,
         p.gym ? h('p', { className:'text-sm text-gray-600 pt-2' }, '🏋 Gym i dag: ' + GYM[p.gym] + (gymDone(k, wk) ? ' · gjort' : '')) : null));
   }
@@ -299,6 +350,13 @@
           h('button', { type:'button', disabled: future, onClick:function(){ props.onToggleGym(k, p.gym); }, 'aria-pressed':gd, 'aria-label':'Bocka av gympass',
             className:'w-7 h-7 shrink-0 rounded-full border-2 grid place-items-center text-sm ' + (gd ? 'bg-violet-500 border-violet-500 text-white' : 'border-gray-300 text-transparent') + (future ? ' opacity-40 cursor-default' : '') }, '✓'),
           h('p', { className:'text-sm' }, h('span', { className:'text-xs font-bold uppercase tracking-wider text-violet-600 mr-1.5' }, 'Gym'), GYM[p.gym])) : null,
+        (function(){ var mp = medPlan(d, props.ouraData, props.dayLogs); return h('div', { className:'flex items-start gap-3' },
+          h('button', { type:'button', disabled: future, onClick:function(){ props.onToggleMed(k, mp.id); }, 'aria-pressed':mp.done, 'aria-label':'Bocka av meditation',
+            className:'w-7 h-7 shrink-0 rounded-full border-2 grid place-items-center text-sm ' + (mp.done ? 'bg-teal-500 border-teal-500 text-white' : 'border-gray-300 text-transparent') + (future ? ' opacity-40 cursor-default' : '') }, '✓'),
+          h('div', { className:'min-w-0' },
+            h('span', { className:'text-xs font-bold uppercase tracking-wider text-teal-600 mr-1.5' }, 'Meditation'),
+            h('a', { href:Y(mp.id), target:'_blank', rel:'noopener', className:'font-medium text-gray-800 hover:underline' }, MED[mp.id].n),
+            h('p', { className:'text-xs text-gray-500' }, MED[mp.id].m + ' min · ' + mp.why))); })(),
         extra.length ? h('p', { className:'text-xs text-gray-500 pl-10' }, 'Även loggat: ' + extra.map(function(w){ return P[w.yoga].n + ' (' + w.duration + ' min)'; }).join(', ')) : null);
     });
 
@@ -330,6 +388,12 @@
         h('p', { className:'text-xs font-bold uppercase tracking-wider text-gray-400' }, DN[pt.dow] + ' · vecka ' + isoWeek(t)),
         h('div', { className:'divide-y divide-gray-100' },
           pRow('Morgon', pt.morning, false),
+          (function(){ var mp = medPlan(t, props.ouraData, props.dayLogs); return h('div', { className:'flex items-center justify-between gap-3 flex-wrap py-3' },
+            h('div', { className:'min-w-0' },
+              h('p', { className:'text-xs font-bold uppercase tracking-wider text-teal-600' }, 'Meditation efter yogan'),
+              h('p', { className:'text-lg font-semibold text-gray-800' }, MED[mp.id].m + ' min ' + MED[mp.id].n),
+              h('p', { className:'text-sm text-gray-500' }, mp.why)),
+            h('div', { className:'flex gap-2' }, h('a', { href:Y(mp.id), target:'_blank', rel:'noopener', className:'inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold text-white whitespace-nowrap bg-teal-600 hover:bg-teal-700' }, '▶ Starta'), btnDone(mp.done, function(){ props.onToggleMed(today, mp.id); }))); })(),
           pt.lunch ? pRow('Lunch', pt.lunch, true) : null,
           pt.gym ? h('div', { className:'flex items-center justify-between gap-3 flex-wrap py-3' },
             h('div', null, h('p', { className:'text-xs font-bold uppercase tracking-wider text-violet-600' }, 'Gym'), h('p', { className:'text-lg font-semibold text-gray-800' }, GYM[pt.gym])),
@@ -446,6 +510,21 @@
             })));
         }))),
 
+      // meditation
+      h('div', null,
+        h('h3', { className:'text-lg font-bold text-gray-800 mb-1' }, 'Meditation'),
+        (function(){ var n7 = 0; for (var i = 0; i < 7; i++) { var dd = ymd(addDays(t, -i)); if (props.dayLogs && props.dayLogs[dd] && props.dayLogs[dd].med) n7++; }
+          return h('p', { className:'text-sm text-gray-500 mb-3' }, n7 + ' av de senaste 7 dagarna. Priming på måndag och fredag, lugn dagen efter gym, andning på torsdag, tacksamhet på söndag. Efter en dag med ovanligt hög stress blir det djupvila i stället.'); })(),
+        h('div', { className: card + ' p-4 space-y-4' }, MED_LIB.map(function(g){
+          return h('div', { key:g[0] },
+            h('p', { className:'text-sm font-semibold text-gray-700 mb-1' }, g[0]),
+            h('ul', { className:'divide-y divide-gray-100' }, g[1].map(function(id){
+              return h('li', { key:id, className:'flex justify-between gap-3 py-1.5 text-sm' },
+                h('a', { href:Y(id), target:'_blank', rel:'noopener', className:'text-gray-800 hover:underline' }, MED[id].n),
+                h('span', { className:'text-gray-400 whitespace-nowrap' }, MED[id].m + ' min'));
+            })));
+        }))),
+
       // import
       h('details', { className: card + ' p-4 text-sm' },
         h('summary', { className:'cursor-pointer font-semibold text-gray-700' }, 'Importera historik från yogaveckan.vercel.app'),
@@ -458,5 +537,5 @@
     );
   }
 
-  window.Yoga = { View: View, Today: Today, plan: plan, P: P, GYM: GYM, makeYoga: makeYoga, fromYogaveckan: fromYogaveckan, ymd: ymd };
+  window.Yoga = { View: View, Today: Today, plan: plan, medPlan: medPlan, MED: MED, P: P, GYM: GYM, makeYoga: makeYoga, fromYogaveckan: fromYogaveckan, ymd: ymd };
 })();

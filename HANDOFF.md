@@ -92,6 +92,10 @@ Safari fastnade på gammal index.html: gamla SW:n gjorde `fetch(req, {cache:'no-
 - **Yogaeffekt** (`effect` i yoga.js): Oura 28 nätter före YOGA_START mot sedan start, och natten efter yogadag mot utan (kräver ≥5 i varje grupp). Yoga-vyn får `ouraData` via yogaProps.
 - **Alkohol i batteriet:** 5 p/enhet max 20, men högst −5 om natten ändå var bra (sömn ≥ 75 och HRV ≥ 95 % av baslinjen).
 
+## Meditation (2026-11-16)
+
+Meditation efter yogan i yoga.js (`MED`, `MED_WEEK`, `medPlan`). Loggas i `dayLogs[datum].med = videoId` ('' = avbockad, så synkens fältmerge inte återställer den). Veckorotation: mån Tony Robbins priming, tis Reset Your Mind, ons Elevate Your Morning, tor breathwork, fre Tony 10-min priming, lör Most Incredible Day, sön tacksamhet. Var gårdagens stress_high_min minst 40 % över 30-dagarssnittet blir det NSDR i stället.
+
 ## Deploy — lärdomar (viktigt)
 
 - **`file_upload`-verktyget fungerar inte** i Cowork-sessioner: klienten konverterar sökvägarna innan de når värden.
