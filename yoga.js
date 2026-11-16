@@ -229,8 +229,8 @@
     ['Andning och vila',['Gb9YxCC5WBw','KHIbgSN2qAU']]
   ];
   var MED_WEEK = [
-    ['u1JIIF6o0RM','Priming inför veckan'],
-    ['YRRjaa-Yji0','Lugn dagen efter gym'],
+    ['YRRjaa-Yji0','Lugn start på veckan'],
+    ['u1JIIF6o0RM','Priming'],
     ['_v2HX0ezk60','Visualisera dagen'],
     ['Gb9YxCC5WBw','Andning för energi'],
     ['fDXiYiSrG7M','Priming inför helgen'],
@@ -514,7 +514,7 @@
       h('div', null,
         h('h3', { className:'text-lg font-bold text-gray-800 mb-1' }, 'Meditation'),
         (function(){ var n7 = 0; for (var i = 0; i < 7; i++) { var dd = ymd(addDays(t, -i)); if (props.dayLogs && props.dayLogs[dd] && props.dayLogs[dd].med) n7++; }
-          return h('p', { className:'text-sm text-gray-500 mb-3' }, n7 + ' av de senaste 7 dagarna. Priming på måndag och fredag, lugn dagen efter gym, andning på torsdag, tacksamhet på söndag. Efter en dag med ovanligt hög stress blir det djupvila i stället.'); })(),
+          return h('p', { className:'text-sm text-gray-500 mb-3' }, n7 + ' av de senaste 7 dagarna. Lugn på måndag, priming på tisdag och fredag, andning på torsdag, tacksamhet på söndag. Efter en dag med ovanligt hög stress blir det djupvila i stället.'); })(),
         h('div', { className: card + ' p-4 space-y-4' }, MED_LIB.map(function(g){
           return h('div', { key:g[0] },
             h('p', { className:'text-sm font-semibold text-gray-700 mb-1' }, g[0]),
