@@ -133,7 +133,7 @@
     if (g) morning = { id:STD, why:'Rörlighet inför gymmet' };
     else if (prev) morning = dow >= 5 ? { id:R('RvCntPg7oPE','HIuJA4xS4WM'), why:'Rörlighet dagen efter gym' }
       : prev === 'over' ? { id:'98rmMgBwJXE', why:'Snällt för axeln efter överkroppspass' }
-      : { id:R('2eC7TlC2NLs','RvCntPg7oPE'), why:'Återhämtning dagen efter gym, 30 min stretch' };
+      : { id: dow === 3 ? 'baqAriam3l8' : R('2eC7TlC2NLs','RvCntPg7oPE'), why:'Återhämtning dagen efter gym, 30 min stretch' };
     else if (strength) { morning = { id: dow === 4 ? R('HvluUhDizIY','TDo4HU60IXY') : STD, why:'Morgonflöde, styrka på lunchen' }; lunch = { id:strength, why:'Ingen gym nära, kroppen är utvilad' }; }
     else if (dow === 3) morning = { id:R('5TzqqPJFHeQ','2eC7TlC2NLs'), why:'Längre allround' };
     else if (dow === 5) morning = { id:big, why:'Veckans stora pass' };
