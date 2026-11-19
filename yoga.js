@@ -238,6 +238,10 @@
     ['qQ4vD5FdOKM','Starta helgen bra'],
     ['-9KLB2HI9BI','Tacksamhet']
   ];
+  // Enskilda dagar med ett bestämt pass (går före veckorotationen och stressregeln).
+  var MED_OVERRIDE = {
+    '2026-11-20': ['Gb9YxCC5WBw', 'Samma andning som i går, som du ville']
+  };
   var medPlan = function(d, oura, dayLogs){
     var key = ymd(d), dow = (d.getDay()+6)%7, done = dayLogs && dayLogs[key] && dayLogs[key].med;
     var w = MED_WEEK[dow], plan = { key:key, id:w[0], why:w[1] };
@@ -249,6 +253,7 @@
       var base = prev.length >= 7 ? prev.reduce(function(a,r){ return a + r.stress_high_min; },0)/prev.length : null;
       if (base && yRow.stress_high_min > base*1.4) plan = { key:key, id:'KHIbgSN2qAU', why:'Hög stress i går (' + yRow.stress_high_min + ' min mot snitt ' + Math.round(base) + '), djupvila i dag' };
     }
+    if (MED_OVERRIDE[key]) plan = { key:key, id:MED_OVERRIDE[key][0], why:MED_OVERRIDE[key][1] };
     if (done && MED[done] && done !== plan.id) plan = { key:key, id:done, why:'Körde i stället för ' + MED[plan.id].n };
     plan.done = !!(done && MED[done]);
     return plan;
