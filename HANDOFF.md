@@ -92,6 +92,10 @@ Safari fastnade på gammal index.html: gamla SW:n gjorde `fetch(req, {cache:'no-
 - **Yogaeffekt** (`effect` i yoga.js): Oura 28 nätter före YOGA_START mot sedan start, och natten efter yogadag mot utan (kräver ≥5 i varje grupp). Yoga-vyn får `ouraData` via yogaProps.
 - **Alkohol i batteriet:** 5 p/enhet max 20, men högst −5 om natten ändå var bra (sömn ≥ 75 och HRV ≥ 95 % av baslinjen).
 
+## Yogaplan 2026-11-21
+
+Yogan körs på morgonen. Inget lunchpass längre: yogastyrkan (Pilates/Power 25 min, växlar per vecka) läggs som morgonpass på vardagar utan gym intill (i praktiken onsdag de veckor onsdagsgymmet uteblir). Lördag är alltid ett dynamiskt flöde (vinyasa jämna veckor, Daily Flow Full Body udda), även dagen efter fredagsgym. Söndag lugn rörlighet (Yoga Stretch Flexibility / Hips Flow).
+
 ## Meditation (2026-11-16)
 
 Meditation efter yogan i yoga.js (`MED`, `MED_WEEK`, `medPlan`). Loggas i `dayLogs[datum].med = videoId` ('' = avbockad, så synkens fältmerge inte återställer den). Veckorotation: mån Reset Your Mind, tis Tony Robbins priming, ons Elevate Your Morning, tor breathwork, fre Tony 10-min priming, lör Most Incredible Day, sön tacksamhet. Var gårdagens stress_high_min minst 40 % över 30-dagarssnittet blir det NSDR i stället.

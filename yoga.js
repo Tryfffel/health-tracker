@@ -126,25 +126,27 @@
     var odd = isoWeek(d) % 2 === 1;
     var R = function(even, oddId){ return odd ? oddId : even; };
     var STD = R('dqIZnyUtKXI','poZBpvLTHNw');
-    if (strength === 'e8TuZbVK3h8') strength = R('e8TuZbVK3h8','EpRxH1v-nqc');
+    // Yogastyrka körs på morgonen (lunch är bonus, då går gymmet före). Minst 25 min:
+    // Pilates och Power växlar mellan veckorna.
+    if (strength) strength = strength === 'e8TuZbVK3h8' ? R('e8TuZbVK3h8','iYS1P-ZjNsA') : R('iYS1P-ZjNsA','e8TuZbVK3h8');
     var big = R('0fPk-UzQWOs','5TzqqPJFHeQ');
     var morning, lunch = null;
     // Gymdag: vanligt morgonflöde (20 till 25 min rörlighet tröttar inte ut inför gymmet).
     // Minst 20 min varje dag, helst 25: gymdagar och lunchstyrkedagar får 25 min Morning Flow.
     if (g) morning = { id:'dqIZnyUtKXI', why:'Rörlighet inför gymmet' };
-    else if (prev) morning = dow >= 5 ? { id:R('RvCntPg7oPE','HIuJA4xS4WM'), why:'Rörlighet dagen efter gym' }
+    else if (prev && dow === 5) morning = { id:big, why:'Dynamiskt flöde för balans och kroppskontroll, lugnt nog dagen efter gym' };
+    else if (prev) morning = dow === 6 ? { id:R('RvCntPg7oPE','HIuJA4xS4WM'), why:'Rörlighet dagen efter gym' }
       : prev === 'over' ? { id:R('HIuJA4xS4WM','baqAriam3l8'), why:'Höfter och ben, axeln får vila efter överkroppspasset' }
       : { id: dow === 3 ? 'baqAriam3l8' : R('2eC7TlC2NLs','RvCntPg7oPE'), why:'Återhämtning dagen efter gym, 30 min stretch' };
-    else if (strength) { morning = { id:'dqIZnyUtKXI', why:'Morgonflöde, styrka på lunchen' }; lunch = { id:strength, why:'Ingen gym nära, kroppen är utvilad' }; }
+    else if (strength) morning = { id:strength, why:'Yogastyrka, ingen gym nära så kroppen är utvilad' };
     else if (dow === 3) morning = { id:R('5TzqqPJFHeQ','2eC7TlC2NLs'), why:'Längre allround' };
     else if (dow === 5) morning = { id:big, why:'Veckans stora pass' };
-    else if (dow === 6 && gOn(ymd(addDays(d,-2)))) morning = { id:big, why:'Veckans stora pass, flyttat från lördag' };
     else if (dow === 6 && (function(){
       // Körde du något annat än lördagens stora pass flyttas det till söndag.
       var satKey = ymd(addDays(d,-1)), sp = plan(addDays(d,-1), gymPlan, workouts);
       return sp.morning.id === big && !has(workouts, satKey, big) && yogaOf(workouts).some(function(w){ return w.date === satKey; });
     })()) morning = { id:big, why:'Lördagens stora pass, flyttat till i dag' };
-    else if (dow === 6) morning = { id:R('baqAriam3l8','RvCntPg7oPE'), why:'Lugn rörlighet' };
+    else if (dow === 6) morning = { id:R('baqAriam3l8','HIuJA4xS4WM'), why:'Lugn rörlighet' };
     else morning = { id:STD, why:'Standardpasset' };
     if (!g && gOn(ymd(addDays(d,1))) && !lunch && dow < 5 && morning.id === STD) morning.why = 'Standardpasset, gym i morgon';
     return { key:key, dow:dow, gym:g, morning:morning, lunch:lunch };
@@ -497,10 +499,10 @@
       h('div', null,
         h('h3', { className:'text-lg font-bold text-gray-800 mb-3' }, 'Så anpassar sig planen'),
         h('div', { className:'grid sm:grid-cols-2 gap-3' },
-          [['Gymdag','Vanligt morgonflöde, 20 till 25 min rörlighet som förbereder kroppen. Ingen yogastyrka samma dag.'],
+          [['Gymdag','25 min Morning Flow, rörlighet som förbereder kroppen. Ingen yogastyrka samma dag.'],
            ['Dagen efter gym','20 min Stretch Routine. Efter överkropp Everyday Yoga, som är snällare mot axeln. På helgen 30 min Flexibility.'],
-           ['Yogastyrka på lunchen','Högst två pass i veckan, bara måndag, onsdag eller fredag (tisdag och torsdag är kontorsdagar) och aldrig dagen före, samma dag eller dagen efter gym. Pilates först, Power sedan.'],
-           ['Övriga dagar','Morgonflöde, 30 min allround på torsdag, veckans stora pass på lördag (söndag om du gymmar fredag) och lugn rörlighet på söndag. Passen i varje roll byts varannan vecka.']
+           ['Yogastyrka på morgonen','Pilates eller Power Yoga, 25 min, på vardagar utan gym dagen före, samma dag eller dagen efter. Med gym måndag och fredag blir det onsdag de veckor du inte gymmar då. Yoga på lunchen är bonus, gymmet går före.'],
+           ['Övriga dagar','30 min allround på torsdag, ett dynamiskt flöde på lördag (även dagen efter fredagsgym) och lugn rörlighet på söndag. Passen i varje roll byts varannan vecka.']
           ].map(function(r){ return h('div', { key:r[0], className: card + ' p-4' }, h('p', { className:'font-semibold text-gray-800 mb-1' }, r[0]), h('p', { className:'text-sm text-gray-500' }, r[1])); }))),
 
       // bibliotek
