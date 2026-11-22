@@ -140,7 +140,7 @@
       : prev === 'over' ? { id:R('HIuJA4xS4WM','baqAriam3l8'), why:'Höfter och ben, axeln får vila efter överkroppspasset' }
       : { id: dow === 3 ? 'baqAriam3l8' : R('2eC7TlC2NLs','RvCntPg7oPE'), why:'Återhämtning dagen efter gym, 30 min stretch' };
     else if (strength) morning = { id:strength, why:'Yogastyrka, ingen gym nära så kroppen är utvilad' };
-    else if (dow === 3) morning = { id:R('2eC7TlC2NLs','5TzqqPJFHeQ'), why:'Längre allround' };
+    else if (dow === 3) morning = { id:R('5TzqqPJFHeQ','2eC7TlC2NLs'), why:'Längre allround' };
     else if (dow === 5) morning = { id:big, why:'Veckans stora pass' };
     else if (dow === 6 && (function(){
       // Körde du något annat än lördagens stora pass flyttas det till söndag.
