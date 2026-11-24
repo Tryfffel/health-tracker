@@ -14,7 +14,8 @@
   var h = React.createElement;
   var useState = React.useState;
 
-  var Y = function(id){ return 'https://www.youtube.com/watch?v=' + id; };
+  // Studiopass (t.ex. hot yin på SATS) har egen url i P i stället för en YouTube-video.
+  var Y = function(id){ return (P[id] && P[id].url) || ('https://www.youtube.com/watch?v=' + id); };
   var P = {
     'dqIZnyUtKXI':{n:'Morning Flow, Energising',m:25,c:'morgon'},
     '5TzqqPJFHeQ':{n:'Daily Flow, Full Body',m:30,c:'morgon'},
@@ -39,15 +40,17 @@
     'baqAriam3l8':{n:'Yoga Stretch, Flexibility',m:30,c:'stretch'},
     'EpRxH1v-nqc':{n:'Strong Yoga',m:20,c:'styrka'},
     'YKtDkKUHtPU':{n:'Daily Yoga Stretch',m:20,c:'kvall'},
-    'NJU8dcCacRY':{n:'Pilates Yoga, Stretch & Strengthen',m:30,c:'styrka'}
+    'NJU8dcCacRY':{n:'Pilates Yoga, Stretch & Strengthen',m:30,c:'styrka'},
+    'yin-sats':{n:'Hot yin, SATS',m:60,c:'yin',url:'https://www.sats.se/'}
   };
-  var INTENSITY = { morgon:2, stretch:1, kvall:1, styrka:4, helg:3 };
+  var INTENSITY = { morgon:2, stretch:1, kvall:1, styrka:4, helg:3, yin:1 };
   var CATS = [
     { k:'morgon', l:'Morgon', cls:'bg-indigo-500' },
     { k:'stretch', l:'Stretch', cls:'bg-emerald-500' },
     { k:'styrka', l:'Styrka', cls:'bg-orange-500' },
     { k:'helg', l:'Längre flöden', cls:'bg-violet-500' },
-    { k:'kvall', l:'Kväll', cls:'bg-teal-500' }
+    { k:'kvall', l:'Kväll', cls:'bg-teal-500' },
+    { k:'yin', l:'Yin', cls:'bg-rose-400' }
   ];
   var LIB = [
     ['Morgon',['dqIZnyUtKXI','poZBpvLTHNw','5TzqqPJFHeQ','2eC7TlC2NLs']],
@@ -55,6 +58,7 @@
     ['Yogastyrka',['e8TuZbVK3h8','NJU8dcCacRY','EpRxH1v-nqc','iYS1P-ZjNsA']],
     ['Helg',['0fPk-UzQWOs']],
     ['Kväll',['8cltCOUpYTQ','YKtDkKUHtPU']],
+    ['Studio',['yin-sats']],
     ['Korta, för gymdagar och stressiga morgnar',['Vr3h5X9kmUo','8URMcK7_PjY','UxU8OCsNbYY']],
     ['Senare, från yogavecka 12 (vecka 3 2027)',['PZB7EkWkj_M','7SU59GxGqbo','B1U-Z1b-EOg']]
   ];
@@ -150,6 +154,8 @@
     else if (dow === 6) morning = { id:'HIuJA4xS4WM', why:'Söndagens höftflöde' };
     else morning = { id:STD, why:'Standardpasset' };
     if (!g && gOn(ymd(addDays(d,1))) && !lunch && dow < 5 && morning.id === STD) morning.why = 'Standardpasset, gym i morgon';
+    // Bonus: hot yin på SATS tisdag lunch (dagen efter måndagsgymmet). Frivilligt, morgonpasset gäller ändå.
+    if (dow === 1 && !g) lunch = { id:'yin-sats', why:'Bonus om du hinner, återhämtning dagen efter gym' };
     return { key:key, dow:dow, gym:g, morning:morning, lunch:lunch };
   };
 
@@ -264,7 +270,7 @@
 
   // ── små UI-bitar ──
   var card = 'bg-white rounded-xl shadow-md';
-  var btnPlay = function(href, warm){ return h('a', { href:href, target:'_blank', rel:'noopener', className:'inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold text-white whitespace-nowrap ' + (warm ? 'bg-orange-500 hover:bg-orange-600' : 'bg-indigo-600 hover:bg-indigo-700') }, '▶ Starta'); };
+  var btnPlay = function(href, warm){ return h('a', { href:href, target:'_blank', rel:'noopener', className:'inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold text-white whitespace-nowrap ' + (warm ? 'bg-orange-500 hover:bg-orange-600' : 'bg-indigo-600 hover:bg-indigo-700') }, href.indexOf('youtube.com') < 0 ? 'SATS ↗' : '▶ Starta'); };
   var btnDone = function(on, onClick, labelOn, labelOff){ return h('button', { type:'button', onClick:onClick, 'aria-pressed': on,
     className:'px-4 py-2 rounded-full text-sm font-bold border-2 whitespace-nowrap ' + (on ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-white border-gray-200 text-gray-700 hover:border-emerald-400') }, on ? (labelOn || '✓ Gjort') : (labelOff || '✓ Klart')); };
 
@@ -503,6 +509,7 @@
           [['Gymdag','25 min Morning Flow, rörlighet som förbereder kroppen. Ingen yogastyrka samma dag.'],
            ['Dagen efter gym','20 min Stretch Routine. Efter överkropp Everyday Yoga, som är snällare mot axeln. På helgen 30 min Flexibility.'],
            ['Yogastyrka på morgonen','Pilates Yoga, 25 eller 30 min, på vardagar utan gym dagen före, samma dag eller dagen efter. Med gym måndag och fredag blir det onsdag de veckor du inte gymmar då. Yoga på lunchen är bonus, gymmet går före.'],
+           ['Hot yin på tisdagar','Bonuspass på SATS tisdag lunch, 60 min. Räknas som yoga med låg intensitet när du bockar av det, och påverkar inte morgonpasset.'],
            ['Övriga dagar','30 min allround på torsdag, ett dynamiskt flöde på lördag (även dagen efter fredagsgym) och höftflödet Yoga Pilates Flow varje söndag. Passen i varje roll byts varannan vecka.']
           ].map(function(r){ return h('div', { key:r[0], className: card + ' p-4' }, h('p', { className:'font-semibold text-gray-800 mb-1' }, r[0]), h('p', { className:'text-sm text-gray-500' }, r[1])); }))),
 

@@ -96,6 +96,10 @@ Safari fastnade på gammal index.html: gamla SW:n gjorde `fetch(req, {cache:'no-
 
 Yogan körs på morgonen. Inget lunchpass längre: yogastyrkan (Pilates/Power 25 min, växlar per vecka) läggs som morgonpass på vardagar utan gym intill (i praktiken onsdag de veckor onsdagsgymmet uteblir). Lördag är alltid ett dynamiskt flöde (vinyasa jämna veckor, Daily Flow Full Body udda), även dagen efter fredagsgym. Söndag lugn rörlighet (Yoga Stretch Flexibility / Hips Flow).
 
+## Hot yin (2026-11-24)
+
+Studiopass i yoga.js: `P['yin-sats']` (60 min, kategori `yin`, egen `url` i stället för YouTube). Visas som bonusrad på lunchen varje tisdag utan gym. Loggas som vanligt yogapass (type Yoga, intensitet 1) och räknas i yogaminuterna.
+
 ## Meditation (2026-11-16)
 
 Meditation efter yogan i yoga.js (`MED`, `MED_WEEK`, `medPlan`). Loggas i `dayLogs[datum].med = videoId` ('' = avbockad, så synkens fältmerge inte återställer den). Veckorotation: mån Reset Your Mind, tis Tony Robbins priming, ons Elevate Your Morning, tor breathwork, fre Tony 10-min priming, lör Most Incredible Day, sön tacksamhet. Var gårdagens stress_high_min minst 40 % över 30-dagarssnittet blir det NSDR i stället.
