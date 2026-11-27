@@ -224,7 +224,11 @@
     'u1JIIF6o0RM':{n:'Tony Robbins Priming, guidad',m:14,c:'priming'},
     'fDXiYiSrG7M':{n:'Tony Robbins 10-Minute Priming',m:11,c:'priming'},
     '_v2HX0ezk60':{n:'Elevate Your Morning (Sarah Wes)',m:10,c:'priming'},
-    'qQ4vD5FdOKM':{n:'Morning Meditation, Most Incredible Day',m:11,c:'priming'},
+    'qQ4vD5FdOKM':{n:'Most Incredible Day (My Peace of Mindfulness)',m:11,c:'priming'},
+    '61wT0Twlhfs':{n:'You\'ll Feel Unstoppable Today (My Peace of Mindfulness)',m:10,c:'priming'},
+    'FfWVh5ieG3c':{n:'Wake Up & Start a Good Day (My Peace of Mindfulness)',m:10,c:'priming'},
+    'ux3H3Vd1eEo':{n:'Everything Will Be Ok (My Peace of Mindfulness)',m:10,c:'lugn'},
+    'mJULXusK1rM':{n:'Speak These Words Every Day (My Peace of Mindfulness)',m:11,c:'priming'},
     '-9KLB2HI9BI':{n:'Positivity, Gratitude & Joy',m:11,c:'tacksamhet'},
     'ASO6Kd4u-Sc':{n:'21 Affirmations for Gratitude (Sarah Wes)',m:11,c:'tacksamhet'},
     'YRRjaa-Yji0':{n:'Reset Your Mind (Sarah Wes)',m:10,c:'lugn'},
@@ -233,18 +237,18 @@
     'KHIbgSN2qAU':{n:'NSDR, djupvila (Huberman)',m:11,c:'vila'}
   };
   var MED_LIB = [
-    ['Priming och visualisering',['u1JIIF6o0RM','fDXiYiSrG7M','_v2HX0ezk60','qQ4vD5FdOKM']],
+    ['Morgon och visualisering',['qQ4vD5FdOKM','61wT0Twlhfs','FfWVh5ieG3c','mJULXusK1rM','_v2HX0ezk60']],
     ['Tacksamhet',['-9KLB2HI9BI','ASO6Kd4u-Sc']],
-    ['Lugn',['YRRjaa-Yji0','FGO8IWiusJo']],
+    ['Lugn',['YRRjaa-Yji0','ux3H3Vd1eEo','FGO8IWiusJo']],
     ['Andning och vila',['Gb9YxCC5WBw','KHIbgSN2qAU']]
   ];
   var MED_WEEK = [
     ['YRRjaa-Yji0','Lugn start på veckan'],
-    ['u1JIIF6o0RM','Priming'],
+    ['61wT0Twlhfs','Energi och självförtroende'],
     ['_v2HX0ezk60','Visualisera dagen'],
     ['Gb9YxCC5WBw','Andning för energi'],
-    ['fDXiYiSrG7M','Priming inför helgen'],
-    ['qQ4vD5FdOKM','Starta helgen bra'],
+    ['qQ4vD5FdOKM','Din favorit, bra start på fredagen'],
+    ['FfWVh5ieG3c','Starta helgen bra'],
     ['-9KLB2HI9BI','Tacksamhet']
   ];
   // Enskilda dagar med ett bestämt pass (går före veckorotationen och stressregeln).
@@ -530,7 +534,7 @@
       h('div', null,
         h('h3', { className:'text-lg font-bold text-gray-800 mb-1' }, 'Meditation'),
         (function(){ var n7 = 0; for (var i = 0; i < 7; i++) { var dd = ymd(addDays(t, -i)); if (props.dayLogs && props.dayLogs[dd] && props.dayLogs[dd].med) n7++; }
-          return h('p', { className:'text-sm text-gray-500 mb-3' }, n7 + ' av de senaste 7 dagarna. Lugn på måndag, priming på tisdag och fredag, andning på torsdag, tacksamhet på söndag. Efter en dag med ovanligt hög stress blir det djupvila i stället.'); })(),
+          return h('p', { className:'text-sm text-gray-500 mb-3' }, n7 + ' av de senaste 7 dagarna. Lugn på måndag, morgonmeditationer från My Peace of Mindfulness tisdag, fredag och lördag, visualisering på onsdag, andning på torsdag och tacksamhet på söndag. Efter en dag med ovanligt hög stress blir det djupvila i stället.'); })(),
         h('div', { className: card + ' p-4 space-y-4' }, MED_LIB.map(function(g){
           return h('div', { key:g[0] },
             h('p', { className:'text-sm font-semibold text-gray-700 mb-1' }, g[0]),

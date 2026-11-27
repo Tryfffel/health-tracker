@@ -96,6 +96,10 @@ Safari fastnade på gammal index.html: gamla SW:n gjorde `fetch(req, {cache:'no-
 
 Yogan körs på morgonen. Inget lunchpass längre: yogastyrkan (Pilates/Power 25 min, växlar per vecka) läggs som morgonpass på vardagar utan gym intill (i praktiken onsdag de veckor onsdagsgymmet uteblir). Lördag är alltid ett dynamiskt flöde (vinyasa jämna veckor, Daily Flow Full Body udda), även dagen efter fredagsgym. Söndag lugn rörlighet (Yoga Stretch Flexibility / Hips Flow).
 
+## Meditation 2026-11-27
+
+Tony Robbins borttagen ur rotation och bibliotek (posterna ligger kvar i `MED` så gamla loggar visas). Ny rotation: mån Reset Your Mind, tis Unstoppable, ons Elevate Your Morning, tor breathwork, fre Most Incredible Day, lör Start a Good Day, sön tacksamhet. Tis/fre/lör är My Peace of Mindfulness, som David gillar.
+
 ## Hot yin (2026-11-24)
 
 Studiopass i yoga.js: `P['yin-sats']` (60 min, kategori `yin`, egen `url` i stället för YouTube). Visas som bonusrad på lunchen varje tisdag utan gym. Loggas som vanligt yogapass (type Yoga, intensitet 1) och räknas i yogaminuterna.
